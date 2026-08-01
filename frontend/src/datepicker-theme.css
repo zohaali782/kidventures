@@ -1,0 +1,35 @@
+/* Kidventures brand theme for react-datepicker.
+   Import this once (e.g. in main.jsx or App.jsx): import "./datepicker-theme.css"; */
+
+.react-datepicker {
+  font-family: sans-serif;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.react-datepicker__header {
+  background-color: #fbedde;
+  border-bottom: none;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: #3d2b1f;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #f5941f !important;
+  color: #fff !important;
+  border-radius: 50%;
+}
+
+.react-datepicker__day:hover {
+  background-color: #fbedde;
+  border-radius: 50%;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #f5941f;
+}

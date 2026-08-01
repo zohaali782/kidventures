@@ -1,0 +1,160 @@
+/* Kidventures — base styles.
+
+   ⚠️ IMPORTANT (Tailwind v4): saara custom CSS ab @layer ke andar hai.
+   Pehle ye "unlayered" tha — aur Tailwind v4 mein unlayered CSS hamesha
+   utility classes (px-4, rounded-2xl, text-brand-orange, mb-5, ...) ko
+   DABAA deti hai. Isi wajah se poore page ki spacing/colors flat lag rahi thi.
+   @layer base ke andar aate hi Tailwind ki utilities wapas override kar
+   sakti hain, aur page theek dikhta hai. */
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-gold: #f4c542;
+  --color-brand-orange: #f5941f;
+  --color-brand-sky: #3fa9e0;
+  --color-brand-cream: #fbedde;
+  --color-brand-brown: #3d2b1f;
+}
+
+/* ---- base reset + element defaults (utilities inhe override kar sakti hain) ---- */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #3d2b1f; /* brand brown — default text */
+    background-color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: light; /* force light — no dark-mode flipping */
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+  }
+
+  body {
+    background-color: #ffffff;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: #3d2b1f;
+    font-weight: 700;
+    letter-spacing: normal;
+    line-height: 1.25;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* form controls same font */
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+}
+
+/* ---- purani inline-styled pages ke liye .kv-* classes (Homepage ab inhe use
+   nahi karta, bas safety ke liye rakhi hain). Components layer mein hain to
+   Tailwind utilities inhe override kar sakti hain. ---- */
+@layer components {
+  /* ===== HERO (desktop) ===== */
+  .kv-hero {
+    position: relative;
+    min-height: 440px;
+    display: flex;
+    align-items: center;
+    padding: 40px;
+    background-image:
+      linear-gradient(
+        90deg,
+        rgba(251, 237, 222, 0.96) 0%,
+        rgba(251, 237, 222, 0.82) 40%,
+        rgba(251, 237, 222, 0.2) 70%,
+        rgba(251, 237, 222, 0) 100%
+      ),
+      url("https://images.unsplash.com/photo-1560421683-6856ea585c78?w=1400");
+    background-size: cover;
+    background-position: center right;
+  }
+  .kv-hero-inner {
+    max-width: 820px;
+    width: 100%;
+  }
+  .kv-hero-title {
+    font-size: 32px;
+    line-height: 1.25;
+    margin: 0 0 8px;
+    color: #3d2b1f;
+  }
+
+  .kv-field {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    flex: 1 1 160px;
+    min-width: 160px;
+  }
+  .kv-field-keyword {
+    flex: 2 1 200px;
+    min-width: 200px;
+  }
+
+  /* ===== MOBILE ===== */
+  @media (max-width: 640px) {
+    .kv-hero {
+      min-height: auto;
+      padding: 26px 16px;
+      background-image:
+        linear-gradient(
+          180deg,
+          rgba(251, 237, 222, 0.94),
+          rgba(251, 237, 222, 0.86)
+        ),
+        url("https://images.unsplash.com/photo-1560421683-6856ea585c78?w=1400");
+      background-position: center;
+    }
+    .kv-hero-title {
+      font-size: 23px;
+    }
+    .kv-search-row {
+      flex-direction: column;
+    }
+    .kv-field,
+    .kv-field-keyword {
+      min-width: 100%;
+      flex: 1 1 auto;
+    }
+    .kv-divider {
+      display: none;
+    }
+    .kv-search-btn {
+      width: 100%;
+      height: 48px !important;
+      margin: 6px 0 0 !important;
+    }
+    .kv-info-cards {
+      flex-direction: column;
+    }
+  }
+}
