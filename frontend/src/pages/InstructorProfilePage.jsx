@@ -5,7 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import api from "../api/axios";
 import { normActivity, toList } from "../api/normalize";
-import { getToken } from "../api/auth";
+import { isLoggedIn } from "../api/auth";
 
 /* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
    ka na ho, waisi hi wapas kar deta hai. */
@@ -301,7 +301,7 @@ export default function InstructorProfilePage() {
   };
 
   const onMessage = () => {
-    if (!getToken()) {
+    if (!isLoggedIn()) {
       flash("Message bhejne ke liye pehle log in karein.");
       return;
     }

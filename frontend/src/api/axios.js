@@ -43,11 +43,19 @@ api.interceptors.response.use(
 
     // Server ka asli message nikaal kar aage bhejo, taake har page
     // err.message dikha sake — "Request failed with status code 500" ke bajaye.
-    const apiMessage =
-      err.response?.data?.message ||
-      (err.code === "ECONNABORTED"
-        ? "Request timed out. Please try again."
-        : null);
+    let apiMessage = err.response?.data?.message || null;
+
+    if (!apiMessage) {
+      if (err.code === "ECONNABORTED") {
+        apiMessage = "Request timed out. Please try again.";
+      } else if (!err.response) {
+        // Koi response aaya hi nahi — server band hai, ya CORS/network masla.
+        // Pehle yahan generic "try again" dikhta tha aur asal wajah chhup jati thi.
+        apiMessage =
+          "Cannot reach the server. Please check that the backend is running.";
+        console.error("[api] no response from server:", err.code, err.message, url);
+      }
+    }
 
     if (apiMessage) {
       err.message = apiMessage;

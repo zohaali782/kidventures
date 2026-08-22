@@ -204,8 +204,9 @@ export default function MyClassesPage() {
     }
   };
 
-  const doLogout = () => {
-    logout();
+  const doLogout = async () => {
+    // logout ab server ko call karta hai taake httpOnly cookie clear ho.
+    await logout();
     nav("/login");
   };
 

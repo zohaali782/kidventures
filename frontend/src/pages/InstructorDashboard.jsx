@@ -300,8 +300,10 @@ export default function InstructorDashboard() {
     setTimeout(() => setToast(""), 2200);
   };
 
-  const doLogout = () => {
-    logout();
+  const doLogout = async () => {
+    // logout ab server ko call karta hai taake httpOnly cookie clear ho —
+    // is liye navigate karne se pehle await zaroori hai.
+    await logout();
     nav("/login");
   };
 

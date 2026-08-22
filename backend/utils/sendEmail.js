@@ -16,6 +16,11 @@ function getTransporter() {
     requireTLS: Number(process.env.SMTP_PORT) !== 465,
     tls: { rejectUnauthorized: true }, // jaali certificate accept na ho
 
+    // SMTP kabhi hamesha ke liye latak na jaye
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 

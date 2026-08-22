@@ -5,7 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import api from "../api/axios";
 import { toList } from "../api/normalize";
-import { getToken, getStoredUser } from "../api/auth";
+import { isLoggedIn, getStoredUser } from "../api/auth";
 import { getFavorites } from "../api/favorites";
 
 /* ------------------------------ icons ------------------------------ */
@@ -173,7 +173,10 @@ export default function ParentDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!getToken()) {
+    // Token ab httpOnly cookie mein hai (JavaScript use parh nahi sakti),
+    // is liye yahan sirf dekhte hain ke local user info maujood hai.
+    // Asal check backend har API call par karta hai.
+    if (!isLoggedIn()) {
       nav("/login");
       return;
     }

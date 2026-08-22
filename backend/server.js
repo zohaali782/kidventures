@@ -35,6 +35,7 @@ if (process.env.NODE_ENV === "production" && !process.env.CLIENT_URL) {
 }
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
+const sanitizeRequest = require("./middleware/sanitize");
 const { handleWebhook } = require("./controllers/paymentController");
 const releaseExpiredReservations = require("./utils/releaseExpiredReservations");
 
@@ -48,11 +49,7 @@ app.set("trust proxy", 1);
 /* ------------------------------ Security ------------------------------- */
 app.use(helmet());
 
-// Mongoose har query filter se $ operators aur dots hata dega.
-// Yeh NoSQL injection (?price[$gt]=0 type payloads) ke khilaf bunyadi bachao hai.
-// NOTE: express-mongo-sanitize Express 5 ke saath kaam nahi karta,
-// is liye Mongoose ka apna flag use kiya hai.
-mongoose.set("sanitizeFilter", true);
+// Schema me jo field nahi, us par query na chale.
 mongoose.set("strictQuery", true);
 
 app.use(
@@ -87,6 +84,15 @@ app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 
 // httpOnly auth cookie parhne ke liye
 app.use(cookieParser());
+
+/**
+ * NoSQL injection se bachao — user ki bheji hui body/query me se
+ * "$" wale Mongo operators aur dotted paths nikal deta hai.
+ *
+ * Yeh webhook ke BAAD hai (webhook ki raw body ko haath nahi lagna chahiye)
+ * aur routes se PEHLE.
+ */
+app.use(sanitizeRequest);
 
 /* ------------------------------ Rate limit ------------------------------ */
 app.use(

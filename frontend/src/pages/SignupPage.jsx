@@ -84,6 +84,7 @@ function SignupPage() {
     } catch (err) {
       setServerError(
         err?.response?.data?.message ||
+          err?.message ||
           "Could not create your account. Please try again.",
       );
     } finally {

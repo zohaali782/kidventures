@@ -15,6 +15,7 @@
 |---|---|
 | `backend/utils/authCookie.js` | httpOnly cookie set/clear karne ka logic |
 | `backend/utils/guardDevScript.js` | Seed scripts ko production par chalne se rokta hai |
+| `backend/middleware/sanitize.js` | User ki body/query se Mongo operators (`$gt` waghera) hata deta hai |
 
 ### Badli hui files — Backend
 
@@ -88,13 +89,25 @@ Expected output: `cookie-parser OK`
 
 - [ ] `backend/.env` file kholein aur yeh lines add karein (jo pehle se hain, unhein chhor dein):
 
+**Add karein:**
+
 ```
 NODE_ENV=development
-JWT_EXPIRE=7d
-CLIENT_URL=http://localhost:5173
 SERVER_URL=http://localhost:5000
-TEST_INSTRUCTOR_PASSWORD=ChangeThis99
 ```
+
+**Badlein** — aap ki file mein `JWT_EXPIRE=30d` hai, use `7d` kar dein:
+
+```
+JWT_EXPIRE=7d
+```
+
+**Baqi sab pehle se theek hain** — `PORT`, `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`,
+`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CLOUDINARY_*`, `STRIPE_*`, `SMTP_*`, `EMAIL_FROM`,
+`FRONTEND_URL`. Inhein haath na lagayein.
+
+> `TEST_INSTRUCTOR_PASSWORD` ki zaroorat nahi — woh sirf `seedActivities.js`
+> (fake demo classes) ke liye tha, jo hum nahi chala rahe.
 
 **`JWT_SECRET` check karein** — agar woh 32 characters se chhota hai to naya bana lein:
 
@@ -135,38 +148,48 @@ un ka `emailVerified` field hai hi nahi — woh login nahi kar payenge.
 - [ ] Apna database → `users` collection
 - [ ] Saare documents delete kar dein (collection khali kar dein)
 
-Ya terminal se:
+- [ ] **Agar** aap ne pehle kabhi `seedActivities.js` chalayi thi (Compass mein
+      `activities` collection mein "Little Picasso" / "Chess Masterminds" jaisi
+      classes nazar aayen), to woh collection bhi khali kar dein — un ka instructor
+      ab maujood nahi hoga aur classes toot jayengi.
+
+Terminal se dono ek sath (backend folder mein):
 
 ```bash
-node -e "require('dotenv').config();const m=require('mongoose');m.connect(process.env.MONGO_URI).then(async()=>{const r=await m.connection.collection('users').deleteMany({});console.log('deleted',r.deletedCount);process.exit(0)})"
+node -e "require('dotenv').config();const m=require('mongoose');m.connect(process.env.MONGO_URI).then(async()=>{const u=await m.connection.collection('users').deleteMany({});const a=await m.connection.collection('activities').deleteMany({});console.log('users:',u.deletedCount,'activities:',a.deletedCount);process.exit(0)})"
 ```
 
-- [ ] Phir admin dobara banayein:
+- [ ] Phir categories aur admin dobara banayein:
 
 ```bash
 node utils/seed.js
 ```
 
+> **`node utils/seedActivities.js` NAHI chalani.** Woh 10 fake demo classes banati hai.
+> Aap khud apna instructor aur parent account bana kar test karengi.
+>
+> `seed.js` zaroori hai — woh categories (Art & Painting, Coding, Chess...) banati hai,
+> jin ke baghair instructor class create hi nahi kar sakega.
+
 ### ✅ Test
 
-- [ ] Output mein `✓ Admin created: <aap ki email>` aana chahiye
-- [ ] Compass mein us user ko dekh kar confirm karein: `emailVerified: true` aur `role: "admin"`
+- [ ] Output mein `✓ Categories: 12 created` aur `✓ Admin created: <aap ki email>` aaye
+- [ ] Compass mein admin user dekh kar confirm karein: `emailVerified: true`, `role: "admin"`
 
 ---
 
 ## STEP 4 — Seed script ka production guard test
 
-- [ ] Yeh chala kar dekhein (yeh **fail** hona chahiye — yehi test hai):
+- [ ] Yeh chala kar dekhein (yeh **fail** hona chahiye — yehi test hai).
 
-```bash
-NODE_ENV=production node utils/seed.js
-```
-
-Windows PowerShell par:
+**Aap PowerShell use kar rahi hain**, to yeh wali line chalayein:
 
 ```powershell
-$env:NODE_ENV="production"; node utils/seed.js; $env:NODE_ENV="development"
+$env:NODE_ENV="production"; node utils/seed.js; Remove-Item Env:NODE_ENV
 ```
+
+> `NODE_ENV=production node utils/seed.js` wala tareeqa sirf Mac/Linux ka hai.
+> PowerShell mein woh error deta hai: *"is not recognized as the name of a cmdlet"*.
 
 ### ✅ Expected
 
@@ -295,13 +318,39 @@ Agar token ki lambi string aayi → kuch galat hai, mujhe batayein.
 - [ ] **500 server error nahi** aana chahiye
 - [ ] Login **na** ho
 
-Chahein to terminal se bhi:
+> Note: frontend ki apni validation `{"$gt":""}` ko "Enter a valid email" keh kar
+> pehle hi rok deti hai — request backend tak jati hi nahi. Yeh acha hai (do layer
+> ka bachao), lekin backend ka test isse nahi hota. Us ke liye neeche wali script hai.
 
-```bash
-curl -X POST http://localhost:5000/api/auth/login -H "Content-Type: application/json" -d "{\"email\":{\"$gt\":\"\"},\"password\":{\"$gt\":\"\"}}"
+### Backend ke tests — `security-test.js`
+
+Backend chalta rehne dein, naya terminal:
+
+```powershell
+cd C:\Users\hp\kidventures
+node security-test.js
 ```
 
-Expected: `{"success":false,"message":"Invalid email or password"}`
+Yeh 6 cheezein ek sath test karti hai:
+
+- [ ] NoSQL injection (login bypass) — blocked
+- [ ] Kamzor passwords (`12345678`, `password`, `abcdefgh`) — rejected
+- [ ] Signup me `role: "admin"` — parent hi banta hai
+- [ ] Security headers (nosniff, X-Frame-Options, X-Powered-By hidden)
+- [ ] 200kb JSON body — 413 reject
+- [ ] Server reachable
+
+Chalate waqt **backend terminal par nazar rakhein** — wahan yeh line aani chahiye:
+
+```
+[sanitize] POST /api/auth/login — dropped keys: $gt, $gt
+```
+
+- [ ] Role test ka account Compass me check karein (`role: "parent"` hona chahiye), phir delete kar dein
+- [ ] Sab test ho jane ke baad `security-test.js` file delete kar dein
+
+> PowerShell se `curl` / `Invoke-RestMethod` mat use karein — us ki quoting JSON
+> tor deti hai aur test galat nateeja deta hai.
 
 ---
 
@@ -309,7 +358,7 @@ Expected: `{"success":false,"message":"Invalid email or password"}`
 
 Yeh woh hole tha jis se instructor parents ko phishing link bhej sakta tha.
 
-- [ ] Instructor account se login karein (ya admin se koi class banayein)
+- [ ] Apna instructor account banayein, admin se approve karein, phir class banayein
 - [ ] Class ka title yeh rakhein:
 
 ```

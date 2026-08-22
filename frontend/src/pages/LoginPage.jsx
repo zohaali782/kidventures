@@ -72,8 +72,11 @@ function LoginPage() {
       const dest = location.state?.from || homeForRole(user?.role);
       navigate(dest, { replace: true });
     } catch (err) {
+      // err.message axios interceptor set karta hai — us me server ka asli
+      // message hota hai, ya "Cannot reach the server..." agar backend band ho.
       setServerError(
         err?.response?.data?.message ||
+          err?.message ||
           "Login failed. Please check your details and try again.",
       );
     } finally {

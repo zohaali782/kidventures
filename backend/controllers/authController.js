@@ -30,12 +30,20 @@ const API_URL = () =>
   (process.env.SERVER_URL || `http://localhost:${process.env.PORT || 5000}`)
     .replace(/\/$/, "");
 
+// SMTP set hai ya nahi. Dev machine par aksar nahi hota — us soorat me
+// verification skip kar dete hain, warna koi login hi na kar sake.
+const smtpConfigured = () =>
+  Boolean(process.env.SMTP_HOST && process.env.SMTP_USER);
+
 /**
- * Verification email bhejta hai.
- * Return: true agar email waqai bheji gayi, false agar SMTP set hi nahi hai.
+ * Verification token banata hai, save karta hai, aur email BACKGROUND me
+ * bhejta hai.
  *
- * Yeh farq zaroori hai — dev machine par SMTP nahi hota, aur agar hum
- * unverified users ko block karte rahen to koi login hi na kar sake.
+ * ZAROORI: email bhejne ka intezar nahi karte. SMTP (khaas kar Gmail)
+ * kabhi kabhi 10-30 second le leta hai — us dauran user ki signup request
+ * latki rehti hai aur browser timeout kar deta hai, halanke account ban
+ * chuka hota hai. Is liye response foran bhejte hain aur email apne waqt
+ * par chali jati hai.
  */
 const sendVerificationEmail = async (user) => {
   const rawToken = user.createEmailVerifyToken();
@@ -47,8 +55,10 @@ const sendVerificationEmail = async (user) => {
     verifyUrl,
   });
 
-  const result = await sendEmail({ to: user.email, subject, html });
-  return result?.ok === true;
+  // await nahi — background me chalne do
+  sendEmail({ to: user.email, subject, html }).catch((err) =>
+    console.error("[verify-email] send failed:", err.message),
+  );
 };
 
 /**
@@ -104,23 +114,12 @@ const signup = async (req, res, next) => {
       role: userRole,
     });
 
-    // 7. Verification email bhejo.
-    //    Agar SMTP configure hi nahi (local development), to email ka
-    //    intezar karwana bekar hai — account ko verified maan lo, warna
-    //    koi login hi na kar paye.
-    const emailSent = await sendVerificationEmail(user);
-
-    if (!emailSent) {
-      user.emailVerified = true;
-      user.emailVerifyToken = undefined;
-      user.emailVerifyExpires = undefined;
-      await user.save({ validateBeforeSave: false });
-    }
-
-    // 8. Agar verification email gayi hai to abhi login NAHI karate —
+    // 7. SMTP set hai to verification email bhejo aur abhi login NAHI karate —
     //    pehle email confirm ho. (Login bhi unverified users ko rokta hai,
     //    dono jagah ek hi usool.)
-    if (emailSent) {
+    if (smtpConfigured()) {
+      await sendVerificationEmail(user); // email background me jati hai
+
       return res.status(201).json({
         success: true,
         verificationRequired: true,
@@ -129,7 +128,12 @@ const signup = async (req, res, next) => {
       });
     }
 
-    // 9. SMTP configure nahi (local dev) — seedha login kara dete hain.
+    // 8. SMTP configure nahi (local dev) — verification skip, seedha login.
+    user.emailVerified = true;
+    await user.save({ validateBeforeSave: false });
+
+    // 9. Token httpOnly cookie mein jata hai, JSON response mein NAHI,
+    //    warna frontend use localStorage mein rakhta aur XSS se chura ja sakta.
     //    Token httpOnly cookie mein jata hai, JSON response mein NAHI,
     //    warna frontend use localStorage mein rakhta aur XSS se chura ja sakta.
     const token = generateToken(user._id);

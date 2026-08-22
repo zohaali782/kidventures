@@ -226,8 +226,10 @@ export default function AdminDashboard() {
     setTimeout(() => setToast(""), 3000);
   };
 
-  const doLogout = () => {
-    logout();
+  const doLogout = async () => {
+    // logout ab server ko call karta hai taake httpOnly cookie clear ho.
+    // await ke baghair page navigate ho jata aur request cancel ho sakti thi.
+    await logout();
     window.location.href = "/login";
   };
 
