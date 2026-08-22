@@ -4,6 +4,8 @@ const Category = require("../models/Category");
 const Booking = require("../models/Booking");
 const ClassRequest = require("../models/ClassRequest");
 const User = require("../models/User");
+const { sendEmail } = require("../utils/sendEmail");
+const tpl = require("../utils/emailTemplates");
 
 /**
  * Ye saara file sirf admin ke liye hai.
@@ -90,7 +92,11 @@ const approveInstructor = async (req, res, next) => {
 
     await profile.save();
 
-    // TODO (email step): instructor ko "approved" ka email jaye
+    const user = await User.findById(profile.user).select("name email");
+    sendEmail({
+      to: user?.email,
+      ...tpl.instructorApproved({ name: user?.name }),
+    }).catch((e) => console.error("[email] approve email failed:", e.message));
 
     res.json({ success: true, message: "Instructor approved", profile });
   } catch (error) {
@@ -129,7 +135,14 @@ const rejectInstructor = async (req, res, next) => {
 
     await profile.save();
 
-    // TODO (email step): instructor ko wajah ke saath email jaye
+    const user = await User.findById(profile.user).select("name email");
+    sendEmail({
+      to: user?.email,
+      ...tpl.instructorRejected({
+        name: user?.name,
+        reason: profile.rejectionReason,
+      }),
+    }).catch((e) => console.error("[email] reject email failed:", e.message));
 
     res.json({ success: true, message: "Instructor rejected", profile });
   } catch (error) {
@@ -252,6 +265,16 @@ const approveActivity = async (req, res, next) => {
     activity.status = "active";
     activity.statusNote = undefined;
     await activity.save();
+
+    const instructorUser = await User.findById(activity.instructor).select(
+      "name email",
+    );
+    sendEmail({
+      to: instructorUser?.email,
+      ...tpl.classApproved({ name: instructorUser?.name, activity }),
+    }).catch((e) =>
+      console.error("[email] class-approved email failed:", e.message),
+    );
 
     res.json({ success: true, message: "Class is now live", activity });
   } catch (error) {

@@ -8,6 +8,13 @@ import RecentlyViewed from "../components/RecentlyViewed";
 import api from "../api/axios";
 import heroImg from "../assets/hero.png"; // hero image: src/assets/hero.jpg
 
+/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
+   ka na ho (jaise koi purani/manual image), waisi hi wapas kar deta hai. */
+const cldOptimize = (url, width = 400) => {
+  if (!url || !url.includes("res.cloudinary.com")) return url;
+  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
+};
+
 /* ============================================================
    ICONS (sab SVG, koi emoji nahi) — ye frontend cheez hai, backend se nahi aati
    ============================================================ */
@@ -279,7 +286,7 @@ const normActivity = (a) => ({
 });
 
 const normInstructor = (i) => ({
-  id: i._id || i.id || i.user?._id,
+  id: i.user?._id || i.user || i._id || i.id,
   name:
     asText(i.name) ||
     asText(i.displayName) ||
@@ -392,15 +399,20 @@ function SectionHeader({ title, link }) {
 
 /* ============================================================
    MOMENTS MARQUEE (auto-scrolling image band)
-   Filhaal placeholder images — baad mein asli class photos se replace kar dena.
+   Real class photos hosted on Cloudinary, resized+auto-optimized
+   via w_500,q_auto,f_auto transformation for fast load.
    ============================================================ */
 const galleryImages = [
-  "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500",
-  "https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=500",
-  "https://images.unsplash.com/photo-1596464716127-f2a82984de30?w=500",
-  "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=500",
-  "https://images.unsplash.com/photo-1544717305-2782549b5136?w=500",
-  "https://images.unsplash.com/photo-1560421683-6856ea585c78?w=500",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786558300/kid1.jpg",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620602/kid2.jpg",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620616/kid3.jpg",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620667/kid4.jpg",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620672/kid8.png",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620673/kid6.png",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620674/kid7.png",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620674/kid5.png",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620716/kid10.png",
+  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620716/kid9.png",
 ];
 
 function MomentsMarquee() {
@@ -697,7 +709,7 @@ function Homepage() {
                   <div className="relative">
                     {a.image ? (
                       <img
-                        src={a.image}
+                        src={cldOptimize(a.image, 400)}
                         alt={a.title}
                         loading="lazy"
                         className="h-[130px] w-full object-cover"
@@ -776,7 +788,7 @@ function Homepage() {
               >
                 {ins.photo ? (
                   <img
-                    src={ins.photo}
+                    src={cldOptimize(ins.photo, 120)}
                     alt={`${ins.name} — instructor`}
                     loading="lazy"
                     className="mx-auto mb-2.5 h-[60px] w-[60px] rounded-full object-cover"

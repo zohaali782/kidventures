@@ -1,5 +1,8 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
+const guardDevScript = require("./guardDevScript");
+guardDevScript("addSessions.js");
+
 const Activity = require("../models/Activity");
 
 /**

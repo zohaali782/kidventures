@@ -1,9 +1,5 @@
 const mongoose = require("mongoose");
 
-/**
- * Review = ek parent ka kisi class par rating + comment.
- * Ek parent ek class ko sirf EK dafa review kar sakta hai (unique index).
- */
 const reviewSchema = new mongoose.Schema(
   {
     activity: {

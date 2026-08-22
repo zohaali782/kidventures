@@ -2,8 +2,37 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
+
+/* --------------------------- Env validation ----------------------------
+ *
+ * Agar zaroori secrets set na hon to app ko chalna hi nahi chahiye.
+ * Warna JWT_SECRET undefined ke saath server chal parta hai aur
+ * auth khamoshi se toot jati hai.
+ */
+["MONGO_URI", "JWT_SECRET"].forEach((key) => {
+  if (!process.env[key]) {
+    console.error(`FATAL: ${key} is not set in .env`);
+    process.exit(1);
+  }
+});
+
+if (process.env.JWT_SECRET.length < 32) {
+  const msg =
+    "JWT_SECRET is shorter than 32 characters — brute-force ke liye kamzor hai.";
+  if (process.env.NODE_ENV === "production") {
+    console.error(`FATAL: ${msg}`);
+    process.exit(1);
+  }
+  console.warn(`WARNING: ${msg}`);
+}
+
+if (process.env.NODE_ENV === "production" && !process.env.CLIENT_URL) {
+  console.error("FATAL: CLIENT_URL must be set in production (CORS).");
+  process.exit(1);
+}
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const { handleWebhook } = require("./controllers/paymentController");
@@ -11,8 +40,20 @@ const releaseExpiredReservations = require("./utils/releaseExpiredReservations")
 
 const app = express();
 
+// Host (Render/Railway/Vercel) proxy ke peeche chalta hai. Is ke baghair
+// express-rate-limit har request ka IP proxy ka samajhta hai — yaani
+// poori site ke users ek hi limit share karte hain.
+app.set("trust proxy", 1);
+
 /* ------------------------------ Security ------------------------------- */
 app.use(helmet());
+
+// Mongoose har query filter se $ operators aur dots hata dega.
+// Yeh NoSQL injection (?price[$gt]=0 type payloads) ke khilaf bunyadi bachao hai.
+// NOTE: express-mongo-sanitize Express 5 ke saath kaam nahi karta,
+// is liye Mongoose ka apna flag use kiya hai.
+mongoose.set("sanitizeFilter", true);
+mongoose.set("strictQuery", true);
 
 app.use(
   cors({
@@ -38,9 +79,14 @@ app.post(
 );
 
 /* ------------------------------ Body parse ------------------------------ */
-// Baqi sab routes par normal JSON parsing
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true }));
+// Baqi sab routes par normal JSON parsing.
+// 5mb bohat zyada tha — bare payloads se server ki memory bhari ja sakti hai.
+// Files multer (multipart) se jati hain, un par is limit ka koi asar nahi.
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
+
+// httpOnly auth cookie parhne ke liye
+app.use(cookieParser());
 
 /* ------------------------------ Rate limit ------------------------------ */
 app.use(
@@ -80,6 +126,7 @@ app.use("/api/children", require("./routes/childRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/class-requests", require("./routes/classRequestRoutes"));
+app.use("/api/reviews", require("./routes/reviewRoutes"));
 
 /* --------------------------- Error handling ----------------------------- */
 app.use(notFound);
@@ -97,14 +144,22 @@ mongoose
       console.log(`Server running on port ${PORT}`);
     });
 
-    /* ----------------------- Background cleanup -----------------------
+    /**
+     * Reservation cleanup cron.
      *
-     * Har 2 minute baad expire hui seat reservations wapas chhodta hai.
-     * Ye ek simple in-app timer hai - alag cron service ki zaroorat nahi.
+     * Agar app PM2 cluster ya multiple instances par chale to yeh har
+     * instance me chalti hai — aur ek hi booking ki seats kai dafa release
+     * ho sakti hain. Is liye sirf pehle worker par chalao.
+     * (Single instance par NODE_APP_INSTANCE hota hi nahi, to normal chalega.)
      */
-    setInterval(releaseExpiredReservations, 2 * 60 * 1000);
-    // Ek baar start par bhi chala do
-    releaseExpiredReservations();
+    const instanceId = process.env.NODE_APP_INSTANCE;
+
+    if (!instanceId || instanceId === "0") {
+      setInterval(releaseExpiredReservations, 2 * 60 * 1000);
+      releaseExpiredReservations();
+    } else {
+      console.log(`Reservation cleanup skipped on worker ${instanceId}`);
+    }
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err);

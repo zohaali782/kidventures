@@ -31,6 +31,7 @@ const EDITABLE_FIELDS = [
 const getMyProfile = async (req, res, next) => {
   try {
     let profile = await InstructorProfile.findOne({ user: req.user._id })
+      .populate("user", "name email avatar")
       .populate("categories", "name slug icon")
       .select("+documents");
 

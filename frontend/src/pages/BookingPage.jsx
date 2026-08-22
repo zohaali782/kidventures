@@ -216,6 +216,16 @@ function PaymentForm({ booking, onConfirmed }) {
     if (!stripe || !elements) return;
     setSubmitting(true);
     setErr("");
+
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setErr(
+        submitError.message || "Please check your card details and try again.",
+      );
+      setSubmitting(false);
+      return;
+    }
+
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: "if_required",

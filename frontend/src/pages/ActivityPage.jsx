@@ -68,6 +68,11 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
+
+const cldOptimize = (url, width = 400) => {
+  if (!url || !url.includes("res.cloudinary.com")) return url;
+  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
+};
 const PinIcon = () => (
   <svg
     width="13"
@@ -288,6 +293,20 @@ function ActivityPage() {
   });
   const [keyword, setKeyword] = useState(query.q);
   const [page, setPage] = useState(1);
+
+  // Navbar se location badalne par (same page par rehte hue) URL se sync karo -
+  // warna sirf pehli mount par hi location read hoti thi, dobara nahi. Ye sirf
+  // URL -> state direction mein sync karta hai, isliye agar user khud sidebar
+  // se koi alag location chun le, wahi lagu rehta hai jab tak URL dobara na badle.
+  useEffect(() => {
+    const urlLocation = searchParams.get("location") || "";
+    const urlCity = searchParams.get("city") || "";
+    setQuery((q) => {
+      if (q.location === urlLocation && q.city === urlCity) return q;
+      return { ...q, location: urlLocation, city: urlCity };
+    });
+    setPage(1);
+  }, [searchParams]);
 
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);

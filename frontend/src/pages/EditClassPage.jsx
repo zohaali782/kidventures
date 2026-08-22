@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import api from "../api/axios";
 import { toList } from "../api/normalize";
@@ -53,7 +53,6 @@ const IcCheck = (p) => (
 const OTHER = "__other__";
 const MAX_IMAGES = 8;
 
-/* "HH:MM" + minutes -> "HH:MM" (session endTime nikaalne ke liye) */
 function addMinutes(time, mins) {
   const [h, m] = String(time).split(":").map(Number);
   if (isNaN(h) || isNaN(m)) return time;
@@ -62,6 +61,16 @@ function addMinutes(time, mins) {
   const mm = String(total % 60).padStart(2, "0");
   return `${hh}:${mm}`;
 }
+const fmtDate = (d) => {
+  const dt = new Date(d);
+  return isNaN(dt)
+    ? ""
+    : dt.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+};
 
 const inputCls =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-brand-brown outline-none focus:border-brand-orange";
@@ -76,7 +85,6 @@ function Field({ label, error, children, className = "" }) {
     </div>
   );
 }
-
 function Section({ title, subtitle, children }) {
   return (
     <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
@@ -89,121 +97,112 @@ function Section({ title, subtitle, children }) {
   );
 }
 
-export default function CreateClassPage() {
+export default function EditClassPage() {
+  const { id } = useParams();
   const navigate = useNavigate();
 
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState({
-    title: "",
-    category: "", // category _id  OR  OTHER
-    suggestedCategory: "",
-    description: "",
-    ageMin: "",
-    ageMax: "",
-    durationMinutes: "",
-    format: "in-person", // "in-person" | "online"
-    area: "",
-    address: "",
-    languages: "English",
-    price: "",
-    capacity: "",
-    materialsIncluded: false,
-    whatToBring: "",
-  });
+
+  const [form, setForm] = useState(null); // null until loaded
   const [learnList, setLearnList] = useState([""]);
-  const [sessions, setSessions] = useState([{ date: "", startTime: "" }]);
+  const [images, setImages] = useState([]); // [{_id, url}]
+  const [sessions, setSessions] = useState([]); // existing sessions from server
 
-  /* images: [{ file, previewUrl, status: "pending"|"uploading"|"done"|"error" }] */
-  const [images, setImages] = useState([]);
   const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadStage, setUploadStage] = useState(""); // status text under the button
+  const [saving, setSaving] = useState(false);
   const [apiErr, setApiErr] = useState("");
+  const [toast, setToast] = useState("");
 
+  const [showFeeInfo, setShowFeeInfo] = useState(false);
+
+  const flash = (m) => {
+    setToast(m);
+    setTimeout(() => setToast(""), 2600);
+  };
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const isOther = form.category === OTHER;
+  const isOther = form?.category === OTHER;
 
+  /* ---------------- load ---------------- */
   useEffect(() => {
     let alive = true;
     (async () => {
+      setLoading(true);
       try {
-        const { data } = await api.get("/categories");
-        if (alive) setCategories(toList(data.categories || data));
+        const [actRes, catRes] = await Promise.all([
+          api.get(`/activities/${id}`),
+          api.get("/categories").catch(() => ({ data: { categories: [] } })),
+        ]);
+        if (!alive) return;
+        const a = actRes.data.activity || actRes.data;
+        if (!a || !(a._id || a.id)) {
+          setNotFound(true);
+          return;
+        }
+        setCategories(toList(catRes.data.categories || catRes.data));
+        setForm({
+          title: a.title || "",
+          category:
+            a.category?._id || a.category || (a.suggestedCategory ? OTHER : ""),
+          suggestedCategory: a.suggestedCategory || "",
+          description: a.description || "",
+          ageMin: a.ageMin ?? "",
+          ageMax: a.ageMax ?? "",
+          durationMinutes: a.durationMinutes ?? "",
+          format: a.format || "in-person",
+          area: a.location?.area || "",
+          address: a.location?.address || "",
+          languages: Array.isArray(a.languages)
+            ? a.languages.join(", ")
+            : "English",
+          price: a.price ?? "",
+          capacity: a.capacity ?? "",
+          materialsIncluded: !!a.materialsIncluded,
+          whatToBring: a.whatToBring || "",
+          status: a.status,
+        });
+        setLearnList(
+          Array.isArray(a.whatChildrenLearn) && a.whatChildrenLearn.length
+            ? a.whatChildrenLearn
+            : [""],
+        );
+        setImages(
+          (Array.isArray(a.images) ? a.images : []).map((im) => ({
+            _id: im._id,
+            url: im.url,
+            isCover: im.isCover,
+          })),
+        );
+        setSessions(toList(a.sessions));
       } catch {
-        /* categories load fail -> Other se kaam chalega */
+        if (alive) setNotFound(true);
+      } finally {
+        if (alive) setLoading(false);
       }
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [id]);
 
-  // preview URLs ko cleanup karo jab component unmount ho ya image list badle
-  useEffect(() => {
-    return () => {
-      images.forEach((img) => {
-        if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
-      });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* learning points */
+  /* ---------------- learn points ---------------- */
   const setLearn = (i, v) =>
     setLearnList((l) => l.map((x, idx) => (idx === i ? v : x)));
   const addLearn = () => setLearnList((l) => [...l, ""]);
   const removeLearn = (i) =>
     setLearnList((l) => l.filter((_, idx) => idx !== i));
 
-  /* sessions */
-  const setSession = (i, k, v) =>
-    setSessions((s) =>
-      s.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)),
-    );
-  const addSession = () =>
-    setSessions((s) => [...s, { date: "", startTime: "" }]);
-  const removeSession = (i) =>
-    setSessions((s) => s.filter((_, idx) => idx !== i));
-
-  /* images — real files now, with local previews */
-  const pickImages = (fileList) => {
-    const incoming = Array.from(fileList).slice(
-      0,
-      Math.max(0, MAX_IMAGES - images.length),
-    );
-    const mapped = incoming.map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-      status: "pending",
-    }));
-    setImages((im) => [...im, ...mapped]);
-  };
-  const removeImage = (i) => {
-    setImages((im) => {
-      const target = im[i];
-      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
-      return im.filter((_, idx) => idx !== i);
-    });
-  };
-
-  /**
-   * Parent pays exactly the price the instructor sets — no extra fee on
-   * top. Kidventures keeps a 15% commission out of that price, so the
-   * instructor receives 85%.
-   */
+  /* ---------------- price fee hint ---------------- */
+  const [feeInfoShownOnce, setFeeInfoShownOnce] = useState(true); // don't auto-pop on edit load
   const priceHint = useMemo(() => {
-    const p = Number(form.price);
+    const p = Number(form?.price);
     if (!p) return "";
     const youReceive = Math.round(p * 0.85 * 100) / 100;
     return `Parents pay exactly AED ${p} · you receive AED ${youReceive} after Kidventures' 15% commission`;
-  }, [form.price]);
+  }, [form?.price]);
 
-  // Price fee-explainer popup: shows automatically the first time the
-  // instructor focuses the price field, so they price with the 15%
-  // cut in mind. Reachable again anytime via the small "i" icon.
-  const [showFeeInfo, setShowFeeInfo] = useState(false);
-  const [feeInfoShownOnce, setFeeInfoShownOnce] = useState(false);
-
+  /* ---------------- validate + save basic fields ---------------- */
   const validate = () => {
     const e = {};
     if (!form.title.trim()) e.title = "Enter a class title";
@@ -220,37 +219,14 @@ export default function CreateClassPage() {
       e.area = "Enter the venue area";
     if (form.format === "in-person" && !form.address.trim())
       e.address = "Enter the venue address so parents can find you";
+
     if (!form.price) e.price = "Enter a price";
     if (!form.capacity || Number(form.capacity) < 1)
       e.capacity = "Enter class capacity";
-    const validSessions = sessions.filter((s) => s.date && s.startTime);
-    if (validSessions.length === 0)
-      e.sessions = "Add at least one date and time";
     return e;
   };
 
-  /* upload one image, mark its status as we go */
-  const uploadOneImage = async (activityId, index) => {
-    setImages((im) =>
-      im.map((row, i) => (i === index ? { ...row, status: "uploading" } : row)),
-    );
-    try {
-      const fd = new FormData();
-      fd.append("file", images[index].file);
-      await api.post(`/uploads/activities/${activityId}/image`, fd);
-      setImages((im) =>
-        im.map((row, i) => (i === index ? { ...row, status: "done" } : row)),
-      );
-      return true;
-    } catch {
-      setImages((im) =>
-        im.map((row, i) => (i === index ? { ...row, status: "error" } : row)),
-      );
-      return false;
-    }
-  };
-
-  const handleSubmit = async (status = "pending") => {
+  const saveChanges = async (submitForReview = false) => {
     const e = validate();
     setErrors(e);
     setApiErr("");
@@ -258,10 +234,6 @@ export default function CreateClassPage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-
-    const dur = Number(form.durationMinutes);
-    const cap = Number(form.capacity);
-
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
@@ -269,7 +241,7 @@ export default function CreateClassPage() {
       ageMin: Number(form.ageMin),
       ageMax: Number(form.ageMax),
       price: Number(form.price),
-      durationMinutes: dur,
+      durationMinutes: Number(form.durationMinutes),
       format: form.format,
       languages: form.languages
         .split(",")
@@ -280,92 +252,191 @@ export default function CreateClassPage() {
         city: "Dubai",
         address: form.address.trim(),
       },
-      capacity: cap,
+      capacity: Number(form.capacity),
       materialsIncluded: form.materialsIncluded,
       whatToBring: form.whatToBring.trim(),
-      status, // "pending" = submit for approval, "draft" = save for later
-      sessions: sessions
-        .filter((s) => s.date && s.startTime)
-        .map((s) => ({
-          date: s.date,
-          startTime: s.startTime,
-          endTime: addMinutes(s.startTime, dur),
-          capacity: cap,
-        })),
     };
-    // category: official _id  OR  "Other" free text
     if (isOther) payload.suggestedCategory = form.suggestedCategory.trim();
     else payload.category = form.category;
 
-    setSubmitting(true);
-    setUploadStage(status === "draft" ? "Saving…" : "Publishing…");
+    // Sirf tab status badlo jab instructor explicitly "resubmit" kare
+    // (jaise rejected/draft class dobara review ke liye bhejni ho).
+    if (submitForReview) payload.status = "pending";
+
+    setSaving(true);
     try {
-      // 1) class create karo
-      const { data } = await api.post("/activities", payload);
-      const activityId =
-        data.activity?._id || data.activity?.id || data._id || data.id;
-
-      // 2) images upload karo (agar koi select ki gayi hain)
-      if (activityId && images.length > 0) {
-        setUploadStage(`Uploading photos (0/${images.length})…`);
-        let uploaded = 0;
-        let failed = 0;
-        for (let i = 0; i < images.length; i++) {
-          const ok = await uploadOneImage(activityId, i);
-          if (ok) uploaded++;
-          else failed++;
-          setUploadStage(`Uploading photos (${uploaded}/${images.length})…`);
-        }
-        if (failed > 0) {
-          setApiErr(
-            `Class saved, but ${failed} photo(s) failed to upload. You can add them later from My Classes.`,
-          );
-        }
-      }
-
-      navigate("/instructor/my-classes");
+      await api.put(`/activities/${id}`, payload);
+      flash(
+        submitForReview
+          ? "Changes saved and sent for review."
+          : "Changes saved.",
+      );
+      if (submitForReview) set("status", "pending");
     } catch (err) {
       setApiErr(
         err?.response?.data?.message ||
-          "Couldn't publish the class. Please try again.",
+          "Couldn't save changes. Please try again.",
       );
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
-      setSubmitting(false);
-      setUploadStage("");
+      setSaving(false);
     }
   };
+
+  /* ---------------- sessions (live save) ---------------- */
+  const [newSession, setNewSession] = useState({ date: "", startTime: "" });
+  const [addingSession, setAddingSession] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const addSession = async () => {
+    if (!newSession.date || !newSession.startTime) {
+      flash("Pick a date and start time first.");
+      return;
+    }
+    setAddingSession(true);
+    try {
+      const dur = Number(form.durationMinutes) || 60;
+      const { data } = await api.post(`/activities/${id}/sessions`, {
+        date: newSession.date,
+        startTime: newSession.startTime,
+        endTime: addMinutes(newSession.startTime, dur),
+        capacity: Number(form.capacity) || undefined,
+      });
+      setSessions(toList(data.activity?.sessions));
+      setNewSession({ date: "", startTime: "" });
+      flash("Session added.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't add session.");
+    } finally {
+      setAddingSession(false);
+    }
+  };
+
+  const cancelSession = async (sessionId) => {
+    setCancellingId(sessionId);
+    try {
+      const { data } = await api.delete(
+        `/activities/${id}/sessions/${sessionId}`,
+      );
+      setSessions(toList(data.activity?.sessions));
+      flash(data.message);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't remove session.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  /* ---------------- images (live save) ---------------- */
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState(null);
+
+  const uploadImages = async (fileList) => {
+    const files = Array.from(fileList).slice(
+      0,
+      Math.max(0, MAX_IMAGES - images.length),
+    );
+    setUploadingImage(true);
+    for (const file of files) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const { data } = await api.post(`/uploads/activities/${id}/image`, fd);
+        setImages(
+          toList(data.images).map((im) => ({
+            _id: im._id,
+            url: im.url,
+            isCover: im.isCover,
+          })),
+        );
+      } catch {
+        flash("One of the images failed to upload.");
+      }
+    }
+    setUploadingImage(false);
+  };
+
+  const removeImage = async (imageId) => {
+    setDeletingImageId(imageId);
+    try {
+      const { data } = await api.delete(
+        `/uploads/activities/${id}/image/${imageId}`,
+      );
+      setImages(
+        toList(data.images).map((im) => ({
+          _id: im._id,
+          url: im.url,
+          isCover: im.isCover,
+        })),
+      );
+    } catch {
+      flash("Couldn't remove that image.");
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
+  /* ---------------- render ---------------- */
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] text-brand-brown">
+        <div className="px-4 py-20 text-center opacity-60">Loading…</div>
+      </div>
+    );
+  }
+  if (notFound || !form) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] p-10 text-center text-brand-brown">
+        <p className="mb-4">Couldn't load this class.</p>
+        <Link
+          to="/instructor/my-classes"
+          className="font-bold text-brand-orange"
+        >
+          Back to My Classes
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] text-brand-brown">
       <Helmet>
-        <title>Create New Class — Kidventures</title>
+        <title>Edit Class — Kidventures</title>
         <meta name="robots" content="noindex" />
       </Helmet>
 
-      {/* top bar */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-brand-brown px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
+
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 sm:px-8">
         <div className="flex items-center gap-4">
           <Link
-            to="/instructor/dashboard"
+            to="/instructor/my-classes"
             className="inline-flex items-center gap-1.5 text-sm font-semibold hover:opacity-80"
           >
             <IcBack size={18} /> Back
           </Link>
-          <h1 className="text-base font-bold sm:text-lg">Create New Class</h1>
+          <h1 className="text-base font-bold sm:text-lg">Edit Class</h1>
         </div>
-        <div className="flex items-center gap-3">
-          {uploadStage && (
-            <span className="hidden text-xs opacity-70 sm:inline">
-              {uploadStage}
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          {form.status === "rejected" || form.status === "draft" ? (
+            <button
+              onClick={() => saveChanges(true)}
+              disabled={saving}
+              className="rounded-lg bg-brand-orange px-5 py-2 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save & Submit for Review"}
+            </button>
+          ) : null}
           <button
-            onClick={() => handleSubmit("pending")}
-            disabled={submitting}
-            className="rounded-lg bg-brand-orange px-5 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
+            onClick={() => saveChanges(false)}
+            disabled={saving}
+            className="rounded-lg border-2 border-brand-orange bg-white px-5 py-2 text-sm font-bold text-brand-orange disabled:opacity-60"
           >
-            {submitting ? "Publishing…" : "Publish Class"}
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
@@ -385,10 +456,8 @@ export default function CreateClassPage() {
                 className={inputCls}
                 value={form.title}
                 onChange={(e) => set("title", e.target.value)}
-                placeholder="e.g. Pottery for Beginners"
               />
             </Field>
-
             <Field label="Category" error={errors.category}>
               <select
                 className={inputCls}
@@ -404,29 +473,19 @@ export default function CreateClassPage() {
                 <option value={OTHER}>Other (not listed)</option>
               </select>
               {isOther && (
-                <div className="mt-2">
-                  <input
-                    className={inputCls}
-                    value={form.suggestedCategory}
-                    onChange={(e) => set("suggestedCategory", e.target.value)}
-                    placeholder="Your category — e.g. Calligraphy, Fencing, Magic"
-                    autoFocus
-                  />
-                  <p className="mt-1 text-xs opacity-70">
-                    Not in the list? Type it here — our team will review and add
-                    it. Your class stays pending under this category until it's
-                    approved.
-                  </p>
-                </div>
+                <input
+                  className={`${inputCls} mt-2`}
+                  value={form.suggestedCategory}
+                  onChange={(e) => set("suggestedCategory", e.target.value)}
+                  placeholder="Your category"
+                />
               )}
             </Field>
-
             <Field label="Description" error={errors.description}>
               <textarea
                 className={`${inputCls} min-h-[110px] resize-y`}
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
-                placeholder="Describe what happens in the class, what makes it fun, and what parents can expect…"
               />
             </Field>
           </div>
@@ -441,33 +500,25 @@ export default function CreateClassPage() {
             <Field label="Minimum age" error={errors.age}>
               <input
                 type="number"
-                min="0"
-                max="18"
                 className={inputCls}
                 value={form.ageMin}
                 onChange={(e) => set("ageMin", e.target.value)}
-                placeholder="6"
               />
             </Field>
             <Field label="Maximum age">
               <input
                 type="number"
-                min="0"
-                max="18"
                 className={inputCls}
                 value={form.ageMax}
                 onChange={(e) => set("ageMax", e.target.value)}
-                placeholder="10"
               />
             </Field>
             <Field label="Duration (minutes)" error={errors.duration}>
               <input
                 type="number"
-                min="15"
                 className={inputCls}
                 value={form.durationMinutes}
                 onChange={(e) => set("durationMinutes", e.target.value)}
-                placeholder="90"
               />
             </Field>
             <Field label="Format">
@@ -480,19 +531,11 @@ export default function CreateClassPage() {
                 <option value="online">Online</option>
               </select>
             </Field>
-            <Field
-              label={
-                form.format === "online"
-                  ? "Area (optional for online)"
-                  : "Venue area"
-              }
-              error={errors.area}
-            >
+            <Field label="Venue area" error={errors.area}>
               <input
                 className={inputCls}
                 value={form.area}
                 onChange={(e) => set("area", e.target.value)}
-                placeholder="e.g. Mirdif"
               />
             </Field>
             <Field
@@ -507,7 +550,6 @@ export default function CreateClassPage() {
                 className={inputCls}
                 value={form.address}
                 onChange={(e) => set("address", e.target.value)}
-                placeholder="Building / street"
               />
             </Field>
             <Field label="Languages (comma separated)" className="col-span-2">
@@ -515,7 +557,6 @@ export default function CreateClassPage() {
                 className={inputCls}
                 value={form.languages}
                 onChange={(e) => set("languages", e.target.value)}
-                placeholder="English, Arabic"
               />
             </Field>
           </div>
@@ -534,24 +575,15 @@ export default function CreateClassPage() {
                   type="button"
                   onClick={() => setShowFeeInfo(true)}
                   className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-cream text-[10px] font-bold text-brand-orange"
-                  aria-label="How the platform commission works"
                 >
                   i
                 </button>
               </div>
               <input
                 type="number"
-                min="0"
                 className={inputCls}
                 value={form.price}
                 onChange={(e) => set("price", e.target.value)}
-                onFocus={() => {
-                  if (!feeInfoShownOnce) {
-                    setShowFeeInfo(true);
-                    setFeeInfoShownOnce(true);
-                  }
-                }}
-                placeholder="120"
               />
               {errors.price && (
                 <div className="mt-1 text-xs text-red-600">{errors.price}</div>
@@ -560,11 +592,9 @@ export default function CreateClassPage() {
             <Field label="Capacity (max children)" error={errors.capacity}>
               <input
                 type="number"
-                min="1"
                 className={inputCls}
                 value={form.capacity}
                 onChange={(e) => set("capacity", e.target.value)}
-                placeholder="10"
               />
             </Field>
           </div>
@@ -573,50 +603,82 @@ export default function CreateClassPage() {
           )}
         </Section>
 
-        {/* 4. schedule */}
+        {/* 4. sessions — live save */}
         <Section
-          title="Schedule"
-          subtitle="Add one or more dates. End time is set automatically from the duration."
+          title="Sessions"
+          subtitle="Changes here save immediately, separate from the button above"
         >
-          {errors.sessions && (
-            <div className="mb-2 text-xs text-red-600">{errors.sessions}</div>
-          )}
-          <div className="space-y-3">
-            {sessions.map((s, i) => (
-              <div key={i} className="flex items-end gap-3">
-                <Field label="Date" className="flex-1">
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={s.date}
-                    onChange={(e) => setSession(i, "date", e.target.value)}
-                  />
-                </Field>
-                <Field label="Start time" className="flex-1">
-                  <input
-                    type="time"
-                    className={inputCls}
-                    value={s.startTime}
-                    onChange={(e) => setSession(i, "startTime", e.target.value)}
-                  />
-                </Field>
-                {sessions.length > 1 && (
-                  <button
-                    onClick={() => removeSession(i)}
-                    className="mb-0.5 flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white hover:border-red-300"
+          {sessions.length === 0 ? (
+            <p className="mb-3 text-sm opacity-60">No sessions yet.</p>
+          ) : (
+            <div className="mb-4 space-y-2">
+              {sessions.map((s) => {
+                const sid = s._id || s.id;
+                const cancelled = s.status === "cancelled";
+                return (
+                  <div
+                    key={sid}
+                    className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2.5 text-sm ${
+                      cancelled
+                        ? "border-gray-100 bg-gray-50 opacity-60"
+                        : "border-gray-200"
+                    }`}
                   >
-                    <IcX size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
+                    <div>
+                      <b>{fmtDate(s.date)}</b> · {s.startTime}
+                      <span className="ml-2 text-xs opacity-60">
+                        {s.seatsBooked || 0}/{s.capacity} booked
+                        {cancelled ? " · cancelled" : ""}
+                      </span>
+                    </div>
+                    {!cancelled && (
+                      <button
+                        onClick={() => cancelSession(sid)}
+                        disabled={cancellingId === sid}
+                        className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 disabled:opacity-60"
+                      >
+                        {cancellingId === sid
+                          ? "…"
+                          : s.seatsBooked > 0
+                            ? "Cancel session"
+                            : "Remove"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-end gap-2.5">
+            <Field label="Date" className="flex-1">
+              <input
+                type="date"
+                className={inputCls}
+                value={newSession.date}
+                onChange={(e) =>
+                  setNewSession((s) => ({ ...s, date: e.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Start time" className="flex-1">
+              <input
+                type="time"
+                className={inputCls}
+                value={newSession.startTime}
+                onChange={(e) =>
+                  setNewSession((s) => ({ ...s, startTime: e.target.value }))
+                }
+              />
+            </Field>
+            <button
+              onClick={addSession}
+              disabled={addingSession}
+              className="mb-0.5 flex h-[42px] items-center gap-1.5 rounded-lg bg-brand-orange px-4 text-xs font-bold text-white disabled:opacity-60"
+            >
+              <IcPlus size={15} /> {addingSession ? "Adding…" : "Add session"}
+            </button>
           </div>
-          <button
-            onClick={addSession}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-brand-orange px-3.5 py-2 text-xs font-semibold text-brand-orange"
-          >
-            <IcPlus size={15} /> Add another date
-          </button>
         </Section>
 
         {/* 5. learning points */}
@@ -655,7 +717,7 @@ export default function CreateClassPage() {
         {/* 6. materials */}
         <Section
           title="Materials & Requirements"
-          subtitle="What's included or what to bring (optional)"
+          subtitle="What's included or what to bring"
         >
           <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm">
             <input
@@ -671,15 +733,14 @@ export default function CreateClassPage() {
               className={`${inputCls} min-h-[80px] resize-y`}
               value={form.whatToBring}
               onChange={(e) => set("whatToBring", e.target.value)}
-              placeholder="e.g. Wear clothes that can get messy."
             />
           </Field>
         </Section>
 
-        {/* 7. images — now actually uploaded */}
+        {/* 7. images — live save */}
         <Section
           title="Class Images"
-          subtitle={`Photos parents will see (up to ${MAX_IMAGES})`}
+          subtitle={`Up to ${MAX_IMAGES} · changes here save immediately`}
         >
           <p className="mb-3 text-xs text-brand-orange">
             For best results, use a landscape (wide) photo — around 16:9 or 3:2
@@ -690,98 +751,74 @@ export default function CreateClassPage() {
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-brand-orange bg-brand-cream p-6">
               <IcUpload size={24} />
               <span className="text-sm font-semibold">
-                Click to upload images
-              </span>
-              <span className="text-xs opacity-60">
-                JPG or PNG · first photo becomes the cover
+                {uploadingImage ? "Uploading…" : "Click to upload images"}
               </span>
               <input
                 type="file"
                 multiple
                 accept="image/*"
                 className="hidden"
+                disabled={uploadingImage}
                 onChange={(e) => {
-                  pickImages(e.target.files);
-                  e.target.value = ""; // same file dobara select ho sake
+                  uploadImages(e.target.files);
+                  e.target.value = "";
                 }}
               />
             </label>
           )}
-
           {images.length > 0 && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {images.map((img, i) => (
+              {images.map((img) => (
                 <div
-                  key={i}
+                  key={img._id}
                   className="group relative aspect-square overflow-hidden rounded-xl border border-gray-200"
                 >
                   <img
-                    src={img.previewUrl}
+                    src={img.url}
                     alt=""
                     className="h-full w-full object-cover"
                   />
-                  {i === 0 && (
+                  {img.isCover && (
                     <span className="absolute left-1.5 top-1.5 rounded-full bg-brand-orange px-2 py-0.5 text-[10px] font-bold text-white">
                       Cover
                     </span>
                   )}
-                  {img.status === "uploading" && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white">
-                      Uploading…
-                    </div>
-                  )}
-                  {img.status === "done" && (
-                    <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white">
-                      <IcCheck size={12} />
-                    </div>
-                  )}
-                  {img.status === "error" && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-red-500/70 text-[11px] font-semibold text-white">
-                      Failed
-                    </div>
-                  )}
-                  {img.status !== "uploading" && (
-                    <button
-                      type="button"
-                      onClick={() => removeImage(i)}
-                      className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"
-                    >
-                      <IcX size={13} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(img._id)}
+                    disabled={deletingImageId === img._id}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"
+                  >
+                    {deletingImageId === img._id ? "…" : <IcX size={13} />}
+                  </button>
                 </div>
               ))}
             </div>
           )}
-          <p className="mt-3 text-xs opacity-60">
-            Photos upload automatically once you publish or save the class.
-          </p>
         </Section>
 
-        {/* bottom actions */}
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
-          {uploadStage && (
-            <span className="text-xs opacity-70 sm:hidden">{uploadStage}</span>
-          )}
+        <div className="mt-2 flex flex-wrap justify-end gap-3">
           <Link
-            to="/instructor/dashboard"
+            to="/instructor/my-classes"
             className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-bold"
           >
-            Cancel
+            Done
           </Link>
+          {(form.status === "rejected" || form.status === "draft") && (
+            <button
+              onClick={() => saveChanges(true)}
+              disabled={saving}
+              className="rounded-lg bg-brand-orange px-6 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save & Submit for Review"}
+            </button>
+          )}
           <button
-            onClick={() => handleSubmit("draft")}
-            disabled={submitting}
-            className="rounded-lg border-2 border-brand-orange bg-white px-5 py-2.5 text-sm font-bold text-brand-orange hover:bg-brand-cream disabled:opacity-60"
+            onClick={() => saveChanges(false)}
+            disabled={saving}
+            className="rounded-lg border-2 border-brand-orange bg-white px-6 py-2.5 text-sm font-bold text-brand-orange disabled:opacity-60"
           >
-            Save as draft
-          </button>
-          <button
-            onClick={() => handleSubmit("pending")}
-            disabled={submitting}
-            className="rounded-lg bg-brand-orange px-6 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
-          >
-            {submitting ? "Publishing…" : "Publish Class"}
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
@@ -792,10 +829,9 @@ export default function CreateClassPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6">
             <h3 className="mb-2 text-base font-bold">How pricing works</h3>
             <p className="mb-4 text-sm leading-relaxed opacity-75">
-              Whatever price you set here is exactly what parents pay — no extra
-              fees are added on top. Kidventures keeps a 15% commission out of
-              that price, and the rest is yours. Price your class with that in
-              mind.
+              Whatever price you set is exactly what parents pay — no extra fees
+              are added on top. Kidventures keeps a 15% commission out of that
+              price, and the rest is yours.
             </p>
             {Number(form.price) > 0 && (
               <div className="mb-4 rounded-lg bg-brand-cream px-4 py-3 text-sm">

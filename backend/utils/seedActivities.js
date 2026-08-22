@@ -1,6 +1,9 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
+const guardDevScript = require("./guardDevScript");
+guardDevScript("seedActivities.js");
+
 const Activity = require("../models/Activity");
 const Category = require("../models/Category");
 const User = require("../models/User");
@@ -194,14 +197,36 @@ const seed = async () => {
       process.exit(1);
     }
 
-    /* ------- ek instructor dhoondo (ya bana do) ------- */
+    /* ------- ek instructor dhoondo (ya bana do) -------
+     *
+     * SECURITY: pehle yahan password: "Test1234" hardcoded tha. Agar yeh
+     * script kabhi live DB par chal jati to ek aisa instructor account
+     * ban jata jis ka password har us bande ko maloom hai jis ne code
+     * dekha ho — aur woh classes bana kar bachon ke naam dekh sakta tha.
+     *
+     * Ab password .env se aata hai aur account hamesha unverified banta hai.
+     */
     let instructor = await User.findOne({ role: "instructor" });
     if (!instructor) {
+      const testPassword = process.env.TEST_INSTRUCTOR_PASSWORD;
+
+      if (!testPassword) {
+        console.log(
+          "\n! Koi instructor nahi mila aur TEST_INSTRUCTOR_PASSWORD .env me set nahi hai.\n" +
+            "  .env me yeh line daal kar dobara chalayein (apna koi mazboot password):\n" +
+            "  TEST_INSTRUCTOR_PASSWORD=<kuch-mazboot-yahan>\n",
+        );
+        process.exit(1);
+      }
+
       instructor = await User.create({
         name: "Test Instructor",
-        email: "test.instructor@kidventures.local",
-        password: "Test1234",
+        email:
+          process.env.TEST_INSTRUCTOR_EMAIL ||
+          "test.instructor@kidventures.local",
+        password: testPassword,
         role: "instructor",
+        emailVerified: true, // sirf local testing ke liye
       });
       console.log(`+ Created test instructor: ${instructor.email}`);
     } else {

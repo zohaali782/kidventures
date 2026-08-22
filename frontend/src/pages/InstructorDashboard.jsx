@@ -351,9 +351,9 @@ export default function InstructorDashboard() {
       </div>
 
       <div className="mb-3 flex items-center gap-3 border-b border-white/10 px-5 pb-4">
-        {profile?.user?.avatar ? (
+        {profile?.user?.avatar?.url ? (
           <img
-            src={profile.user.avatar}
+            src={profile.user.avatar.url}
             alt=""
             className="h-10 w-10 rounded-full object-cover"
           />

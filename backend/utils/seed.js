@@ -1,6 +1,9 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
+const guardDevScript = require("./guardDevScript");
+guardDevScript("seed.js");
+
 const Category = require("../models/Category");
 const User = require("../models/User");
 
@@ -86,6 +89,7 @@ const seed = async () => {
           email: adminEmail.toLowerCase(),
           password: adminPassword, // model me khud hash ho jayega
           role: "admin",
+          emailVerified: true, // admin ko verification link ka intezar nahi karna
         });
         console.log(`\n✓ Admin created: ${adminEmail}`);
       }

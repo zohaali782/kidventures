@@ -7,6 +7,14 @@ import api from "../api/axios";
 import { normActivity, toList } from "../api/normalize";
 import { getToken } from "../api/auth";
 
+/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
+   ka na ho, waisi hi wapas kar deta hai. */
+const cldOptimize = (url, width = 400) => {
+  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com"))
+    return url;
+  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
+};
+
 /* ------------------------------------------------------------------ *
  * SINGLE ADJUSTMENT POINT
  * Agar backend field names badlein, sirf yahan theek karo.
@@ -19,7 +27,7 @@ function normProfile(p = {}) {
     id: p._id || p.id,
     userId: u._id || u.id || p.user, // links/follow ke liye
     name: u.name || p.name || "Instructor",
-    avatar: u.avatar || p.avatar || "",
+    avatar: u.avatar?.url || p.avatar?.url || "",
     city: u.city || loc.area || "",
     headline: p.headline || "",
     bio: p.bio || "",
@@ -497,7 +505,7 @@ export default function InstructorProfilePage() {
         <section className="flex flex-col items-center gap-6 rounded-2xl bg-brand-cream p-6 text-center sm:flex-row sm:items-center sm:p-9 sm:text-left">
           {profile.avatar ? (
             <img
-              src={profile.avatar}
+              src={cldOptimize(profile.avatar, 200)}
               alt={profile.name}
               className="h-24 w-24 flex-shrink-0 rounded-full object-cover shadow-md sm:h-28 sm:w-28"
             />
@@ -680,7 +688,7 @@ export default function InstructorProfilePage() {
                           >
                             {isImg ? (
                               <img
-                                src={g}
+                                src={cldOptimize(g, 300)}
                                 alt={`${firstName}'s class ${idx + 1}`}
                                 loading="lazy"
                                 className="h-full w-full object-cover"
@@ -702,9 +710,9 @@ export default function InstructorProfilePage() {
                   <VerifiedBadge />
                 </div>
                 <p className="text-xs leading-6 opacity-80">
-                  Is instructor ki identity aur credentials Kidventures team ne
-                  review aur approve ki hain. Saari classes ek safe, supervised
-                  environment mein hoti hain.
+                  This instructor's identity and credentials have been reviewed
+                  and approved by the Kidventures team. All classes take place
+                  in a safe, supervised environment.
                 </p>
               </aside>
             </div>
@@ -733,7 +741,7 @@ export default function InstructorProfilePage() {
                         <div className="relative h-32 bg-brand-cream">
                           {img ? (
                             <img
-                              src={img}
+                              src={cldOptimize(img, 300)}
                               alt={a.title}
                               loading="lazy"
                               className="h-full w-full object-cover"

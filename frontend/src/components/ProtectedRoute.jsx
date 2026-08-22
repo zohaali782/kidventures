@@ -1,5 +1,5 @@
 import { Navigate, Link } from "react-router-dom";
-import { getToken, getStoredUser } from "../api/auth";
+import { getStoredUser } from "../api/auth";
 
 const roleLabel = {
   parent: "a parent",
@@ -13,10 +13,12 @@ const roleLabel = {
  * - agar nahi diya to sirf "logged in hona chahiye" check hoga
  */
 function ProtectedRoute({ children, role }) {
-  const token = getToken();
+  // NOTE: yeh sirf UI-level check hai — page dikhana hai ya login par bhejna.
+  // Asal security backend par hai: har protected API call cookie ka token
+  // verify karti hai, is liye localStorage chhed kar koi data nahi nikaal sakta.
   const user = getStoredUser();
 
-  if (!token || !user) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

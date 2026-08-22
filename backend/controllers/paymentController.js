@@ -2,6 +2,8 @@ const stripe = require("../config/stripe");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Activity = require("../models/Activity");
+const { sendEmail } = require("../utils/sendEmail");
+const tpl = require("../utils/emailTemplates");
 
 /**
  * Stripe amounts "smallest unit" me hote hain. AED ke liye fils
@@ -241,10 +243,40 @@ const onPaymentSucceeded = async (paymentIntent) => {
     { $set: update },
   );
 
-  // TODO (email step): parent ko confirmation, instructor ko new booking,
-  // admin ko notification bhejni hai.
+  // Confirmation emails - parent ko receipt, instructor ko new-booking alert.
+  // Fire-and-forget: Stripe ko response upar hi bhej diya gaya hai.
+  sendBookingEmails(booking._id).catch((e) =>
+    console.error("[email] booking emails failed:", e.message),
+  );
 
   console.log(`✓ Booking confirmed: ${booking.bookingNumber}`);
+};
+
+/**
+ * Confirmation emails - parent ko receipt, instructor ko new-booking alert.
+ * Duplicate na jayen isliye emailsSent.confirmation flag check karte hain.
+ */
+const sendBookingEmails = async (bookingId) => {
+  const booking = await Booking.findById(bookingId)
+    .populate("parent", "name email")
+    .populate("instructor", "name email");
+
+  if (!booking || booking.emailsSent?.confirmation) return;
+
+  const parentMail = tpl.bookingConfirmedParent({
+    parentName: booking.parent?.name,
+    booking,
+  });
+  await sendEmail({ to: booking.parent?.email, ...parentMail });
+
+  const instructorMail = tpl.newBookingInstructor({
+    instructorName: booking.instructor?.name,
+    booking,
+  });
+  await sendEmail({ to: booking.instructor?.email, ...instructorMail });
+
+  booking.emailsSent = { ...booking.emailsSent, confirmation: true };
+  await booking.save();
 };
 
 /**
@@ -374,7 +406,25 @@ const refundPayment = async (req, res, next) => {
 
     await booking.save();
 
-    // TODO (email step): parent ko refund ki khabar
+    // Refund confirmation email - Stripe/DB update ho chuke, response se pehle
+    // await kar rahe hain kyunke ye admin-triggered hai (webhook ki tarah
+    // latency-sensitive nahi), lekin fail hone par bhi refund process rukna
+    // nahi chahiye - isliye catch laga hai.
+    try {
+      const parentUser = await require("../models/User")
+        .findById(booking.parent)
+        .select("name email");
+      await sendEmail({
+        to: parentUser?.email,
+        ...tpl.refundConfirmed({
+          parentName: parentUser?.name,
+          booking,
+          refundAmount,
+        }),
+      });
+    } catch (e) {
+      console.error("[email] refund email failed:", e.message);
+    }
 
     res.json({
       success: true,

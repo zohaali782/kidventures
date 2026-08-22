@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { COOKIE_NAME, clearAuthCookie } = require("../utils/authCookie");
 
 /**
  * protect - "gate keeper".
@@ -8,10 +9,13 @@ const User = require("../models/User");
  */
 const protect = async (req, res, next) => {
   try {
-    let token;
+    // 1. Token pehle httpOnly cookie se — yehi asal tareeqa hai.
+    //    Bearer header sirf backwards-compatibility ke liye rakha hai
+    //    (purane logged-in users / API testing tools ke liye).
+    let token = req.cookies?.[COOKIE_NAME];
 
-    // Frontend header aisa bhejta hai:  Authorization: Bearer <token>
     if (
+      !token &&
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
     ) {
@@ -25,21 +29,51 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // Token asli hai ya nahi - agar chhera gaya ho to yahan error aa jayega
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // 2. Token verify karo.
+    //    algorithms pin karna zaroori hai — warna "alg confusion" attack
+    //    se koi apna banaya hua token pass kara sakta hai.
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        algorithms: ["HS256"],
+      });
+    } catch {
+      // Invalid ya expired token 500 nahi, 401 hona chahiye —
+      // taake frontend session expire samajh kar login par bhej sake.
+      clearAuthCookie(res);
+      return res.status(401).json({
+        success: false,
+        message: "Session expired, please login again",
+      });
+    }
 
     const user = await User.findById(decoded.id);
 
     if (!user) {
+      clearAuthCookie(res);
       return res
         .status(401)
         .json({ success: false, message: "User no longer exists" });
     }
 
-    if (user.isBlocked) {
+    if (user.isBlocked || user.isActive === false) {
+      clearAuthCookie(res);
       return res
         .status(403)
-        .json({ success: false, message: "Your account has been blocked" });
+        .json({ success: false, message: "Your account is unavailable" });
+    }
+
+    // 3. Password badalne ke baad purane token na chalein.
+    //    (User model mein passwordChangedAt field add karne par chalu hoga.)
+    if (
+      user.passwordChangedAt &&
+      decoded.iat * 1000 < new Date(user.passwordChangedAt).getTime()
+    ) {
+      clearAuthCookie(res);
+      return res.status(401).json({
+        success: false,
+        message: "Password was changed. Please login again.",
+      });
     }
 
     req.user = user; // ab har controller ko pata hai ke request kis ki hai

@@ -1,15 +1,14 @@
-const mongoose = require("mongoose");
 const Review = require("../models/Review");
 const Activity = require("../models/Activity");
 const Booking = require("../models/Booking");
 
 /**
- * Kisi activity ki rating (average + count) dobara calculate karke Activity par save.
- * Har naye/delete hue review ke baad chalta hai — taake card/detail par sahi rating dikhe.
+ * Activity ki rating.average aur rating.count recompute karta hai
+ * saari uski reviews se. Review add/edit/delete ke baad call hota hai.
  */
-async function recalcActivityRating(activityId) {
-  const agg = await Review.aggregate([
-    { $match: { activity: new mongoose.Types.ObjectId(activityId) } },
+const recomputeActivityRating = async (activityId) => {
+  const stats = await Review.aggregate([
+    { $match: { activity: activityId } },
     {
       $group: {
         _id: "$activity",
@@ -18,17 +17,52 @@ async function recalcActivityRating(activityId) {
       },
     },
   ]);
-  const { average = 0, count = 0 } = agg[0] || {};
-  await Activity.findByIdAndUpdate(activityId, {
-    "rating.average": Math.round(average * 10) / 10,
-    "rating.count": count,
-  });
-}
+
+  const average = stats[0] ? Math.round(stats[0].average * 10) / 10 : 0;
+  const count = stats[0] ? stats[0].count : 0;
+
+  await Activity.updateOne(
+    { _id: activityId },
+    { $set: { "rating.average": average, "rating.count": count } },
+  );
+};
 
 /**
- * @desc   Naya review add karna
- * @route  POST /api/reviews
- * @access Private (parent)
+ * @desc    Ek class ke saare reviews
+ * @route   GET /api/reviews?activity=<id>&limit=20
+ * @access  Public
+ */
+const getReviews = async (req, res, next) => {
+  try {
+    const { activity } = req.query;
+
+    if (!activity) {
+      return res
+        .status(400)
+        .json({ success: false, message: "activity query param is required" });
+    }
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+
+    const reviews = await Review.find({ activity })
+      .populate("user", "name avatar")
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json({ success: true, count: reviews.length, reviews });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Review post karna
+ * @route   POST /api/reviews
+ * @access  Parent
+ * Body: { activity, rating, comment }
+ *
+ * SECURITY: sirf wahi parent review kar sakta hai jisne is class ki
+ * confirmed/completed booking ki ho - warna koi bhi random rating de sakta.
  */
 const createReview = async (req, res, next) => {
   try {
@@ -37,134 +71,66 @@ const createReview = async (req, res, next) => {
     if (!activity || !rating) {
       return res.status(400).json({
         success: false,
-        message: "Activity and rating are required",
+        message: "activity and rating are required",
       });
     }
-    if (rating < 1 || rating > 5) {
+
+    const numRating = Number(rating);
+    if (numRating < 1 || numRating > 5) {
       return res
         .status(400)
-        .json({ success: false, message: "Rating must be 1-5" });
+        .json({ success: false, message: "Rating must be between 1 and 5" });
     }
 
-    const exists = await Activity.findById(activity);
-    if (!exists) {
+    const activityDoc = await Activity.findById(activity);
+    if (!activityDoc) {
       return res
         .status(404)
-        .json({ success: false, message: "Activity not found" });
+        .json({ success: false, message: "Class not found" });
     }
 
-    const already = await Review.findOne({ activity, user: req.user._id });
-    if (already) {
-      return res.status(400).json({
-        success: false,
-        message: "You have already reviewed this class",
-      });
-    }
-
-    // VERIFIED REVIEWS: sirf wahi parent review kar sakta hai jisne class BOOK ki ho.
-    // NOTE: field/status naam tumhare Booking model ke mutabiq adjust ho sakte hain
-    // (agar zaroorat pade to Booking.js bhej dena, main exactly match kar dungi).
-    const booking = await Booking.findOne({
+    // Ownership check: parent ne is class ki booking ki ho aur
+    // uska status confirmed ya completed ho.
+    const hasBooking = await Booking.exists({
+      parent: req.user._id,
       activity,
-      $or: [{ user: req.user._id }, { parent: req.user._id }],
-      status: { $in: ["paid", "confirmed", "completed", "attended"] },
+      status: { $in: ["confirmed", "completed"] },
     });
-    if (!booking) {
+
+    if (!hasBooking) {
       return res.status(403).json({
         success: false,
-        message: "You can review this class only after booking it.",
+        message: "You can only review classes you've booked",
       });
     }
 
-    const review = await Review.create({
-      activity,
-      user: req.user._id,
-      rating,
-      comment,
-    });
-
-    await recalcActivityRating(activity);
-    await review.populate("user", "name avatar");
-
-    res.status(201).json({ success: true, review });
-  } catch (error) {
-    // duplicate key (race) ko friendly message
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: "You have already reviewed this class",
+    let review;
+    try {
+      review = await Review.create({
+        activity,
+        user: req.user._id,
+        rating: numRating,
+        comment: comment?.trim(),
       });
-    }
-    next(error);
-  }
-};
-
-/**
- * @desc   Kisi activity ke reviews lena
- * @route  GET /api/reviews?activity=<id>&page=&limit=
- * @access Public
- */
-const getReviews = async (req, res, next) => {
-  try {
-    const { activity } = req.query;
-    if (!activity) {
-      return res
-        .status(400)
-        .json({ success: false, message: "activity query is required" });
+    } catch (err) {
+      // duplicate key -> already reviewed
+      if (err.code === 11000) {
+        return res.status(400).json({
+          success: false,
+          message: "You've already reviewed this class",
+        });
+      }
+      throw err;
     }
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    await recomputeActivityRating(activity);
 
-    const [reviews, total] = await Promise.all([
-      Review.find({ activity })
-        .populate("user", "name avatar")
-        .sort("-createdAt")
-        .skip((page - 1) * limit)
-        .limit(limit),
-      Review.countDocuments({ activity }),
-    ]);
+    const populated = await review.populate("user", "name avatar");
 
-    res.json({
-      success: true,
-      total,
-      page,
-      pages: Math.ceil(total / limit) || 1,
-      reviews,
-    });
+    res.status(201).json({ success: true, review: populated });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @desc   Apna review delete karna (ya admin)
- * @route  DELETE /api/reviews/:id
- * @access Private
- */
-const deleteReview = async (req, res, next) => {
-  try {
-    const review = await Review.findById(req.params.id);
-    if (!review) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Review not found" });
-    }
-    if (
-      String(review.user) !== String(req.user._id) &&
-      req.user.role !== "admin"
-    ) {
-      return res.status(403).json({ success: false, message: "Not allowed" });
-    }
-
-    const activityId = review.activity;
-    await review.deleteOne();
-    await recalcActivityRating(activityId);
-
-    res.json({ success: true, message: "Review removed" });
-  } catch (error) {
-    next(error);
-  }
-};
-
-module.exports = { createReview, getReviews, deleteReview };
+module.exports = { getReviews, createReview };

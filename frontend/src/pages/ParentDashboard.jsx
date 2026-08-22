@@ -86,6 +86,12 @@ const IcAlert = (p) => (
     <line x1="12" y1="17" x2="12.01" y2="17" />
   </I>
 );
+const IcDoc = (p) => (
+  <I {...p}>
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+  </I>
+);
 
 const fmtDate = (d) => {
   if (!d) return "";
@@ -117,6 +123,10 @@ const STATUS_COLOR = {
   refunded: "text-red-600",
 };
 
+// Receipt sirf paid bookings ke liye available hai (backend ka bhi
+// yehi rule hai) - unpaid/pending ka koi receipt nahi.
+const PAID_STATUSES = ["paid", "partially_refunded", "refunded"];
+
 export default function ParentDashboard() {
   const nav = useNavigate();
   const [tab, setTab] = useState("children");
@@ -142,6 +152,7 @@ export default function ParentDashboard() {
   const [formErr, setFormErr] = useState({});
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null);
+  const [receiptLoadingId, setReceiptLoadingId] = useState(null);
 
   const parentName = (getStoredUser()?.name || "there").split(" ")[0];
   const flash = (m) => {
@@ -185,6 +196,31 @@ export default function ParentDashboard() {
         .catch(() => setPast([]));
     }
   }, [tab, upcoming, past]);
+
+  /* ---- receipt: authenticated PDF fetch, opens in a new tab ---- */
+  const handleReceipt = async (bookingId, paymentStatus) => {
+    if (!PAID_STATUSES.includes(String(paymentStatus))) {
+      flash("A receipt is only available once payment is complete.");
+      return;
+    }
+    setReceiptLoadingId(bookingId);
+    try {
+      const res = await api.get(`/bookings/${bookingId}/receipt`, {
+        responseType: "blob",
+      });
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([res.data], { type: "application/pdf" }),
+      );
+      window.open(blobUrl, "_blank");
+      // Naye tab ko load hone ka waqt de kar phir revoke karo, taake
+      // memory leak na ho lekin PDF khulne se pehle URL na toote.
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 30000);
+    } catch (err) {
+      flash("Couldn't load the receipt. Please try again.");
+    } finally {
+      setReceiptLoadingId(null);
+    }
+  };
 
   /* ---- child add/edit ---- */
   const openAdd = () => {
@@ -425,7 +461,8 @@ export default function ParentDashboard() {
                 </Link>
               </>
             }
-            onReceipt={() => flash("Receipts are coming soon.")}
+            onReceipt={handleReceipt}
+            receiptLoadingId={receiptLoadingId}
           />
         )}
 
@@ -436,7 +473,8 @@ export default function ParentDashboard() {
             list={past}
             past
             empty="No past bookings yet."
-            onReceipt={() => flash("Receipts are coming soon.")}
+            onReceipt={handleReceipt}
+            receiptLoadingId={receiptLoadingId}
           />
         )}
 
@@ -668,7 +706,14 @@ export default function ParentDashboard() {
 }
 
 /* ------------------------------ booking list ------------------------------ */
-function BookingList({ title, list, empty, past, onReceipt }) {
+function BookingList({
+  title,
+  list,
+  empty,
+  past,
+  onReceipt,
+  receiptLoadingId,
+}) {
   if (list === null) {
     return (
       <>
@@ -699,6 +744,8 @@ function BookingList({ title, list, empty, past, onReceipt }) {
               .join(", ");
             const img = cls.images && (cls.images[0]?.url || cls.images[0]);
             const status = String(b.status || "").toLowerCase();
+            const isPaid = PAID_STATUSES.includes(String(b.paymentStatus));
+            const isReceiptLoading = receiptLoadingId === b._id;
             return (
               <div
                 key={b._id}
@@ -744,10 +791,17 @@ function BookingList({ title, list, empty, past, onReceipt }) {
                   </span>
                 </div>
                 <button
-                  onClick={onReceipt}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold hover:border-brand-orange"
+                  onClick={() => isPaid && onReceipt(b._id, b.paymentStatus)}
+                  disabled={!isPaid || isReceiptLoading}
+                  title={
+                    isPaid
+                      ? "Download receipt"
+                      : "Receipt available once payment is complete"
+                  }
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold hover:border-brand-orange disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Receipt
+                  <IcDoc size={13} />
+                  {isReceiptLoading ? "Loading…" : "Receipt"}
                 </button>
               </div>
             );

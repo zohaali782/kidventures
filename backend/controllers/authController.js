@@ -1,10 +1,55 @@
+const crypto = require("crypto");
+
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
+const { sendAuthCookie, clearAuthCookie } = require("../utils/authCookie");
+const { sendEmail } = require("../utils/sendEmail");
+const { verifyEmail: verifyEmailTemplate } = require("../utils/emailTemplates");
 
 /**
  * Controller = wo function jo request aane par asal kaam karta hai.
  * Route sirf batata hai "ye URL aaye to ye function chalao".
  */
+
+/* --------------------------- Account lockout ---------------------------
+ *
+ * IP-based rate limit routes par lagi hai, lekin attacker IP badal badal kar
+ * ek hi account par attack kar sakta hai. Is liye account ka apna counter.
+ */
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MINUTES = 15;
+
+// Frontend (jahan user ko wapas bhejna hai)
+const APP_URL = () =>
+  (process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173")
+    .replace(/\/$/, "");
+
+// Backend (jahan verification link click hone par jayega)
+// .env me production ke liye SERVER_URL zaroor set karein.
+const API_URL = () =>
+  (process.env.SERVER_URL || `http://localhost:${process.env.PORT || 5000}`)
+    .replace(/\/$/, "");
+
+/**
+ * Verification email bhejta hai.
+ * Return: true agar email waqai bheji gayi, false agar SMTP set hi nahi hai.
+ *
+ * Yeh farq zaroori hai — dev machine par SMTP nahi hota, aur agar hum
+ * unverified users ko block karte rahen to koi login hi na kar sake.
+ */
+const sendVerificationEmail = async (user) => {
+  const rawToken = user.createEmailVerifyToken();
+  await user.save({ validateBeforeSave: false });
+
+  const verifyUrl = `${API_URL()}/api/auth/verify-email/${rawToken}`;
+  const { subject, html } = verifyEmailTemplate({
+    name: user.name,
+    verifyUrl,
+  });
+
+  const result = await sendEmail({ to: user.email, subject, html });
+  return result?.ok === true;
+};
 
 /**
  * @desc    Naya account banana (parent ya instructor)
@@ -23,7 +68,21 @@ const signup = async (req, res, next) => {
       });
     }
 
-    // 2. Email pehle se to registered nahi?
+    // 2. Type check — koi object bhej kar query se cheer-chaar na kar sake
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password format",
+      });
+    }
+
+    // 3. Password kitna mazboot hai
+    const weak = User.validatePasswordStrength(password);
+    if (weak) {
+      return res.status(400).json({ success: false, message: weak });
+    }
+
+    // 4. Email pehle se to registered nahi?
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({
@@ -32,11 +91,11 @@ const signup = async (req, res, next) => {
       });
     }
 
-    // 3. Role check - koi frontend se "admin" bhej kar admin na ban jaye
+    // 5. Role check - koi frontend se "admin" bhej kar admin na ban jaye
     const allowedRoles = ["parent", "instructor"];
     const userRole = allowedRoles.includes(role) ? role : "parent";
 
-    // 4. User banao (password model me khud hash ho jayega)
+    // 6. User banao (password model me khud hash ho jayega)
     const user = await User.create({
       name,
       email: email.toLowerCase(),
@@ -45,19 +104,48 @@ const signup = async (req, res, next) => {
       role: userRole,
     });
 
-    // 5. Token banao aur wapas bhejo - signup ke baad user seedha logged in
+    // 7. Verification email bhejo.
+    //    Agar SMTP configure hi nahi (local development), to email ka
+    //    intezar karwana bekar hai — account ko verified maan lo, warna
+    //    koi login hi na kar paye.
+    const emailSent = await sendVerificationEmail(user);
+
+    if (!emailSent) {
+      user.emailVerified = true;
+      user.emailVerifyToken = undefined;
+      user.emailVerifyExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+    }
+
+    // 8. Agar verification email gayi hai to abhi login NAHI karate —
+    //    pehle email confirm ho. (Login bhi unverified users ko rokta hai,
+    //    dono jagah ek hi usool.)
+    if (emailSent) {
+      return res.status(201).json({
+        success: true,
+        verificationRequired: true,
+        message:
+          "Account created. Please check your email to confirm your address, then log in.",
+      });
+    }
+
+    // 9. SMTP configure nahi (local dev) — seedha login kara dete hain.
+    //    Token httpOnly cookie mein jata hai, JSON response mein NAHI,
+    //    warna frontend use localStorage mein rakhta aur XSS se chura ja sakta.
     const token = generateToken(user._id);
+    sendAuthCookie(res, token);
 
     res.status(201).json({
       success: true,
+      verificationRequired: false,
       message: "Account created successfully",
-      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        emailVerified: user.emailVerified,
       },
     });
   } catch (error) {
@@ -81,42 +169,87 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Model me password "select: false" hai, is liye yahan maangna parta hai
+    // Type check — object bhej kar Mongo query se cheer-chaar na ho
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Model me ye fields "select: false" hain, is liye yahan maangne parte hain
     const user = await User.findOne({ email: email.toLowerCase() }).select(
-      "+password",
+      "+password +failedLoginAttempts +lockedUntil",
     );
 
-    // Security note: "email galat hai" ya "password galat hai" alag alag nahi batate -
-    // warna koi bhi check kar sakta hai ke konsi email registered hai.
+    // 1. Account bar bar galat password ki wajah se lock to nahi?
+    if (user && user.isLocked()) {
+      const minsLeft = Math.ceil((user.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed attempts. Try again in ${minsLeft} minute(s).`,
+      });
+    }
+
+    // 2. Security note: "email galat hai" ya "password galat hai" alag alag
+    //    nahi batate — warna koi bhi check kar sakta hai ke konsi email
+    //    registered hai.
     if (!user || !(await user.matchPassword(password))) {
+      // Galat password par counter barhao (user maujood ho to)
+      if (user) {
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+        if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+          user.lockedUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000);
+          user.failedLoginAttempts = 0;
+        }
+        await user.save({ validateBeforeSave: false });
+      }
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
-    if (user.isBlocked) {
+    if (user.isBlocked || user.isActive === false) {
       return res.status(403).json({
         success: false,
         message: "Your account has been blocked. Please contact support.",
       });
     }
 
+    // 3. Email verify hui ya nahi.
+    //    Bachon ki activities wali site hai — fake email se instructor
+    //    ban jana nahi chahiye.
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        message:
+          "Please confirm your email address first. Check your inbox for the confirmation link.",
+      });
+    }
+
+    // Kamyab login — counter reset
     user.lastLoginAt = new Date();
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
     await user.save({ validateBeforeSave: false });
 
     const token = generateToken(user._id);
+    sendAuthCookie(res, token);
 
     res.json({
       success: true,
       message: "Logged in successfully",
-      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        emailVerified: user.emailVerified,
       },
     });
   } catch (error) {
@@ -146,4 +279,93 @@ const getMe = async (req, res, next) => {
   }
 };
 
-module.exports = { signup, login, getMe };
+/**
+ * @desc    Logout — auth cookie khatam
+ * @route   POST /api/auth/logout
+ * @access  Public (cookie ho ya na ho, safely chal jata hai)
+ *
+ * httpOnly cookie ko JavaScript delete nahi kar sakti, is liye logout
+ * ke liye server ko batana parta hai.
+ */
+const logout = async (req, res) => {
+  clearAuthCookie(res);
+  res.json({ success: true, message: "Logged out successfully" });
+};
+
+/**
+ * @desc    Email verify karna (link click hone par)
+ * @route   GET /api/auth/verify-email/:token
+ * @access  Public
+ *
+ * Raw token sirf email me hota hai; DB me uska hash hai. Is liye yahan
+ * incoming token ko hash kar ke dhoondte hain — DB leak ho jaye to bhi
+ * koi stored token se verify nahi kar sakta.
+ */
+const verifyEmailToken = async (req, res, next) => {
+  try {
+    const hashed = crypto
+      .createHash("sha256")
+      .update(String(req.params.token || ""))
+      .digest("hex");
+
+    const user = await User.findOne({
+      emailVerifyToken: hashed,
+      emailVerifyExpires: { $gt: new Date() },
+    }).select("+emailVerifyToken +emailVerifyExpires");
+
+    if (!user) {
+      return res.redirect(`${APP_URL()}/login?verified=expired`);
+    }
+
+    user.emailVerified = true;
+    user.emailVerifyToken = undefined;
+    user.emailVerifyExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.redirect(`${APP_URL()}/login?verified=1`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Verification email dobara bhejna
+ * @route   POST /api/auth/resend-verification
+ * @access  Public
+ *
+ * Jawab hamesha ek jaisa hota hai — warna koi is endpoint se check kar
+ * sakta hai ke konsi email registered hai.
+ */
+const resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const genericReply = {
+      success: true,
+      message:
+        "If that email needs confirming, we've sent a new link. Please check your inbox.",
+    };
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.json(genericReply);
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (user && !user.emailVerified) {
+      await sendVerificationEmail(user);
+    }
+
+    return res.json(genericReply);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  signup,
+  login,
+  getMe,
+  logout,
+  verifyEmailToken,
+  resendVerification,
+};

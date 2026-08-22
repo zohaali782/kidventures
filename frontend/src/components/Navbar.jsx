@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { getStoredUser, logout, homeForRole } from "../api/auth";
 
@@ -26,10 +26,11 @@ const PinSmall = () => (
  * unke areas asaani se add ho saken - bas LOCATION_GROUPS mein
  * naya { emirate, areas } object daalna hoga.
  *
- * Area select karte hi seedha Activities page khulti hai us khaas
- * area ke hisaab se filtered (?location=) - yehi param jo sidebar
- * ka apna area filter bhi use karta hai, is liye dono me consistency
- * rehti hai.
+ * Area select karte hi current page ke hisaab se navigate karta hai -
+ * agar Instructors page par ho to instructors filter honge, warna
+ * default Activities page par filtered results khulte hain. Dono
+ * jagah wahi ?location= param use hota hai, is liye sidebar filters
+ * ke saath bhi consistency rehti hai.
  */
 const LOCATION_GROUPS = [
   { emirate: "Dubai", areas: ["Mirdif", "Jumeirah", "Arabian Ranches"] },
@@ -38,10 +39,13 @@ const LOCATION_GROUPS = [
 function NavLocation() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSelect = (area) => {
     setOpen(false);
-    navigate(`/activities?location=${encodeURIComponent(area)}`);
+    const base =
+      location.pathname === "/instructors" ? "/instructors" : "/activities";
+    navigate(`${base}?location=${encodeURIComponent(area)}`);
   };
 
   return (
@@ -126,8 +130,10 @@ function Navbar() {
     setUser(getStoredUser());
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // logout ab server ko call karta hai taake httpOnly cookie clear ho —
+    // JavaScript khud us cookie ko delete nahi kar sakti.
+    await logout();
     setUser(null);
     setProfileOpen(false);
     close();

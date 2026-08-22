@@ -1,5 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const { ipKeyGenerator } = require("express-rate-limit");
 const router = express.Router();
 
 const {
@@ -9,6 +10,7 @@ const {
   getBookingById,
   cancelBooking,
   getSessionAttendees,
+  getBookingReceipt,
 } = require("../controllers/bookingController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -31,7 +33,7 @@ const bookingLimiter = rateLimit({
   max: 6,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+  keyGenerator: (req) => req.user?._id?.toString() || ipKeyGenerator(req.ip),
   message: {
     success: false,
     message:
@@ -61,6 +63,7 @@ router.get(
 
 /* ------------------------- Parent / Instructor -------------------------- */
 router.get("/:id", getBookingById); // andar access check hai
+router.get("/:id/receipt", getBookingReceipt); // andar access check hai
 router.put("/:id/cancel", cancelBooking); // andar ownership check hai
 
 module.exports = router;

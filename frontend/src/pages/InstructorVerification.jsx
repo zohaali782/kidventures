@@ -80,7 +80,7 @@ export default function InstructorVerification({
 
   const [langInput, setLangInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(null); // "emiratesId" | ...
+  const [uploading, setUploading] = useState(null); // "emiratesId" | ... | "avatar"
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -306,6 +306,12 @@ export default function InstructorVerification({
           <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <h3 className="mb-4 text-sm font-bold">Profile details</h3>
             <div className="space-y-4">
+              <AvatarUpload
+                avatarUrl={profile?.user?.avatar?.url}
+                busy={uploading === "avatar"}
+                onFile={uploadAvatar}
+              />
+
               <div>
                 <label className={labelCls}>Headline</label>
                 <input
@@ -677,6 +683,50 @@ export default function InstructorVerification({
                 : "Complete the remaining items, then submit."}
           </div>
         </aside>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------ avatar upload ------------------------------ */
+function AvatarUpload({ avatarUrl, busy, onFile }) {
+  const ref = useRef(null);
+  return (
+    <div className="flex items-center gap-4">
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt="Your profile photo"
+          className="h-16 w-16 rounded-full object-cover"
+        />
+      ) : (
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-gold text-xl font-bold text-white">
+          ?
+        </div>
+      )}
+      <div>
+        <div className="mb-1 block text-xs font-semibold text-brand-brown/80">
+          Profile photo
+        </div>
+        <input
+          ref={ref}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) onFile(file);
+          }}
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => ref.current?.click()}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-brown hover:border-brand-orange disabled:opacity-50"
+        >
+          {busy ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
+        </button>
       </div>
     </div>
   );

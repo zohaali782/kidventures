@@ -1,25 +1,19 @@
 import { Link } from "react-router-dom";
 import logo from "../assets/logo.png";
 
-const colors = { gold: "#F4C542", cream: "#FBEDDE", brown: "#3D2B1F" };
-
 function FooterCol({ title, links }) {
   return (
     <div>
-      <h4 style={{ color: colors.gold, marginBottom: "10px" }}>{title}</h4>
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <h4 className="mb-2.5 font-bold text-brand-gold">{title}</h4>
+      <div className="flex flex-col gap-1.5">
         {links.map((l) => (
-          <a
-            key={l}
-            href="#"
-            style={{
-              color: colors.cream,
-              textDecoration: "none",
-              fontSize: "13px",
-            }}
+          <Link
+            key={l.label}
+            to={l.to}
+            className="text-[13px] text-brand-cream no-underline hover:underline"
           >
-            {l}
-          </a>
+            {l.label}
+          </Link>
         ))}
       </div>
     </div>
@@ -28,52 +22,34 @@ function FooterCol({ title, links }) {
 
 function Footer() {
   return (
-    <footer
-      style={{
-        backgroundColor: colors.brown,
-        color: colors.cream,
-        padding: "40px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "30px",
-          maxWidth: "1100px",
-          margin: "0 auto",
-        }}
-      >
-        <div style={{ maxWidth: "250px" }}>
-          <img
-            src={logo}
-            alt="Kidventures"
-            style={{ height: "55px", marginBottom: "10px" }}
-          />
-          <p style={{ fontSize: "13px", opacity: 0.8 }}>
+    <footer className="bg-brand-brown px-6 py-10 text-brand-cream sm:px-10">
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-8 sm:flex-row sm:flex-wrap sm:justify-between">
+        <div className="max-w-[250px]">
+          <img src={logo} alt="Kidventures" className="mb-2.5 h-[55px]" />
+          <p className="text-[13px] opacity-80">
             Discover, learn, and grow with trusted instructors in Dubai.
           </p>
         </div>
         <FooterCol
           title="Quick Links"
-          links={["About", "How It Works", "Become an Instructor", "Contact"]}
+          links={[
+            { label: "About", to: "/about" },
+            { label: "How It Works", to: "/how-it-works" },
+            { label: "Become an Instructor", to: "/become-instructor" },
+            { label: "Contact", to: "/contact" },
+          ]}
         />
         <FooterCol
           title="Support"
-          links={["FAQs", "Privacy Policy", "Terms & Conditions"]}
+          links={[
+            { label: "FAQs", to: "/faqs" },
+            { label: "Privacy Policy", to: "/privacy-policy" },
+            { label: "Terms & Conditions", to: "/terms" },
+            { label: "Refund Policy", to: "/refund-policy" },
+          ]}
         />
       </div>
-      <div
-        style={{
-          textAlign: "center",
-          marginTop: "30px",
-          paddingTop: "20px",
-          borderTop: "1px solid rgba(251,237,222,0.2)",
-          fontSize: "12px",
-          opacity: 0.7,
-        }}
-      >
+      <div className="mx-auto mt-7.5 max-w-[1100px] border-t border-brand-cream/20 pt-5 text-center text-xs opacity-70">
         © 2026 Kidventures. All rights reserved.
       </div>
     </footer>

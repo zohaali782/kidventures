@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Activity = require("../models/Activity");
 const Child = require("../models/Child");
+const PDFDocument = require("pdfkit");
 
 /**
  * Commission .env se aati hai. Booking ke waqt ka rate booking me
@@ -516,6 +517,185 @@ const getSessionAttendees = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Booking ki PDF receipt
+ * @route   GET /api/bookings/:id/receipt
+ * @access  Parent (apni) / Instructor (apni class ki) / Admin
+ *
+ * Sirf paid bookings ke liye receipt banti hai - pending/unpaid ka
+ * koi receipt nahi (kyunki abhi tak paisa liya hi nahi gaya).
+ */
+const getBookingReceipt = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate("activity", "location")
+      .populate("instructor", "name")
+      .populate("parent", "name email");
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    // ACCESS CHECK - wahi teen log jo getBookingById me hain
+    const userId = req.user._id.toString();
+    const isParent = booking.parent._id.toString() === userId;
+    const isInstructor = booking.instructor._id.toString() === userId;
+    const isAdmin = req.user.role === "admin";
+
+    if (!isParent && !isInstructor && !isAdmin) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
+    }
+
+    const paidStatuses = ["paid", "partially_refunded", "refunded"];
+    if (!paidStatuses.includes(booking.paymentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "A receipt is only available once payment is complete",
+      });
+    }
+
+    const BRAND = {
+      gold: "#F4C542",
+      orange: "#F5941F",
+      brown: "#3D2B1F",
+      gray: "#6B6B6B",
+      line: "#E5E5E5",
+    };
+    const aed = (n) => `AED ${Number(n || 0).toFixed(2)}`;
+    const fmtDate = (d) =>
+      new Date(d).toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="Kidventures-Receipt-${booking.bookingNumber}.pdf"`,
+    );
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    doc.pipe(res);
+
+    /* ---------- Header band ---------- */
+    doc.rect(0, 0, doc.page.width, 90).fill(BRAND.gold);
+    doc
+      .fillColor(BRAND.brown)
+      .font("Helvetica-Bold")
+      .fontSize(24)
+      .text("Kidventures", 50, 30);
+    doc.font("Helvetica").fontSize(10).text("Booking Receipt", 50, 60);
+
+    /* ---------- Title + ref ---------- */
+    doc
+      .fillColor(BRAND.brown)
+      .font("Helvetica-Bold")
+      .fontSize(16)
+      .text(booking.activityTitle, 50, 115);
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(BRAND.gray)
+      .text(`Booking Ref: ${booking.bookingNumber}`, 50, 137)
+      .text(`Issued: ${fmtDate(new Date())}`, 50, 151);
+
+    let y = 180;
+    const row = (label, value, bold = false) => {
+      doc
+        .fillColor(BRAND.gray)
+        .font("Helvetica")
+        .fontSize(10)
+        .text(label, 50, y);
+      doc
+        .fillColor(BRAND.brown)
+        .font(bold ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(bold ? 11 : 10)
+        .text(value, 300, y, { width: 245, align: "right" });
+      y += 18;
+    };
+    const heading = (text) => {
+      doc
+        .fillColor(BRAND.brown)
+        .font("Helvetica-Bold")
+        .fontSize(12)
+        .text(text, 50, y);
+      y += 20;
+    };
+    const divider = () => {
+      doc.moveTo(50, y).lineTo(545, y).strokeColor(BRAND.line).stroke();
+      y += 14;
+    };
+
+    heading("Class Details");
+    row("Instructor", booking.instructor?.name || "—");
+    row("Date", fmtDate(booking.sessionDate));
+    row(
+      "Time",
+      `${booking.startTime}${booking.endTime ? " – " + booking.endTime : ""}`,
+    );
+    if (booking.activity?.location?.area) {
+      row(
+        "Location",
+        `${booking.activity.location.area}${
+          booking.activity.location.city
+            ? ", " + booking.activity.location.city
+            : ""
+        }`,
+      );
+    }
+
+    y += 6;
+    heading("Children Attending");
+    booking.children.forEach((c) => row(c.name, `${c.age} years old`));
+
+    y += 6;
+    divider();
+
+    heading("Payment Summary");
+    row(
+      `${aed(booking.pricePerChild)} × ${booking.numberOfChildren} child${
+        booking.numberOfChildren > 1 ? "ren" : ""
+      }`,
+      aed(booking.subtotalBeforeDiscount),
+    );
+    if (Number(booking.discountAmount) > 0) {
+      row(
+        `Sibling discount (${booking.discountPercent}%)`,
+        `- ${aed(booking.discountAmount)}`,
+      );
+    }
+    y += 2;
+    divider();
+    row("Total Paid", aed(booking.totalAmount), true);
+    row(
+      "Payment Status",
+      booking.paymentStatus.replace("_", " ").toUpperCase(),
+    );
+
+    /* ---------- Footer ---------- */
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor(BRAND.gray)
+      .text(
+        "Kidventures, Dubai, UAE — for any questions, contact us through the website.",
+        50,
+        760,
+        { align: "center", width: 495 },
+      );
+
+    doc.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -523,4 +703,5 @@ module.exports = {
   getBookingById,
   cancelBooking,
   getSessionAttendees,
+  getBookingReceipt,
 };

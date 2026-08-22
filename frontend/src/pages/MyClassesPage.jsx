@@ -5,6 +5,14 @@ import api from "../api/axios";
 import { toList } from "../api/normalize";
 import { logout } from "../api/auth";
 
+/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
+   ka na ho, waisi hi wapas kar deta hai. */
+const cldOptimize = (url, width = 200) => {
+  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com"))
+    return url;
+  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
+};
+
 /* ------------------------------ icons ------------------------------ */
 const I = ({ children, size = 18, sw = 2 }) => (
   <svg
@@ -385,7 +393,7 @@ export default function MyClassesPage() {
                     <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-cream">
                       {cover ? (
                         <img
-                          src={cover}
+                          src={cldOptimize(cover, 160)}
                           alt=""
                           className="h-full w-full object-cover"
                         />
@@ -438,17 +446,13 @@ export default function MyClassesPage() {
 
                     {/* actions */}
                     <div className="flex gap-2">
-                      <button
+                      <Link
                         title="Edit"
-                        onClick={() =>
-                          showToast(
-                            "Editing a class is coming in the next step.",
-                          )
-                        }
+                        to={`/instructor/edit-class/${c._id}`}
                         className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white hover:border-brand-orange"
                       >
                         <IcEdit size={16} />
-                      </button>
+                      </Link>
                       <button
                         title="Delete"
                         onClick={() => setConfirmDelete(c)}
@@ -470,7 +474,7 @@ export default function MyClassesPage() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-5">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6">
             <h3 className="mb-2 text-lg font-bold">
-              Delete “{confirmDelete.title}”?
+              Delete "{confirmDelete.title}"?
             </h3>
             <p className="mb-5 text-sm opacity-70">
               If this class has bookings it will be archived (kept for booking

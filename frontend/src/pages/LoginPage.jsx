@@ -17,6 +17,27 @@ function LoginPage() {
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Signup / email-verification / session-expiry ke baad yahan aate hain —
+  // user ko bata dena chahiye ke hua kya hai.
+  const params = new URLSearchParams(location.search);
+  const notice =
+    {
+      "verify=1":
+        "Almost done — we've emailed you a confirmation link. Click it, then log in here.",
+      "verified=1": "Email confirmed! You can log in now.",
+      "verified=expired":
+        "That confirmation link has expired. Request a new one below.",
+      "expired=1": "Your session expired. Please log in again.",
+    }[
+      params.has("verify")
+        ? `verify=${params.get("verify")}`
+        : params.has("verified")
+          ? `verified=${params.get("verified")}`
+          : params.has("expired")
+            ? `expired=${params.get("expired")}`
+            : ""
+    ] || "";
+
   const validate = () => {
     const e = {};
     if (!email.trim()) e.email = "Enter your email";
@@ -38,14 +59,16 @@ function LoginPage() {
         email: email.trim(),
         password,
       });
-      const { token, user } = parseAuthResponse(res.data);
-      if (!token) {
+      // Token ab response mein nahi aata — woh httpOnly cookie mein set ho
+      // chuka hai. Yahan sirf user info milti hai (navbar/redirect ke liye).
+      const { user } = parseAuthResponse(res.data);
+      if (!user) {
         setServerError(
-          "Logged in, but no token came back — check the API response shape in src/api/auth.js.",
+          "Logged in, but no user info came back — check the API response shape in src/api/auth.js.",
         );
         return;
       }
-      saveAuth({ token, user });
+      saveAuth({ user });
       const dest = location.state?.from || homeForRole(user?.role);
       navigate(dest, { replace: true });
     } catch (err) {
@@ -83,6 +106,12 @@ function LoginPage() {
           <p className="mb-6 text-[13px] text-brand-brown/70">
             Log in to book classes and manage your account.
           </p>
+
+          {notice && !serverError && (
+            <div className="mb-4 rounded-[10px] border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-[13px] text-brand-brown">
+              {notice}
+            </div>
+          )}
 
           {serverError && (
             <div className="mb-4 rounded-[10px] border border-[#c0392b]/30 bg-[#c0392b]/10 px-4 py-3 text-[13px] text-[#c0392b]">

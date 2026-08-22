@@ -66,9 +66,17 @@ function SignupPage() {
         phone: form.phone.trim(),
         password: form.password,
       });
-      const { token, user } = parseAuthResponse(res.data);
-      if (token) {
-        saveAuth({ token, user });
+      // Agar verification email gayi hai to abhi login nahi hua —
+      // pehle email confirm karni hai.
+      if (res.data?.verificationRequired) {
+        navigate("/login?verify=1", { replace: true });
+        return;
+      }
+
+      // Warna token httpOnly cookie mein set ho chuka hai — yahan sirf user info.
+      const { user } = parseAuthResponse(res.data);
+      if (user) {
+        saveAuth({ user });
         navigate(homeForRole(user?.role || role), { replace: true });
       } else {
         navigate("/login", { replace: true });

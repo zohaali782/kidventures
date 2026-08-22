@@ -5,6 +5,14 @@ import api from "../api/axios";
 import { toList } from "../api/normalize";
 import { logout } from "../api/auth";
 
+/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
+   ka na ho, waisi hi wapas kar deta hai. */
+const cldOptimize = (url, width = 150) => {
+  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com"))
+    return url;
+  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
+};
+
 /* -------------------------------- icons -------------------------------- */
 const I = ({ children, size = 18, sw = 2 }) => (
   <svg
@@ -726,7 +734,7 @@ export default function AdminDashboard() {
                       <div className="flex flex-wrap items-start gap-3.5">
                         {p.user?.avatar?.url ? (
                           <img
-                            src={p.user.avatar.url}
+                            src={cldOptimize(p.user.avatar.url, 100)}
                             alt=""
                             className="h-12 w-12 shrink-0 rounded-full object-cover"
                           />
@@ -807,7 +815,7 @@ export default function AdminDashboard() {
                   >
                     {ins.user?.avatar?.url ? (
                       <img
-                        src={ins.user.avatar.url}
+                        src={cldOptimize(ins.user.avatar.url, 80)}
                         alt=""
                         className="h-10 w-10 shrink-0 rounded-full object-cover"
                       />
@@ -901,7 +909,7 @@ export default function AdminDashboard() {
                       <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-brand-cream">
                         {c.images?.[0]?.url && (
                           <img
-                            src={c.images[0].url}
+                            src={cldOptimize(c.images[0].url, 90)}
                             alt=""
                             className="h-full w-full object-cover"
                           />
@@ -1016,37 +1024,52 @@ export default function AdminDashboard() {
                   No bookings yet.
                 </div>
               ) : (
-                bookings.map((b, i) => (
-                  <div
-                    key={b._id}
-                    className={`flex flex-wrap items-center gap-3.5 py-3.5 ${
-                      i < bookings.length - 1 ? "border-b border-gray-100" : ""
-                    }`}
-                  >
-                    <div className="min-w-[180px] flex-1">
+                bookings.map((b, i) => {
+                  const isRefunded =
+                    b.status === "refunded" ||
+                    b.paymentStatus === "refunded" ||
+                    b.paymentStatus === "partially_refunded";
+                  return (
+                    <div
+                      key={b._id}
+                      className={`flex flex-wrap items-center gap-3.5 py-3.5 ${
+                        isRefunded ? "bg-red-50/60" : ""
+                      } ${
+                        i < bookings.length - 1
+                          ? "border-b border-gray-100"
+                          : ""
+                      }`}
+                    >
+                      <div className="min-w-[180px] flex-1">
+                        <div className="text-sm font-bold">
+                          {b.activityTitle || b.activity?.title || "Class"}
+                        </div>
+                        <div className="text-xs opacity-60">
+                          {b.parent?.name || "Parent"} · {b.bookingNumber} ·{" "}
+                          {fmtDate(b.createdAt)}
+                        </div>
+                        {isRefunded && (
+                          <div className="mt-1 text-[11px] font-semibold text-red-600">
+                            ⚠ Do not pay out the instructor for this booking
+                          </div>
+                        )}
+                      </div>
                       <div className="text-sm font-bold">
-                        {b.activityTitle || b.activity?.title || "Class"}
+                        {AED(b.totalAmount)}
                       </div>
-                      <div className="text-xs opacity-60">
-                        {b.parent?.name || "Parent"} · {b.bookingNumber} ·{" "}
-                        {fmtDate(b.createdAt)}
-                      </div>
+                      <StatusPill status={b.status} />
+                      {(b.status === "confirmed" ||
+                        b.paymentStatus === "partially_refunded") && (
+                        <button
+                          onClick={() => setRefundFor(b)}
+                          className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600"
+                        >
+                          Refund
+                        </button>
+                      )}
                     </div>
-                    <div className="text-sm font-bold">
-                      {AED(b.totalAmount)}
-                    </div>
-                    <StatusPill status={b.status} />
-                    {(b.status === "confirmed" ||
-                      b.paymentStatus === "partially_refunded") && (
-                      <button
-                        onClick={() => setRefundFor(b)}
-                        className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600"
-                      >
-                        Refund
-                      </button>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}
@@ -1297,7 +1320,7 @@ export default function AdminDashboard() {
             <div className="mb-4 h-28 overflow-hidden rounded-xl bg-brand-cream">
               {viewClass.images?.[0]?.url && (
                 <img
-                  src={viewClass.images[0].url}
+                  src={cldOptimize(viewClass.images[0].url, 400)}
                   alt=""
                   className="h-full w-full object-cover"
                 />

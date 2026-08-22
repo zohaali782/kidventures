@@ -66,7 +66,12 @@ const areaCoords = (area) => {
   if (!area) return null;
   return AREA_COORDS[String(area).trim().toLowerCase()] || DUBAI_CENTER;
 };
-
+/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
+   ka na ho, waisi hi wapas kar deta hai. */
+const cldOptimize = (url, width = 500) => {
+  if (!url || !url.includes("res.cloudinary.com")) return url;
+  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
+};
 const sameDay = (a, b) =>
   a &&
   b &&
@@ -547,7 +552,7 @@ function ActivityDetailPage() {
             <div className="relative flex h-[240px] flex-[2] items-center justify-center overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px]">
               {cover ? (
                 <img
-                  src={cover}
+                  src={cldOptimize(cover, 700)}
                   alt={a.title}
                   className="h-full w-full object-cover"
                 />
@@ -580,7 +585,7 @@ function ActivityDetailPage() {
                 {images.slice(1, 4).map((src, i) => (
                   <img
                     key={i}
-                    src={src}
+                    src={cldOptimize(src, 200)}
                     alt={`${a.title} ${i + 2}`}
                     className="h-full w-full flex-1 rounded-xl object-cover"
                   />
@@ -597,7 +602,7 @@ function ActivityDetailPage() {
             <div className="flex items-center gap-2">
               {insAvatar ? (
                 <img
-                  src={insAvatar}
+                  src={cldOptimize(insAvatar, 60)}
                   alt={insName}
                   className="h-7 w-7 rounded-full object-cover"
                 />
@@ -863,7 +868,7 @@ function ActivityDetailPage() {
                       <div className="mb-1 flex items-center gap-2">
                         {pickImg(rv.user?.avatar) ? (
                           <img
-                            src={pickImg(rv.user?.avatar)}
+                            src={cldOptimize(pickImg(rv.user?.avatar), 60)}
                             alt=""
                             className="h-7 w-7 rounded-full object-cover"
                           />
@@ -1012,7 +1017,7 @@ function ActivityDetailPage() {
             <div className="mb-3 flex items-center gap-3">
               {insAvatar ? (
                 <img
-                  src={insAvatar}
+                  src={cldOptimize(insAvatar, 100)}
                   alt={insName}
                   className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
                 />
@@ -1061,7 +1066,7 @@ function ActivityDetailPage() {
                 <div className="relative h-[130px] bg-brand-cream">
                   {r.image && (
                     <img
-                      src={r.image}
+                      src={cldOptimize(r.image, 300)}
                       alt={r.title}
                       loading="lazy"
                       className="h-full w-full object-cover"
