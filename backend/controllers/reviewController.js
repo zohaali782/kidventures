@@ -1,12 +1,33 @@
+const mongoose = require("mongoose");
+
 const Review = require("../models/Review");
 const Activity = require("../models/Activity");
 const Booking = require("../models/Booking");
 
+/** String ko ObjectId banata hai — ghalat ho to null */
+const toObjectId = (value) => {
+  const str = String(value || "");
+  return mongoose.Types.ObjectId.isValid(str)
+    ? new mongoose.Types.ObjectId(str)
+    : null;
+};
+
 /**
  * Activity ki rating.average aur rating.count recompute karta hai
  * saari uski reviews se. Review add/edit/delete ke baad call hota hai.
+ *
+ * BUGFIX: pehle yahan activityId seedha aata tha — aur woh request body ki
+ * STRING hoti thi. Aggregation pipeline me Mongoose schema casting NAHI
+ * lagti (normal find() ke bar-aks), is liye string kabhi ObjectId se match
+ * hi nahi karti thi. Nateeja: $match hamesha khali, aur har review ke baad
+ * class ki rating 0 set ho jati thi.
+ *
+ * Ab ObjectId me badal kar bhejte hain.
  */
-const recomputeActivityRating = async (activityId) => {
+const recomputeActivityRating = async (activityIdInput) => {
+  const activityId = toObjectId(activityIdInput);
+  if (!activityId) return;
+
   const stats = await Review.aggregate([
     { $match: { activity: activityId } },
     {
@@ -42,9 +63,17 @@ const getReviews = async (req, res, next) => {
         .json({ success: false, message: "activity query param is required" });
     }
 
+    // Ghalat id par pehle CastError se 500 aata tha — ab saaf 400
+    const activityId = toObjectId(activity);
+    if (!activityId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid activity id" });
+    }
+
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
 
-    const reviews = await Review.find({ activity })
+    const reviews = await Review.find({ activity: activityId })
       .populate("user", "name avatar")
       .sort({ createdAt: -1 })
       .limit(limit);
@@ -75,39 +104,76 @@ const createReview = async (req, res, next) => {
       });
     }
 
-    const numRating = Number(rating);
-    if (numRating < 1 || numRating > 5) {
+    const activityId = toObjectId(activity);
+    if (!activityId) {
       return res
         .status(400)
-        .json({ success: false, message: "Rating must be between 1 and 5" });
+        .json({ success: false, message: "Invalid activity id" });
     }
 
-    const activityDoc = await Activity.findById(activity);
+    /**
+     * Number.isInteger ka check zaroori hai.
+     *
+     * Pehle sirf "numRating < 1 || numRating > 5" tha. Number("abc") = NaN
+     * hota hai, aur NaN ka har comparison false — yaani NaN dono checks paar
+     * kar jata aur aage Mongoose par crash karta. 4.7 jaisi rating bhi chal
+     * jati thi, halanke stars poore hi hote hain.
+     */
+    const numRating = Number(rating);
+    if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be a whole number between 1 and 5",
+      });
+    }
+
+    const activityDoc = await Activity.findById(activityId);
     if (!activityDoc) {
       return res
         .status(404)
         .json({ success: false, message: "Class not found" });
     }
 
-    // Ownership check: parent ne is class ki booking ki ho aur
-    // uska status confirmed ya completed ho.
-    const hasBooking = await Booking.exists({
+    /**
+     * Ownership check: parent ne is class ki booking ki ho.
+     *
+     * AUR — class ho bhi chuki ho.
+     *
+     * Pehle sirf status "confirmed" kaafi tha, jis ka matlab tha ke koi agle
+     * mahine ki class book kar ke usi waqt 5-star (ya 1-star) review likh
+     * sakta tha. Yaani instructor apne doston se bina attend kiye achi
+     * rating lagwa sakta, aur koi harif bina gaye buri rating de sakta.
+     *
+     * Ab session ki date guzri hui honi chahiye.
+     */
+    const attendedBooking = await Booking.findOne({
       parent: req.user._id,
-      activity,
+      activity: activityId,
       status: { $in: ["confirmed", "completed"] },
-    });
+      sessionDate: { $lt: new Date() },
+    }).select("_id");
 
-    if (!hasBooking) {
+    if (!attendedBooking) {
+      // Booking hai magar class abhi hui nahi — alag message, taake
+      // parent ko samajh aaye ke masla kya hai
+      const upcoming = await Booking.exists({
+        parent: req.user._id,
+        activity: activityId,
+        status: { $in: ["confirmed", "completed"] },
+      });
+
       return res.status(403).json({
         success: false,
-        message: "You can only review classes you've booked",
+        message: upcoming
+          ? "You can leave a review once the class has taken place"
+          : "You can only review classes you've booked",
       });
     }
 
     let review;
     try {
       review = await Review.create({
-        activity,
+        activity: activityId,
         user: req.user._id,
         rating: numRating,
         comment: comment?.trim(),
@@ -123,7 +189,7 @@ const createReview = async (req, res, next) => {
       throw err;
     }
 
-    await recomputeActivityRating(activity);
+    await recomputeActivityRating(activityId);
 
     const populated = await review.populate("user", "name avatar");
 

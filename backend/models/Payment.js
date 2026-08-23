@@ -79,6 +79,16 @@ const paymentSchema = new mongoose.Schema(
     payoutDate: Date,
     payoutReference: String,
     payoutNote: String,
+
+    /* --------------------------- Needs attention --------------------------- */
+    /**
+     * Jab paisa aa jaye lekin booking se joda na ja sake — misaal ke taur par
+     * parent ne booking cancel kar di aur us ke baad Stripe ka webhook aaya.
+     * Aise payment ka refund insaan ko karna parta hai, is liye nishan laga
+     * dete hain warna woh khamoshi se gum ho jate hain.
+     */
+    needsAttention: { type: Boolean, default: false, index: true },
+    attentionReason: String,
   },
   { timestamps: true },
 );

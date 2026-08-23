@@ -199,7 +199,7 @@ const rAvg = (c) =>
   (typeof c?.rating === "number" ? c.rating : 0) ??
   0;
 const rCnt = (c) => c?.rating?.count ?? c?.ratingCount ?? c?.reviews ?? 0;
-const cPrice = (c) => c?.displayPrice ?? c?.price ?? c?.priceDisplay ?? null;
+const cPrice = (c) => c?.price ?? c?.priceDisplay ?? null;
 const cImg = (c) =>
   c?.image || (Array.isArray(c?.images) && c.images[0]) || c?.cover || "";
 const cId = (c) => c?.id || c?._id;

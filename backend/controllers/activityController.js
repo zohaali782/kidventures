@@ -1,5 +1,6 @@
 const Activity = require("../models/Activity");
 const Category = require("../models/Category");
+const { cleanVideoUrl } = require("../utils/safeUrl");
 
 /**
  * SECURITY helper: user ka likha hua text seedha regex me daalna khatarnaak hai
@@ -8,6 +9,16 @@ const Category = require("../models/Category");
  */
 const escapeRegex = (text) =>
   String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Search query ki hadd — bina limit ke har request poori collection scan karti hai */
+const MAX_SEARCH_LENGTH = 80;
+
+/** Query param ko number banata hai — NaN/Infinity par null deta hai */
+const cleanNumber = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
 
 /**
  * @desc    Sab classes - search, filters, pagination ke saath
@@ -46,18 +57,24 @@ const getActivities = async (req, res, next) => {
       filter.category = categoryDoc._id;
     }
 
-    if (age !== undefined && age !== "") {
-      const childAge = Number(age);
-      if (!Number.isNaN(childAge)) {
-        filter.ageMin = { $lte: childAge };
-        filter.ageMax = { $gte: childAge };
-      }
+    const childAge = cleanNumber(age);
+    if (childAge !== null) {
+      filter.ageMin = { $lte: childAge };
+      filter.ageMax = { $gte: childAge };
     }
 
-    if (minPrice || maxPrice) {
+    /**
+     * Pehle yahan Number(minPrice) seedha filter me chala jata tha.
+     * "?minPrice=abc" par woh NaN banta, Mongoose CastError phenkta,
+     * aur user ko 500 error milta. Ab ghalat value bas nazarandaz ho jati hai.
+     */
+    const min = cleanNumber(minPrice);
+    const max = cleanNumber(maxPrice);
+
+    if (min !== null || max !== null) {
       filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
+      if (min !== null) filter.price.$gte = min;
+      if (max !== null) filter.price.$lte = max;
     }
 
     if (format === "online" || format === "in-person") {
@@ -83,11 +100,18 @@ const getActivities = async (req, res, next) => {
     }
 
     if (q) {
-      const safe = escapeRegex(String(q).trim());
-      filter.$or = [
-        { title: new RegExp(safe, "i") },
-        { description: new RegExp(safe, "i") },
-      ];
+      // Length cap: title/description par koi text index nahi hai, is liye
+      // har search poori collection scan karti hai. Bina hadd ke koi bara
+      // string bhej kar server ko bewajah bojh de sakta hai.
+      const trimmed = String(q).trim().slice(0, MAX_SEARCH_LENGTH);
+
+      if (trimmed) {
+        const safe = escapeRegex(trimmed);
+        filter.$or = [
+          { title: new RegExp(safe, "i") },
+          { description: new RegExp(safe, "i") },
+        ];
+      }
     }
 
     const sortOptions = {
@@ -206,7 +230,10 @@ const getActivityById = async (req, res, next) => {
     Activity.updateOne(
       { _id: activity._id },
       { $inc: { "stats.viewCount": 1 } },
-    ).catch(() => {});
+      // viewCount ahem nahi, lekin baar baar fail ho to pata chalna chahiye
+    ).catch((err) =>
+      console.error(`! viewCount update failed: ${err.message}`),
+    );
 
     res.json({ success: true, activity });
   } catch (error) {
@@ -216,12 +243,25 @@ const getActivityById = async (req, res, next) => {
 
 /**
  * Instructor ye fields bhej sakta hai. Baqi sab ignore.
+ *
+ * SECURITY: "images" jaan boojh kar YAHAN NAHI hai.
+ *
+ * Pehle woh is list me tha, jis ka matlab tha ke instructor request body me
+ * apni marzi ki images array bhej sakta tha — apni marzi ke publicId ke sath.
+ * Aur deleteActivityImage usi publicId ko Cloudinary se hata deta tha.
+ *
+ * Yaani: instructor A kisi doosre ki class ka image URL dekhta (publicId URL
+ * me hi likha hota hai), use apni class me daal deta, phir delete kar deta —
+ * aur doosre instructor ka image hamesha ke liye khatam. Us ko khabar bhi na
+ * hoti.
+ *
+ * Ab images sirf upload/delete endpoints se manage hoti hain, jahan ownership
+ * check maujood hai.
  */
 const EDITABLE_FIELDS = [
   "title",
   "description",
   "whatChildrenLearn",
-  "images",
   "videoUrl",
   "category",
   "suggestedCategory",
@@ -250,6 +290,19 @@ const createActivity = async (req, res, next) => {
     EDITABLE_FIELDS.forEach((field) => {
       if (req.body[field] !== undefined) data[field] = req.body[field];
     });
+
+    // videoUrl sirf https YouTube/Vimeo — warna "javascript:" ya koi bhi
+    // bahri link embed ho sakta hai
+    if (data.videoUrl !== undefined) {
+      const safeVideo = cleanVideoUrl(data.videoUrl);
+      if (safeVideo === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Video link must be a YouTube or Vimeo https URL",
+        });
+      }
+      data.videoUrl = safeVideo;
+    }
 
     // "Other" case: koi official category nahi, sirf free-text suggestion.
     const isOther =
@@ -337,9 +390,76 @@ const updateActivity = async (req, res, next) => {
     // "Other" class ki category undefined ho sakti hai - guard.
     const oldCategory = activity.category ? activity.category.toString() : null;
 
+    /**
+     * MODERATION BYPASS SE BACHAO.
+     *
+     * Pehle masla yeh tha: instructor ek seedhi saadhi class submit karta,
+     * admin use approve kar deta (status "active"), aur us ke BAAD woh title,
+     * description, price, location — sab badal deta. Status "active" hi rehta,
+     * yaani badla hua content live chala jata aur kisi admin ki nazar us par
+     * na parti.
+     *
+     * Bachon ki activities wali site par yeh sab se ahem gap hai — approval
+     * ka matlab hi khatam ho jata hai agar approval ke baad content badla ja
+     * sake.
+     *
+     * Ab: agar non-admin kisi LIVE class ka maadi content badle, to class
+     * wapas "pending" ho jati hai aur dobara review me jati hai.
+     * Chhoti cheezein (materialsNote, whatToBring waghera) is me shaamil
+     * nahi — un par dobara review ki zaroorat nahi.
+     */
+    // videoUrl ki jaanch update par bhi — create jaisi hi
+    if (req.body.videoUrl !== undefined) {
+      const safeVideo = cleanVideoUrl(req.body.videoUrl);
+      if (safeVideo === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Video link must be a YouTube or Vimeo https URL",
+        });
+      }
+      req.body.videoUrl = safeVideo;
+    }
+
+    const REVIEW_TRIGGERING_FIELDS = [
+      "title",
+      "description",
+      "whatChildrenLearn",
+      "videoUrl",
+      "category",
+      "suggestedCategory",
+      "ageMin",
+      "ageMax",
+      "price",
+      "format",
+      "location",
+      "capacity",
+    ];
+
+    const changedFields = [];
+
     EDITABLE_FIELDS.forEach((field) => {
-      if (req.body[field] !== undefined) activity[field] = req.body[field];
+      if (req.body[field] === undefined) return;
+
+      const before = JSON.stringify(activity[field] ?? null);
+      const after = JSON.stringify(req.body[field] ?? null);
+
+      if (before !== after) changedFields.push(field);
+
+      activity[field] = req.body[field];
     });
+
+    const materiallyChanged = changedFields.some((f) =>
+      REVIEW_TRIGGERING_FIELDS.includes(f),
+    );
+
+    const sentBackForReview =
+      !isAdmin && activity.status === "active" && materiallyChanged;
+
+    if (sentBackForReview) {
+      activity.status = "pending";
+      activity.statusNote =
+        "Sent back for review after the class details were edited";
+    }
 
     if (req.body.status) {
       const requested = String(req.body.status);
@@ -347,7 +467,11 @@ const updateActivity = async (req, res, next) => {
         activity.status = requested;
         if (req.body.statusNote) activity.statusNote = req.body.statusNote;
       } else if (["draft", "pending"].includes(requested)) {
-        activity.status = requested;
+        // Instructor khud ko "active" nahi kar sakta — aur agar class abhi
+        // review me bheji gayi hai to woh use "draft" me chhupa bhi nahi sakta
+        if (!sentBackForReview || requested === "pending") {
+          activity.status = requested;
+        }
       }
     }
 
@@ -374,7 +498,14 @@ const updateActivity = async (req, res, next) => {
       }
     }
 
-    res.json({ success: true, message: "Class updated", activity });
+    res.json({
+      success: true,
+      message: sentBackForReview
+        ? "Class updated. Because the details changed, it's gone back for review and is no longer visible to parents until approved."
+        : "Class updated",
+      sentBackForReview,
+      activity,
+    });
   } catch (error) {
     next(error);
   }

@@ -155,7 +155,9 @@ function bookingConfirmedParent({ parentName, booking }) {
           ${row("Booking ref", booking.bookingNumber)}
         </table>
         <p style="margin:0;font-size:13px;color:#777;">
-          Free cancellation up to 24 hours before the class starts.
+          Cancel more than 48 hours before the class for a full refund.
+          Between 24 and 48 hours a partial refund may apply. Within
+          24 hours, bookings are generally non-refundable.
         </p>`,
       ctaText: "View my bookings",
       ctaUrl: `${APP()}/parent/dashboard`,
@@ -281,6 +283,46 @@ function verifyEmail({ name, verifyUrl }) {
   };
 }
 
+/* ---------- 8. Password reset ---------- */
+function passwordReset({ name, resetUrl }) {
+  return {
+    subject: subj("Reset your Kidventures password"),
+    html: layout({
+      heading: `Password reset, ${name || "there"}`,
+      body: `
+        <p style="margin:0 0 12px 0;">We got a request to reset your Kidventures
+        password. Click the button below to choose a new one.</p>
+        <p style="margin:0 0 12px 0;font-size:13px;color:#777;">
+          This link works once and expires in 1 hour.
+        </p>
+        <p style="margin:0;font-size:13px;color:#777;">
+          If you didn't ask for this, you can ignore this email — your password
+          stays as it is.
+        </p>`,
+      ctaText: "Choose a new password",
+      ctaUrl: resetUrl,
+    }),
+  };
+}
+
+/* ---------- 9. Password changed (confirmation) ---------- */
+function passwordChanged({ name }) {
+  return {
+    subject: subj("Your Kidventures password was changed"),
+    html: layout({
+      heading: `Password updated, ${name || "there"}`,
+      body: `
+        <p style="margin:0 0 12px 0;">Your Kidventures password was just changed,
+        and you've been logged out everywhere else.</p>
+        <p style="margin:0;font-size:13px;color:#777;">
+          If this wasn't you, reset your password immediately and contact us.
+        </p>`,
+      ctaText: "Log in",
+      ctaUrl: `${APP()}/login`,
+    }),
+  };
+}
+
 module.exports = {
   bookingConfirmedParent,
   newBookingInstructor,
@@ -289,4 +331,6 @@ module.exports = {
   classApproved,
   refundConfirmed,
   verifyEmail,
+  passwordReset,
+  passwordChanged,
 };

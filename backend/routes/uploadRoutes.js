@@ -17,6 +17,8 @@ const {
   uploadImage,
   uploadDocument,
   handleUploadError,
+  verifyImage,
+  verifyDocument,
 } = require("../middleware/upload");
 
 /**
@@ -39,10 +41,13 @@ router.use(protect, uploadLimiter);
 
 /* -------------------------------- Images -------------------------------- */
 // "file" wo naam hai jo Postman/frontend form me dena hai
+// verifyImage magic bytes check karta hai — mimetype/extension client
+// bhejta hai, unke jhoot par bharosa nahi kiya ja sakta
 router.post(
   "/avatar",
   uploadImage.single("file"),
   handleUploadError,
+  verifyImage,
   uploadAvatar,
 );
 
@@ -51,6 +56,7 @@ router.post(
   authorize("instructor", "admin"),
   uploadImage.single("file"),
   handleUploadError,
+  verifyImage,
   uploadActivityImage,
 );
 
@@ -65,6 +71,7 @@ router.post(
   authorize("instructor"),
   uploadImage.single("file"),
   handleUploadError,
+  verifyImage,
   uploadGalleryImage,
 );
 
@@ -74,6 +81,7 @@ router.post(
   authorize("instructor"),
   uploadDocument.single("file"),
   handleUploadError,
+  verifyDocument,
   uploadVerificationDocument,
 );
 

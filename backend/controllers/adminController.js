@@ -563,6 +563,106 @@ const getAllBookings = async (req, res, next) => {
 };
 
 /**
+ * @desc    Woh cancelled bookings jin ka refund abhi baqi hai
+ * @route   GET /api/admin/refunds
+ * @access  Admin
+ *
+ * Jab parent booking cancel karta hai to paisa khud-ba-khud wapas NAHI
+ * jata — booking par sirf nishan lagta hai (refundStatus: "pending_review").
+ * Wajah yeh hai ke policy ka darmiyana tier (24-48 ghante) kehta hai
+ * "partial refund may be offered, depending on the provider's policy" —
+ * aur woh faisla insaan hi kar sakta hai.
+ *
+ * Yeh list us kaam ki qatar hai. Is ke baghair refund requests khamoshi
+ * se DB me pari rehti hain aur kisi ko pata nahi chalta.
+ */
+const getPendingRefunds = async (req, res, next) => {
+  try {
+    const bookings = await Booking.find({
+      "cancellation.refundStatus": "pending_review",
+    })
+      .populate("parent", "name email phone")
+      .populate("instructor", "name email")
+      .populate("activity", "title")
+      .sort({ "cancellation.cancelledAt": -1 })
+      .limit(200);
+
+    // Jo pehle cancel hui, us ka intezar zyada lamba — woh upar
+    const withWaiting = bookings.map((b) => {
+      const cancelledAt = b.cancellation?.cancelledAt;
+      const hoursWaiting = cancelledAt
+        ? Math.floor((Date.now() - new Date(cancelledAt)) / (1000 * 60 * 60))
+        : null;
+      return { ...b.toJSON(), hoursWaiting };
+    });
+
+    res.json({
+      success: true,
+      count: withWaiting.length,
+      bookings: withWaiting,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Refund nipta dene ke baad usay qatar se hata dena
+ * @route   PUT /api/admin/refunds/:id/resolve
+ * @access  Admin
+ *
+ * Do soortein:
+ *   - Stripe se refund kar diya  -> refundStatus: "processed"
+ *   - Refund nahi banta tha       -> refundStatus: "not_required"
+ *
+ * NOTE: yeh sirf nishan badalta hai. Asli paisa
+ * POST /api/payments/:bookingId/refund se wapas jata hai.
+ */
+const resolveRefund = async (req, res, next) => {
+  try {
+    const { status, note } = req.body;
+
+    const ALLOWED = ["processed", "not_required"];
+    if (!ALLOWED.includes(String(status))) {
+      return res.status(400).json({
+        success: false,
+        message: 'status must be "processed" or "not_required"',
+      });
+    }
+
+    // Atomic: sirf tab badlo jab woh ab bhi review ka intezar kar rahi ho,
+    // warna do admin ek hi refund par kaam kar sakte hain.
+    const booking = await Booking.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        "cancellation.refundStatus": "pending_review",
+      },
+      {
+        $set: {
+          "cancellation.refundStatus": String(status),
+          "cancellation.reviewedBy": req.user._id,
+          "cancellation.reviewedAt": new Date(),
+          ...(note ? { "cancellation.reviewNote": String(note).slice(0, 300) } : {}),
+        },
+      },
+      { new: true },
+    );
+
+    if (!booking) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This refund is no longer pending — someone may have already handled it.",
+      });
+    }
+
+    res.json({ success: true, message: "Refund marked as resolved", booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Class Requests tab ke liye demand grouped karke dikhana
  * @route   GET /api/admin/class-requests
  * @access  Admin
@@ -627,4 +727,6 @@ module.exports = {
   getAllActivities,
   getAllBookings,
   getClassRequests,
+  getPendingRefunds,
+  resolveRefund,
 };

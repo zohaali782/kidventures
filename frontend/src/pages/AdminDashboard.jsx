@@ -172,6 +172,7 @@ const navItems = [
   { key: "classes", label: "Classes", icon: IcClasses },
   { key: "users", label: "Users", icon: IcUser },
   { key: "bookings", label: "Bookings", icon: IcBook },
+  { key: "refunds", label: "Refunds", icon: IcBook },
   { key: "categories", label: "Categories", icon: IcTag },
   { key: "requests", label: "Class Requests", icon: IcStar },
 ];
@@ -486,6 +487,48 @@ export default function AdminDashboard() {
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [refundFor, setRefundFor] = useState(null); // booking object
+
+  /* ---------------------------- pending refunds ----------------------------
+   *
+   * Jab parent booking cancel karta hai to paisa khud-ba-khud wapas nahi jata —
+   * booking par sirf "pending_review" ka nishan lagta hai. Yeh tab us kaam ki
+   * qatar hai. Is ke baghair refund requests DB me pari reh jati hain aur kisi
+   * ko pata nahi chalta.
+   */
+  const [refundQueue, setRefundQueue] = useState([]);
+  const [refundQueueLoading, setRefundQueueLoading] = useState(false);
+  const [resolvingId, setResolvingId] = useState(null);
+
+  const loadRefundQueue = useCallback(async () => {
+    setRefundQueueLoading(true);
+    try {
+      const { data } = await api.get("/admin/refunds");
+      setRefundQueue(toList(data.bookings));
+    } catch {
+      /* ignore */
+    } finally {
+      setRefundQueueLoading(false);
+    }
+  }, []);
+
+  // Refund kar dene ke baad (ya "refund nahi banta" kehne par) qatar se hatao
+  const resolveRefund = async (booking, status) => {
+    setResolvingId(booking._id);
+    try {
+      const { data } = await api.put(`/admin/refunds/${booking._id}/resolve`, {
+        status,
+      });
+      setRefundQueue((q) => q.filter((b) => b._id !== booking._id));
+      flash(data?.message || "Marked as resolved");
+    } catch (err) {
+      flash(
+        err?.response?.data?.message || "Couldn't update this refund.",
+      );
+      loadRefundQueue();
+    } finally {
+      setResolvingId(null);
+    }
+  };
   const [refundSaving, setRefundSaving] = useState(false);
   const loadBookings = useCallback(async () => {
     setBookingsLoading(true);
@@ -510,6 +553,23 @@ export default function AdminDashboard() {
       setBookings((bs) =>
         bs.map((b) => (b._id === refundFor._id ? data.booking : b)),
       );
+
+      // Agar yeh booking refunds ki qatar me thi to ab wahan se nikal do —
+      // paisa wapas ja chuka hai, dobara review ki zaroorat nahi.
+      const wasQueued = refundQueue.some((b) => b._id === refundFor._id);
+      if (wasQueued) {
+        setRefundQueue((q) => q.filter((b) => b._id !== refundFor._id));
+        api
+          .put(`/admin/refunds/${refundFor._id}/resolve`, {
+            status: "processed",
+          })
+          .catch(() => {
+            // Nishan na lag saka — qatar dobara load kar lo taake yeh
+            // booking gum na ho jaye
+            loadRefundQueue();
+          });
+      }
+
       setRefundFor(null);
       flash(data.message);
     } catch (err) {
@@ -574,6 +634,7 @@ export default function AdminDashboard() {
     if (tab === "classes") loadClasses();
     if (tab === "users") loadUsers();
     if (tab === "bookings") loadBookings();
+    if (tab === "refunds") loadRefundQueue();
     if (tab === "categories") loadCategoriesTab();
     if (tab === "requests") loadClassRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1069,6 +1130,123 @@ export default function AdminDashboard() {
                           Refund
                         </button>
                       )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* REFUNDS — cancelled bookings waiting on a refund decision */}
+          {tab === "refunds" && (
+            <div className="rounded-2xl bg-white px-4.5 shadow-sm">
+              <div className="border-b border-gray-100 py-4">
+                <div className="text-sm font-bold">Refunds to review</div>
+                <div className="mt-1 text-xs opacity-65">
+                  Parents cancelled these bookings. Money has NOT been returned
+                  yet — refund from here, then mark it resolved.
+                </div>
+              </div>
+
+              {refundQueueLoading ? (
+                <div className="py-10 text-center text-sm opacity-60">
+                  Loading…
+                </div>
+              ) : refundQueue.length === 0 ? (
+                <div className="py-10 text-center text-sm opacity-60">
+                  Nothing waiting. All cancellations have been dealt with.
+                </div>
+              ) : (
+                refundQueue.map((b, i) => {
+                  const tier = b.cancellation?.refundTier;
+                  const tierStyle =
+                    tier === "full"
+                      ? "bg-green-100 text-green-800"
+                      : tier === "partial"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-gray-100 text-gray-700";
+                  const tierLabel =
+                    tier === "full"
+                      ? "FULL REFUND"
+                      : tier === "partial"
+                        ? "PARTIAL — YOU DECIDE"
+                        : String(tier || "").toUpperCase();
+
+                  // 48 ghante se zyada intezar = parent shikayat karne wala hai
+                  const stale = (b.hoursWaiting ?? 0) >= 48;
+
+                  return (
+                    <div
+                      key={b._id}
+                      className={`flex flex-wrap items-center gap-3.5 py-3.5 ${
+                        stale ? "bg-red-50/60" : ""
+                      } ${
+                        i < refundQueue.length - 1
+                          ? "border-b border-gray-100"
+                          : ""
+                      }`}
+                    >
+                      <div className="min-w-[220px] flex-1">
+                        <div className="text-sm font-bold">
+                          {b.activityTitle || b.activity?.title || "Class"}
+                        </div>
+                        <div className="text-xs opacity-60">
+                          {b.parent?.name || "Parent"}
+                          {b.parent?.email ? ` · ${b.parent.email}` : ""} ·{" "}
+                          {b.bookingNumber}
+                        </div>
+                        <div className="mt-1 text-xs opacity-60">
+                          Cancelled {fmtDate(b.cancellation?.cancelledAt)}
+                          {b.hoursWaiting != null
+                            ? ` · waiting ${b.hoursWaiting}h`
+                            : ""}
+                          {b.cancellation?.reason
+                            ? ` · "${b.cancellation.reason}"`
+                            : ""}
+                        </div>
+                        {stale && (
+                          <div className="mt-1 text-[11px] font-semibold text-red-600">
+                            ⚠ Waiting more than 48 hours
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-bold">
+                          {AED(b.totalAmount)}
+                        </div>
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${tierStyle}`}
+                        >
+                          {tierLabel}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setRefundFor(b)}
+                          disabled={resolvingId === b._id}
+                          className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 disabled:opacity-50"
+                        >
+                          Refund
+                        </button>
+                        <button
+                          onClick={() => resolveRefund(b, "processed")}
+                          disabled={resolvingId === b._id}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                          title="Already refunded — just clear it from this list"
+                        >
+                          Mark done
+                        </button>
+                        <button
+                          onClick={() => resolveRefund(b, "not_required")}
+                          disabled={resolvingId === b._id}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold opacity-70 disabled:opacity-50"
+                          title="No refund is due for this cancellation"
+                        >
+                          No refund
+                        </button>
+                      </div>
                     </div>
                   );
                 })

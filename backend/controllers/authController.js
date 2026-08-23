@@ -4,7 +4,11 @@ const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const { sendAuthCookie, clearAuthCookie } = require("../utils/authCookie");
 const { sendEmail } = require("../utils/sendEmail");
-const { verifyEmail: verifyEmailTemplate } = require("../utils/emailTemplates");
+const {
+  verifyEmail: verifyEmailTemplate,
+  passwordReset: passwordResetTemplate,
+  passwordChanged: passwordChangedTemplate,
+} = require("../utils/emailTemplates");
 
 /**
  * Controller = wo function jo request aane par asal kaam karta hai.
@@ -365,6 +369,142 @@ const resendVerification = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Password reset link maangna
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ *
+ * SECURITY: jawab hamesha ek jaisa hota hai, chahe email registered ho ya na
+ * ho. Warna koi is endpoint se check kar sakta hai ke kaun si email account
+ * rakhti hai (user enumeration).
+ */
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const genericReply = {
+      success: true,
+      message:
+        "If an account exists for that email, we've sent a reset link. Please check your inbox.",
+    };
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.json(genericReply);
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    // User nahi mila, ya blocked hai — phir bhi wohi jawab
+    if (!user || user.isBlocked || user.isActive === false) {
+      return res.json(genericReply);
+    }
+
+    // SMTP hi na ho to reset link bhejne ka koi tareeqa nahi
+    if (!smtpConfigured()) {
+      console.warn("[forgot-password] SMTP not configured — no email sent");
+      return res.json(genericReply);
+    }
+
+    const rawToken = user.createPasswordResetToken();
+    await user.save({ validateBeforeSave: false });
+
+    // Reset link FRONTEND par jata hai (wahan naya password ka form hai),
+    // verification link ke bar-aks jo backend par jata hai.
+    const resetUrl = `${APP_URL()}/reset-password/${rawToken}`;
+    const { subject, html } = passwordResetTemplate({
+      name: user.name,
+      resetUrl,
+    });
+
+    // Background me — SMTP slow ho to user ki request na latke
+    sendEmail({ to: user.email, subject, html }).catch((err) =>
+      console.error("[forgot-password] send failed:", err.message),
+    );
+
+    return res.json(genericReply);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Naya password set karna
+ * @route   POST /api/auth/reset-password/:token
+ * @access  Public (token hi sanad hai)
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+
+    if (typeof password !== "string") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Password is required" });
+    }
+
+    const weak = User.validatePasswordStrength(password);
+    if (weak) {
+      return res.status(400).json({ success: false, message: weak });
+    }
+
+    // Incoming raw token ko hash kar ke dhoondte hain
+    const hashed = crypto
+      .createHash("sha256")
+      .update(String(req.params.token || ""))
+      .digest("hex");
+
+    const user = await User.findOne({
+      passwordResetToken: hashed,
+      passwordResetExpires: { $gt: new Date() },
+    }).select("+passwordResetToken +passwordResetExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This reset link is invalid or has expired. Please request a new one.",
+      });
+    }
+
+    // Naya password. Model ka pre-save hook ise hash karega aur
+    // passwordChangedAt set karega — jis se purane saare tokens mar jate hain
+    // (agar attacker andar tha to woh bhi bahar).
+    user.password = password;
+
+    // Token ek hi dafa chalta hai
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+
+    // Reset link email par gaya tha, yaani email ka malik yehi hai
+    user.emailVerified = true;
+
+    // Lock bhi hata do — warna user password badal kar bhi andar na aa sake
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
+
+    await user.save();
+
+    // Confirmation email — agar yeh user ne nahi kiya to use foran pata chale
+    if (smtpConfigured()) {
+      const { subject, html } = passwordChangedTemplate({ name: user.name });
+      sendEmail({ to: user.email, subject, html }).catch((err) =>
+        console.error("[reset-password] confirm mail failed:", err.message),
+      );
+    }
+
+    // Jaan boojh kar login NAHI karate — user naya password khud daal kar
+    // aaye, taake yaad rahe aur password manager bhi save kar le.
+    clearAuthCookie(res);
+
+    res.json({
+      success: true,
+      message: "Password updated. You can log in with your new password now.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -372,4 +512,6 @@ module.exports = {
   logout,
   verifyEmailToken,
   resendVerification,
+  forgotPassword,
+  resetPassword,
 };

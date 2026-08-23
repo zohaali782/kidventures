@@ -115,10 +115,17 @@ const activitySchema = new mongoose.Schema(
     materialsIncluded: { type: Boolean, default: false },
     materialsNote: String,
     whatToBring: String,
+    /**
+     * Default text site ke Refund & Cancellation page se match karta hai.
+     * Instructor chahe to apni class ke liye alag policy likh sakta hai —
+     * page bhi yehi kehta hai ke terms activity ke hisaab se badal sakti hain.
+     */
     cancellationPolicy: {
       type: String,
       default:
-        "Full refund up to 24 hours before the class. No refund within 24 hours.",
+        "Full refund if cancelled more than 48 hours before the class. " +
+        "Between 24 and 48 hours, a partial refund may apply. " +
+        "Within 24 hours, bookings are generally non-refundable.",
     },
 
     sessions: [sessionSchema],

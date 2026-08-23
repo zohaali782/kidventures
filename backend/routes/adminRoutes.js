@@ -18,6 +18,8 @@ const {
   getAllActivities,
   getAllBookings,
   getClassRequests,
+  getPendingRefunds,
+  resolveRefund,
 } = require("../controllers/adminController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -53,6 +55,11 @@ router.put("/users/:id/block", toggleBlockUser);
 
 /* -------------------------------- Bookings -------------------------------- */
 router.get("/bookings", getAllBookings);
+
+/* --------------------------------- Refunds -------------------------------- */
+// Cancelled bookings jin ka refund abhi review ka intezar kar raha hai
+router.get("/refunds", getPendingRefunds);
+router.put("/refunds/:id/resolve", resolveRefund);
 
 /* ---------------------------- Class Requests ---------------------------- */
 router.get("/class-requests", getClassRequests);

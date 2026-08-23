@@ -9,6 +9,8 @@ const {
   logout,
   verifyEmailToken,
   resendVerification,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/authController");
 const { protect } = require("../middleware/auth");
 
@@ -54,5 +56,16 @@ router.post("/logout", logout); // POST /api/auth/logout (cookie clear)
 
 router.get("/verify-email/:token", verifyEmailToken); // email ka link
 router.post("/resend-verification", resendLimiter, resendVerification);
+
+/**
+ * Password reset.
+ *
+ * forgot-password par resendLimiter (1 ghante me 3) — warna koi kisi ke
+ * inbox me reset emails bhar sakta hai.
+ *
+ * reset-password par authLimiter — token guess karne ki koshish na ho sake.
+ */
+router.post("/forgot-password", resendLimiter, forgotPassword);
+router.post("/reset-password/:token", authLimiter, resetPassword);
 
 module.exports = router;

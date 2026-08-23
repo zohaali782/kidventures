@@ -1,10 +1,20 @@
+const mongoose = require("mongoose");
+
 const InstructorProfile = require("../models/InstructorProfile");
 const Activity = require("../models/Activity");
+const { cleanVideoUrl } = require("../utils/safeUrl");
 
 /**
  * Instructor jo fields khud edit kar sakta hai.
  * verificationStatus, isFeatured, rating waghera yahan JAAN BOOJH KAR nahi hain -
  * warna instructor khud ko approved ya featured kar leta.
+ *
+ * "gallery" bhi JAAN BOOJH KAR nikal di gayi hai.
+ * Pehle woh yahan thi, jis ka matlab tha ke instructor request body me apni
+ * marzi ki gallery array bhej sakta tha — apni marzi ke URLs aur publicId ke
+ * sath. Is se 12-image ki limit bekar ho jati thi aur koi bhi bahri site ka
+ * image profile par lagaya ja sakta tha.
+ * Gallery ab sirf POST /api/uploads/gallery se banti hai.
  */
 const EDITABLE_FIELDS = [
   "headline",
@@ -14,7 +24,6 @@ const EDITABLE_FIELDS = [
   "experienceYears",
   "categories",
   "suggestedCategory",
-  "gallery",
   "location",
   "socialLinks",
   // client ke naye fields:
@@ -57,6 +66,19 @@ const updateMyProfile = async (req, res, next) => {
 
     if (!profile) {
       profile = new InstructorProfile({ user: req.user._id });
+    }
+
+    // Intro video sirf https YouTube/Vimeo — warna "javascript:" ya koi bhi
+    // bahri link profile par embed ho sakta hai
+    if (req.body.introVideoUrl !== undefined) {
+      const safeVideo = cleanVideoUrl(req.body.introVideoUrl);
+      if (safeVideo === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Intro video must be a YouTube or Vimeo https link",
+        });
+      }
+      req.body.introVideoUrl = safeVideo;
     }
 
     EDITABLE_FIELDS.forEach((field) => {
@@ -199,8 +221,12 @@ const getInstructors = async (req, res, next) => {
   try {
     const filter = { verificationStatus: "approved", isSuspended: false };
 
+    // Ghalat id par pehle CastError se 500 aata tha — ab bas nazarandaz
     if (req.query.category) {
-      filter.categories = req.query.category;
+      const catId = String(req.query.category);
+      if (mongoose.Types.ObjectId.isValid(catId)) {
+        filter.categories = new mongoose.Types.ObjectId(catId);
+      }
     }
     if (req.query.area) {
       filter["location.area"] = new RegExp(
@@ -247,6 +273,13 @@ const getInstructors = async (req, res, next) => {
  */
 const getInstructorById = async (req, res, next) => {
   try {
+    // Ghalat id par 500 nahi, saaf 404
+    if (!mongoose.Types.ObjectId.isValid(String(req.params.userId))) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Instructor not found" });
+    }
+
     const profile = await InstructorProfile.findOne({ user: req.params.userId })
       .populate("user", "name avatar city")
       .populate("categories", "name slug icon");

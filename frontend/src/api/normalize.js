@@ -88,8 +88,12 @@ export const normActivity = (a) => {
       pickLocation(a.area) ||
       (a.format === "online" || a.isOnline ? "Online" : ""),
     format: a.format || (a.isOnline ? "online" : ""),
-    // parent-facing price = displayPrice (commission-inclusive)
-    price: a.displayPrice ?? a.price ?? "",
+    // Parent bilkul yehi price deta hai. Commission instructor ki earning
+    // me se katta hai, parent par upar se kuch nahi jurta — is liye yahan
+    // sirf activity.price. (Pehle displayPrice ko tarjeeh di jati thi, jo
+    // schema me hai hi nahi; agar kabhi add ho jata to dikhne wali aur
+    // charge hone wali price alag ho jatin.)
+    price: a.price ?? "",
     rating: asNum(a.rating?.average ?? a.rating),
     reviews: asNum(a.rating?.count ?? a.reviews ?? a.reviewCount),
     image: pickImg(a.images?.[0], a.coverImage, a.image),

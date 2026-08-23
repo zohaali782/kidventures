@@ -347,7 +347,7 @@ function ActivityDetailPage() {
       id: a._id || a.id,
       title: a.title,
       image: pickImg(a.images?.[0], a.coverImage),
-      price: a.displayPrice ?? a.price ?? "",
+      price: a.price ?? "",
       ageGroup:
         a.ageMin != null && a.ageMax != null ? `${a.ageMin}-${a.ageMax}` : "",
       rating: asNum(a.rating?.average ?? a.rating),
@@ -450,7 +450,8 @@ function ActivityDetailPage() {
     Array.isArray(a.languages) && a.languages.length
       ? a.languages.join(", ")
       : "English";
-  const price = a.displayPrice ?? a.price ?? "";
+  // Parent bilkul yehi deta hai — commission instructor se katta hai
+  const price = a.price ?? "";
   const exactCoords = isOnline ? null : getCoords(a.location);
   const coords =
     exactCoords || (isOnline ? null : areaCoords(pickLocation(a.location)));

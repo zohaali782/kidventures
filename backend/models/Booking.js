@@ -98,7 +98,32 @@ const bookingSchema = new mongoose.Schema(
       },
       cancelledAt: Date,
       reason: String,
+
+      /**
+       * Cancel ke waqt policy ka kaunsa tier laga. Admin ko baad me
+       * yeh dekh kar faisla karna hota hai — khaas kar "partial" par,
+       * jahan rakam provider ki policy par munhasir hai.
+       */
+      refundTier: {
+        type: String,
+        enum: ["full", "partial", "none", "not_applicable"],
+      },
+
+      // "full" par poori rakam, warna 0 — asli refund admin Stripe se karta hai
       refundAmount: { type: Number, default: 0 },
+
+      // Admin ne refund kar diya ya nahi
+      refundStatus: {
+        type: String,
+        enum: ["not_required", "pending_review", "processed"],
+        default: "not_required",
+        index: true,
+      },
+
+      // Admin ne kab aur kya faisla kiya — audit trail
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      reviewedAt: Date,
+      reviewNote: String,
     },
 
     /* ---------------------------- Notifications --------------------------- */
@@ -139,15 +164,41 @@ bookingSchema.pre("save", function () {
 
 /* -------------------------------- Virtuals -------------------------------- */
 /**
- * Cancellation policy: class se 24 ghante pehle tak full refund.
+ * CANCELLATION / REFUND POLICY
+ *
+ * Yeh wohi policy hai jo site ke Refund & Cancellation page par likhi hai:
+ *
+ *   48 ghante se zyada pehle  -> full refund (processing fees minus)
+ *   24 se 48 ghante ke beech  -> partial refund ho sakta hai, provider ki
+ *                                policy par — faisla insaan karta hai
+ *   24 ghante se kam          -> aam tor par koi refund nahi
+ *
+ * (Pehle code sirf ek hi shart lagata tha: 24+ ghante = poora refund.
+ *  Yaani 30 ghante pehle cancel karne wale ko code full refund ka haqdar
+ *  mark kar deta, jabke policy page us par "partial" kehta hai.)
+ *
+ * Return: "full" | "partial" | "none" | "not_applicable"
  */
-bookingSchema.virtual("isRefundable").get(function () {
-  if (this.status !== "confirmed" || this.paymentStatus !== "paid")
-    return false;
+bookingSchema.virtual("refundTier").get(function () {
+  // Paisa liya hi nahi (pending/unpaid) to refund ka sawal hi nahi
+  if (this.status !== "confirmed" || this.paymentStatus !== "paid") {
+    return "not_applicable";
+  }
 
   const hoursLeft =
     (new Date(this.sessionDate) - Date.now()) / (1000 * 60 * 60);
-  return hoursLeft >= 24;
+
+  if (hoursLeft >= 48) return "full";
+  if (hoursLeft >= 24) return "partial";
+  return "none";
+});
+
+/**
+ * Sirf "full" tier par booking khud-ba-khud poore refund ki haqdar hai.
+ * Partial ka faisla admin karta hai, is liye woh yahan false hai.
+ */
+bookingSchema.virtual("isRefundable").get(function () {
+  return this.refundTier === "full";
 });
 
 bookingSchema.virtual("hoursUntilClass").get(function () {

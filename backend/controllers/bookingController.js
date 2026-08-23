@@ -286,7 +286,14 @@ const createBooking = async (req, res, next) => {
       await Activity.updateOne(
         { _id: activityId, "sessions._id": sessionId },
         { $inc: { "sessions.$.seatsBooked": -numberOfChildren } },
-      ).catch(() => {});
+      ).catch((err) =>
+        // Error chupana nahi — yeh woh soorat hai jahan seat kisi ke kaam
+        // aaye baghair block ho jati hai, aur kisi ko pata nahi chalta.
+        console.error(
+          `! Seat rollback failed — activity ${activityId}, session ${sessionId}, ` +
+            `${numberOfChildren} seat(s): ${err.message}`,
+        ),
+      );
 
       throw bookingError;
     }
@@ -341,10 +348,20 @@ const getInstructorBookings = async (req, res, next) => {
       filter.sessionDate = { $gte: new Date() };
     }
 
-    // Instructor ko sirf confirmed bookings dikhani chahiyen -
-    // "pending" wali abhi paid nahi hui.
-    filter.status = req.query.status
-      ? String(req.query.status)
+    /**
+     * Instructor ko sirf confirmed bookings dikhani chahiyen — "pending"
+     * wali abhi paid nahi hui.
+     *
+     * Pehle ?status= jo bhi aata wohi laga diya jata tha, yaani instructor
+     * ?status=pending bhej kar un bookings ke bachon ke naam aur allergy
+     * notes dekh sakta tha jin ka paisa aaya hi nahi. Ab sirf allowed
+     * statuses hi chalti hain.
+     */
+    const ALLOWED_STATUSES = ["confirmed", "completed", "cancelled", "refunded"];
+    const requested = String(req.query.status || "");
+
+    filter.status = ALLOWED_STATUSES.includes(requested)
+      ? requested
       : { $in: ["confirmed", "completed"] };
 
     if (req.query.activityId) {
@@ -429,39 +446,112 @@ const cancelBooking = async (req, res, next) => {
       });
     }
 
-    const wasRefundable = booking.isRefundable;
+    /**
+     * REFUND TIER — site ke Refund & Cancellation page wali policy:
+     *   48h+     -> full refund
+     *   24h-48h  -> partial ho sakta hai (provider ki policy par)
+     *   24h se kam -> aam tor par kuch nahi
+     *
+     * Asli paisa yahan wapas nahi hota — cancelBooking sirf seat free karta
+     * hai aur tier record karta hai. Refund admin Stripe se karta hai
+     * (POST /api/payments/:bookingId/refund), kyunke "partial" ki rakam
+     * ka faisla insaan hi kar sakta hai. Yeh policy page se bhi match karta
+     * hai: "To request a refund or cancellation, contact Kidventures."
+     */
+    const refundTier = booking.refundTier;
 
-    booking.status = "cancelled";
-    booking.cancellation = {
-      cancelledBy: isAdmin ? "admin" : "parent",
-      cancelledAt: new Date(),
-      reason: req.body.reason?.slice(0, 300),
-      // Asli refund Stripe wale step me hoga - abhi sirf rakam tay
-      refundAmount: wasRefundable ? booking.totalAmount : 0,
+    const refundMessages = {
+      full: "Booking cancelled. You'll receive a full refund, less any non-refundable processing fees. Our team will process it shortly.",
+      partial:
+        "Booking cancelled. As this is within 48 hours of the class, a partial refund may apply depending on the provider's policy. Our team will review it and be in touch.",
+      none: "Booking cancelled. As per our policy, cancellations less than 24 hours before the class are generally non-refundable.",
+      not_applicable:
+        "Booking cancelled. No payment had been taken, so there's nothing to refund.",
     };
 
-    await booking.save();
+    const refundStatus =
+      refundTier === "full" || refundTier === "partial"
+        ? "pending_review"
+        : "not_required";
 
-    // Seats wapas chhor do taake koi aur book kar sake
-    await Activity.updateOne(
+    /**
+     * ATOMIC cancel.
+     *
+     * Pehle yahan findById ke baad booking.save() hota tha. Un dono ke
+     * darmiyan agar Stripe ka webhook payment confirm kar deta, to yeh save
+     * us confirmation ko MITA deta — paise kat jate aur booking cancelled
+     * reh jati. Isi tarah do cancel requests ek sath aatin to seats do
+     * dafa release ho jatin.
+     *
+     * Ab shart update ke andar hai: cancel sirf tab hoti hai jab booking
+     * ab bhi usi status par ho jo humne parhi thi.
+     */
+    const cancelled = await Booking.findOneAndUpdate(
       {
-        _id: booking.activity,
-        sessions: {
-          $elemMatch: {
-            _id: booking.sessionId,
-            seatsBooked: { $gte: booking.numberOfChildren },
+        _id: booking._id,
+        status: booking.status, // beech me badal gaya to match nahi hoga
+      },
+      {
+        $set: {
+          status: "cancelled",
+          cancellation: {
+            cancelledBy: isAdmin ? "admin" : "parent",
+            cancelledAt: new Date(),
+            reason: req.body.reason?.slice(0, 300),
+            refundTier,
+            // Sirf "full" par rakam tay hai. "partial" ki rakam admin
+            // review ke baad decide karta hai, is liye abhi 0.
+            refundAmount: refundTier === "full" ? booking.totalAmount : 0,
+            refundStatus,
           },
         },
       },
-      { $inc: { "sessions.$.seatsBooked": -booking.numberOfChildren } },
-    ).catch(() => {});
+      { new: true },
+    );
+
+    if (!cancelled) {
+      // Is dauran booking ka status badal gaya (payment confirm ho gayi,
+      // ya kisi aur ne cancel kar diya). Dobara koshish karne do.
+      return res.status(409).json({
+        success: false,
+        message:
+          "This booking just changed. Please refresh and try again.",
+      });
+    }
+
+    // Seats wapas chhor do taake koi aur book kar sake
+    const seatResult = await Activity.updateOne(
+      {
+        _id: cancelled.activity,
+        sessions: {
+          $elemMatch: {
+            _id: cancelled.sessionId,
+            seatsBooked: { $gte: cancelled.numberOfChildren },
+          },
+        },
+      },
+      { $inc: { "sessions.$.seatsBooked": -cancelled.numberOfChildren } },
+    ).catch((err) => {
+      console.error(
+        `! Seat release error — booking ${cancelled.bookingNumber}: ${err.message}`,
+      );
+      return null;
+    });
+
+    // Pehle yahan .catch(() => {}) tha — seat block ho jati aur kisi ko
+    // pata na chalta.
+    if (seatResult && seatResult.modifiedCount === 0) {
+      console.error(
+        `! Seat release failed — booking ${cancelled.bookingNumber}, ` +
+          `activity ${cancelled.activity}, session ${cancelled.sessionId}`,
+      );
+    }
 
     res.json({
       success: true,
-      message: wasRefundable
-        ? "Booking cancelled. Refund will be processed."
-        : "Booking cancelled. As per policy, no refund applies within 24 hours of the class.",
-      booking,
+      message: refundMessages[refundTier] || refundMessages.not_applicable,
+      refundTier,
+      booking: cancelled,
     });
   } catch (error) {
     next(error);

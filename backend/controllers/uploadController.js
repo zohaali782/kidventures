@@ -26,7 +26,12 @@ const uploadAvatar = async (req, res, next) => {
     // Purani photo Cloudinary se hata do - warna kachra jama hota rahega
     const user = await User.findById(req.user._id);
     if (user.avatar?.publicId) {
-      deleteFile(user.avatar.publicId).catch(() => {});
+      // Error chupana nahi — orphan files Cloudinary quota kharch karti hain
+      deleteFile(user.avatar.publicId).catch((err) =>
+        console.error(
+          `! Old avatar delete failed (${user.avatar.publicId}): ${err.message}`,
+        ),
+      );
     }
 
     user.avatar = { url: result.secure_url, publicId: result.public_id };
@@ -129,7 +134,37 @@ const deleteActivityImage = async (req, res, next) => {
     }
 
     const wasCover = image.isCover;
-    if (image.publicId) deleteFile(image.publicId).catch(() => {});
+
+    /**
+     * DOOSRI TEH KA BACHAO.
+     *
+     * Ab "images" EDITABLE_FIELDS me nahi hai, to koi apni marzi ka publicId
+     * daal nahi sakta. Phir bhi yahan check laga rahe hain — agar kabhi
+     * ghalti se woh raasta khul jaye to bhi kisi doosre ki file delete na ho.
+     *
+     * Hamare apne uploads hamesha "kidventures/activities/" folder me jate
+     * hain (config/cloudinary.js dekhein).
+     */
+    if (image.publicId) {
+      const isOurs = String(image.publicId).startsWith(
+        "kidventures/activities/",
+      );
+
+      if (!isOurs) {
+        console.error(
+          `! Refusing to delete unexpected publicId "${image.publicId}" ` +
+            `(activity ${activity._id}, user ${req.user._id})`,
+        );
+      } else {
+        // Error chupana nahi — warna Cloudinary par orphan files jama
+        // hote rehte hain aur quota kharch hoti rehti hai.
+        deleteFile(image.publicId).catch((err) =>
+          console.error(
+            `! Cloudinary delete failed for ${image.publicId}: ${err.message}`,
+          ),
+        );
+      }
+    }
 
     image.deleteOne();
 
@@ -275,7 +310,11 @@ const uploadVerificationDocument = async (req, res, next) => {
       // Purani file hata do
       const old = profile.documents[docType];
       if (old?.publicId) {
-        deleteFile(old.publicId, old.resourceType, "private").catch(() => {});
+        deleteFile(old.publicId, old.resourceType, "private").catch((err) =>
+          console.error(
+            `! Old document delete failed (${old.publicId}): ${err.message}`,
+          ),
+        );
       }
       profile.documents[docType] = docData;
     }

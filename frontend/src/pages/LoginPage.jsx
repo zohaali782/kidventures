@@ -28,6 +28,8 @@ function LoginPage() {
       "verified=expired":
         "That confirmation link has expired. Request a new one below.",
       "expired=1": "Your session expired. Please log in again.",
+      "reset=1":
+        "Password updated. Log in with your new password.",
     }[
       params.has("verify")
         ? `verify=${params.get("verify")}`
@@ -35,7 +37,9 @@ function LoginPage() {
           ? `verified=${params.get("verified")}`
           : params.has("expired")
             ? `expired=${params.get("expired")}`
-            : ""
+            : params.has("reset")
+              ? `reset=${params.get("reset")}`
+              : ""
     ] || "";
 
   const validate = () => {

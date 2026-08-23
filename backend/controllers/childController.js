@@ -125,6 +125,43 @@ const updateChild = async (req, res, next) => {
         .json({ success: false, message: "Not your child's record" });
     }
 
+    /**
+     * SECURITY: dateOfBirth ki jaanch YAHAN BHI zaroori hai.
+     *
+     * addChild me future-date aur 18-saal wali jaanch thi, lekin update par
+     * nahi. Yaani parent bacha add karne ke baad us ki DOB badal kar us ki
+     * umar kuch bhi bana sakta tha — aur booking ka age-range check usi umar
+     * par chalta hai. Is tarah 5 saal ka bacha 14+ wali class me daala ja
+     * sakta tha.
+     */
+    if (req.body.dateOfBirth !== undefined) {
+      const dob = new Date(req.body.dateOfBirth);
+
+      if (Number.isNaN(dob.getTime())) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid date of birth" });
+      }
+
+      if (dob > new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Date of birth cannot be in the future",
+        });
+      }
+
+      const ageInYears =
+        (Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      if (ageInYears > 18) {
+        return res.status(400).json({
+          success: false,
+          message: "Kidventures is for children under 18",
+        });
+      }
+
+      req.body.dateOfBirth = dob;
+    }
+
     const allowed = [
       "name",
       "dateOfBirth",

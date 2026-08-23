@@ -70,6 +70,14 @@ const userSchema = new mongoose.Schema(
     emailVerifyExpires: { type: Date, select: false },
 
     /**
+     * Password reset. Wahi usool: raw token sirf email me, DB me uska hash.
+     * Agar DB leak ho jaye to koi stored token se password reset nahi kar sakta.
+     * Expiry chhoti (1 ghanta) — reset link jitni der zinda rahe, utna khatra.
+     */
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
+
+    /**
      * Account-level brute force lock. IP-based rate limit alag hai, lekin
      * attacker IP badal badal kar ek hi account par attack kar sakta hai.
      */
@@ -126,6 +134,22 @@ userSchema.methods.createEmailVerifyToken = function () {
     .update(rawToken)
     .digest("hex");
   this.emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ghante
+
+  return rawToken;
+};
+
+/**
+ * Password reset token banata hai.
+ * Raw token email me jata hai, hashed DB me.
+ */
+userSchema.methods.createPasswordResetToken = function () {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+  this.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 ghanta
 
   return rawToken;
 };

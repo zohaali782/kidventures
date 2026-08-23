@@ -278,8 +278,8 @@ const normActivity = (a) => ({
     pickLocation(a.area) ||
     pickLocation(a.neighborhood) ||
     (a.isOnline ? "Online" : ""),
-  // parent-facing price = displayPrice (commission-inclusive). price = instructor amount.
-  price: a.displayPrice ?? a.price ?? "",
+  // Parent bilkul yehi deta hai — commission instructor ki earning se katta hai.
+  price: a.price ?? "",
   rating: asNum(a.rating ?? a.averageRating),
   reviews: asNum(a.reviews ?? a.reviewCount ?? a.numReviews),
   image: pickImg(a.images?.[0], a.coverImage, a.image),

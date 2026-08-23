@@ -5,6 +5,8 @@ import ActivityDetailPage from "./pages/ActivityDetailPage";
 import InstructorProfilePage from "./pages/InstructorProfilePage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import CreateClassPage from "./pages/CreateClassPage";
 import EditClassPage from "./pages/EditClassPage";
@@ -36,6 +38,8 @@ function App() {
         <Route path="/instructor/:id" element={<InstructorProfilePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/request-class" element={<RequestClassPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />

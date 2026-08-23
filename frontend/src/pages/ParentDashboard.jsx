@@ -127,6 +127,37 @@ const STATUS_COLOR = {
 // yehi rule hai) - unpaid/pending ka koi receipt nahi.
 const PAID_STATUSES = ["paid", "partially_refunded", "refunded"];
 
+// Yeh bookings cancel nahi ho saktin - backend bhi inhe reject karta hai
+const NON_CANCELLABLE = ["cancelled", "refunded", "completed"];
+
+/**
+ * Refund policy (site ke Refund & Cancellation page wali):
+ *   48 ghante se zyada pehle -> full refund
+ *   24 se 48 ghante          -> partial ho sakta hai, provider ki policy par
+ *   24 ghante se kam         -> aam tor par kuch nahi
+ *
+ * Backend booking ke sath "refundTier" bhejta hai (Mongoose virtual).
+ * Yahan sirf fallback hisaab hai, agar kisi purani booking me na aaye.
+ */
+const refundTierFor = (b) => {
+  if (b?.refundTier) return b.refundTier;
+  if (b?.status !== "confirmed" || String(b?.paymentStatus) !== "paid") {
+    return "not_applicable";
+  }
+  const hours = (new Date(b.sessionDate) - Date.now()) / (1000 * 60 * 60);
+  if (hours >= 48) return "full";
+  if (hours >= 24) return "partial";
+  return "none";
+};
+
+const REFUND_TEXT = {
+  full: "You'll receive a full refund, less any non-refundable processing fees.",
+  partial:
+    "This is within 48 hours of the class, so a partial refund may apply depending on the provider's policy. Our team will review it and be in touch.",
+  none: "This is less than 24 hours before the class, so it's generally non-refundable.",
+  not_applicable: "No payment has been taken, so there's nothing to refund.",
+};
+
 export default function ParentDashboard() {
   const nav = useNavigate();
   const [tab, setTab] = useState("children");
@@ -153,6 +184,9 @@ export default function ParentDashboard() {
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null);
   const [receiptLoadingId, setReceiptLoadingId] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const parentName = (getStoredUser()?.name || "there").split(" ")[0];
   const flash = (m) => {
@@ -222,6 +256,37 @@ export default function ParentDashboard() {
       flash("Couldn't load the receipt. Please try again.");
     } finally {
       setReceiptLoadingId(null);
+    }
+  };
+
+  /* ---- booking cancel ---- */
+  const handleCancel = async () => {
+    if (!cancelTarget) return;
+
+    setCancelling(true);
+    try {
+      const { data } = await api.put(
+        `/bookings/${cancelTarget._id}/cancel`,
+        cancelReason.trim() ? { reason: cancelReason.trim() } : {},
+      );
+
+      setCancelTarget(null);
+      setCancelReason("");
+
+      // Dono lists dobara load karwa do - seat free ho gayi hai aur
+      // booking ab history me chali gayi hai.
+      setUpcoming(null);
+      setPast(null);
+
+      flash(data?.message || "Booking cancelled.");
+    } catch (err) {
+      flash(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Couldn't cancel this booking. Please try again.",
+      );
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -466,6 +531,7 @@ export default function ParentDashboard() {
             }
             onReceipt={handleReceipt}
             receiptLoadingId={receiptLoadingId}
+            onCancel={setCancelTarget}
           />
         )}
 
@@ -676,6 +742,72 @@ export default function ParentDashboard() {
         </div>
       )}
 
+      {/* cancel booking confirm */}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-5">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6">
+            <h3 className="mb-2 text-lg font-bold">Cancel this booking?</h3>
+
+            <p className="mb-1 text-sm font-semibold">
+              {cancelTarget.activity?.title || cancelTarget.activityTitle}
+            </p>
+            <p className="mb-4 text-xs opacity-65">
+              {fmtDate(cancelTarget.sessionDate)}
+              {cancelTarget.startTime ? ` · ${cancelTarget.startTime}` : ""}
+              {" · AED "}
+              {cancelTarget.totalAmount}
+            </p>
+
+            {/* Refund policy — parent ko pehle se saaf pata hona chahiye */}
+            {(() => {
+              const tier = refundTierFor(cancelTarget);
+              const tone =
+                tier === "full"
+                  ? "border-green-200 bg-green-50 text-green-800"
+                  : tier === "partial"
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : "border-gray-200 bg-gray-50 text-gray-700";
+              return (
+                <div
+                  className={`mb-4 rounded-lg border px-3.5 py-3 text-[13px] leading-relaxed ${tone}`}
+                >
+                  {REFUND_TEXT[tier]}
+                </div>
+              );
+            })()}
+
+            <label className={labelCls}>Reason (optional)</label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value.slice(0, 300))}
+              rows={2}
+              placeholder="Let us know why, so we can improve"
+              className={`${inputCls} mb-5 resize-none`}
+            />
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setCancelTarget(null);
+                  setCancelReason("");
+                }}
+                disabled={cancelling}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold"
+              >
+                Keep booking
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {cancelling ? "Cancelling…" : "Cancel booking"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* delete confirm */}
       {confirmDel && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-5">
@@ -716,6 +848,7 @@ function BookingList({
   past,
   onReceipt,
   receiptLoadingId,
+  onCancel,
 }) {
   if (list === null) {
     return (
@@ -749,6 +882,9 @@ function BookingList({
             const status = String(b.status || "").toLowerCase();
             const isPaid = PAID_STATUSES.includes(String(b.paymentStatus));
             const isReceiptLoading = receiptLoadingId === b._id;
+            const canCancel =
+              typeof onCancel === "function" &&
+              !NON_CANCELLABLE.includes(status);
             return (
               <div
                 key={b._id}
@@ -806,6 +942,16 @@ function BookingList({
                   <IcDoc size={13} />
                   {isReceiptLoading ? "Loading…" : "Receipt"}
                 </button>
+
+                {canCancel && (
+                  <button
+                    onClick={() => onCancel(b)}
+                    title="Cancel this booking"
+                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:border-red-500"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             );
           })}
