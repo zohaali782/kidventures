@@ -174,6 +174,20 @@ const ShareIcon = () => (
     <path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5" />
   </svg>
 );
+const DirectionsArrowIcon = () => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M7 17 17 7M8 7h9v9" />
+  </svg>
+);
 const WhatsAppIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366">
     <path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-2.8.7.7-2.7-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5 0a6.5 6.5 0 0 1-1.9-1.2 7.3 7.3 0 0 1-1.4-1.7c-.1-.2 0-.4.1-.5l.4-.4.2-.4a.4.4 0 0 0 0-.4l-.7-1.7c-.2-.4-.4-.4-.5-.4h-.5a.9.9 0 0 0-.6.3 2.6 2.6 0 0 0-.8 2 4.5 4.5 0 0 0 1 2.4 10.3 10.3 0 0 0 4 3.5c1.9.8 1.9.5 2.3.5a2.3 2.3 0 0 0 1.5-1 1.9 1.9 0 0 0 .1-1c0-.1-.2-.2-.4-.3z" />
@@ -457,6 +471,7 @@ function ActivityDetailPage() {
     exactCoords || (isOnline ? null : areaCoords(pickLocation(a.location)));
   const approxLocation = !!coords && !exactCoords;
   const learn = Array.isArray(a.whatChildrenLearn) ? a.whatChildrenLearn : [];
+  const faqs = Array.isArray(a.faqs) ? a.faqs : [];
   const canReview = getStoredUser()?.role === "parent";
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -691,7 +706,7 @@ function ActivityDetailPage() {
               { key: "details", label: "Details" },
               { key: "instructor", label: "Instructor" },
               { key: "reviews", label: `Reviews (${reviews})` },
-              { key: "faqs", label: "FAQs" },
+              { key: "faqs", label: `FAQs (${faqs.length})` },
             ].map((t) => (
               <button
                 key={t.key}
@@ -767,9 +782,9 @@ function ActivityDetailPage() {
                       href={`https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2.5 inline-block text-[13px] font-semibold text-brand-orange no-underline"
+                      className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-semibold text-brand-orange no-underline"
                     >
-                      ↗ Get Directions
+                      <DirectionsArrowIcon /> Get Directions
                     </a>
                     {approxLocation && (
                       <div className="mt-1 text-[11px] text-brand-brown/50">
@@ -898,8 +913,25 @@ function ActivityDetailPage() {
             </div>
           )}
           {tab === "faqs" && (
-            <div className="text-sm text-brand-brown/75">
-              Frequently asked questions will appear here.
+            <div>
+              {faqs.length === 0 ? (
+                <div className="text-sm text-brand-brown/60">
+                  No FAQs added for this class yet.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {faqs.map((f, i) => (
+                    <div key={i} className="border-b border-gray-100 pb-4">
+                      <div className="mb-1.5 text-[13px] font-bold text-brand-brown">
+                        {asText(f.question)}
+                      </div>
+                      <p className="text-[13px] leading-relaxed text-brand-brown/80">
+                        {asText(f.answer)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

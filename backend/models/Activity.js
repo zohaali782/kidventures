@@ -77,6 +77,12 @@ const activitySchema = new mongoose.Schema(
       maxlength: 3000,
     },
     whatChildrenLearn: [{ type: String, trim: true, maxlength: 200 }],
+    faqs: [
+      {
+        question: { type: String, trim: true, maxlength: 150 },
+        answer: { type: String, trim: true, maxlength: 500 },
+      },
+    ],
     images: [
       {
         url: String,
@@ -209,6 +215,11 @@ activitySchema.pre("save", function () {
 
   if (this.ageMax < this.ageMin) {
     throw new Error("Maximum age must be greater than or equal to minimum age");
+  }
+
+  // Cap the number of FAQs per class, 20 is plenty.
+  if (this.faqs && this.faqs.length > 20) {
+    throw new Error("A class can have at most 20 FAQs");
   }
 });
 

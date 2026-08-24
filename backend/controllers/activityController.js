@@ -262,6 +262,7 @@ const EDITABLE_FIELDS = [
   "title",
   "description",
   "whatChildrenLearn",
+  "faqs",
   "videoUrl",
   "category",
   "suggestedCategory",
@@ -278,6 +279,22 @@ const EDITABLE_FIELDS = [
   "whatToBring",
   "cancellationPolicy",
 ];
+
+/**
+ * Clean the FAQ list, drop entries with an empty question or answer,
+ * and trim both. The frontend already filters these, but the API can
+ * be called directly too, so this needs to happen here as well.
+ */
+function sanitizeFaqs(input) {
+  if (!Array.isArray(input)) return undefined;
+  return input
+    .map((f) => ({
+      question: String(f?.question ?? "").trim(),
+      answer: String(f?.answer ?? "").trim(),
+    }))
+    .filter((f) => f.question && f.answer)
+    .slice(0, 20);
+}
 
 /**
  * @desc    Nayi class banana
@@ -302,6 +319,10 @@ const createActivity = async (req, res, next) => {
         });
       }
       data.videoUrl = safeVideo;
+    }
+
+    if (data.faqs !== undefined) {
+      data.faqs = sanitizeFaqs(data.faqs);
     }
 
     // "Other" case: koi official category nahi, sirf free-text suggestion.
@@ -420,10 +441,15 @@ const updateActivity = async (req, res, next) => {
       req.body.videoUrl = safeVideo;
     }
 
+    if (req.body.faqs !== undefined) {
+      req.body.faqs = sanitizeFaqs(req.body.faqs);
+    }
+
     const REVIEW_TRIGGERING_FIELDS = [
       "title",
       "description",
       "whatChildrenLearn",
+      "faqs",
       "videoUrl",
       "category",
       "suggestedCategory",

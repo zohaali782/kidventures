@@ -99,9 +99,24 @@ const signup = async (req, res, next) => {
     // 4. Email pehle se to registered nahi?
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
+      /**
+       * Each account has exactly ONE role (parent or instructor), by
+       * design, since instructor accounts go through team verification.
+       * The same email can't hold a second role, but the generic
+       * "already registered" message is confusing when someone is
+       * trying to sign up as an instructor using their own parent
+       * account's email. Spell out the reason clearly here.
+       */
+      const wantsOtherRole =
+        role &&
+        ["parent", "instructor"].includes(role) &&
+        existingUser.role !== role;
+
       return res.status(400).json({
         success: false,
-        message: "This email is already registered. Please login instead.",
+        message: wantsOtherRole
+          ? `This email already has a ${existingUser.role} account. Each account can only have one role, so please use a different email to sign up as ${role === "instructor" ? "an instructor" : "a parent"}.`
+          : "This email is already registered. Please login instead.",
       });
     }
 

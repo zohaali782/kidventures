@@ -83,7 +83,7 @@ export default function InstructorsPage() {
             {instructors.map((profile) => {
               const userId = profile.user?._id || profile.user;
               const name = profile.user?.name || "Instructor";
-              const avatar = profile.user?.avatar;
+              const avatar = profile.user?.avatar?.url;
               const initial = name.charAt(0).toUpperCase();
 
               const categoryNames = (profile.categories || [])

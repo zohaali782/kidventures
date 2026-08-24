@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { getStoredUser, logout, homeForRole } from "../api/auth";
+import { getUnreadCount } from "../api/messages";
 
 const PinSmall = () => (
   <svg
@@ -122,6 +123,7 @@ function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [unread, setUnread] = useState(0);
   const navigate = useNavigate();
   const profileRef = useRef(null);
   const close = () => setMenuOpen(false);
@@ -129,6 +131,29 @@ function Navbar() {
   useEffect(() => {
     setUser(getStoredUser());
   }, []);
+
+  // Unread message badge — polled, not live, matches the rest of messaging.
+  useEffect(() => {
+    if (!user) {
+      setUnread(0);
+      return;
+    }
+    let alive = true;
+    const check = async () => {
+      try {
+        const { data } = await getUnreadCount();
+        if (alive) setUnread(data.count || 0);
+      } catch {
+        /* silent — badge just stays stale until next poll */
+      }
+    };
+    check();
+    const t = setInterval(check, 20000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     // logout ab server ko call karta hai taake httpOnly cookie clear ho —
@@ -206,6 +231,18 @@ function Navbar() {
                     >
                       Dashboard
                     </Link>
+                    <Link
+                      to="/messages"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center justify-between rounded-lg px-3.5 py-2.5 text-left text-[13px] font-medium text-brand-brown no-underline hover:bg-gray-100"
+                    >
+                      Messages
+                      {unread > 0 && (
+                        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-orange px-1.5 text-[10px] font-bold text-white">
+                          {unread}
+                        </span>
+                      )}
+                    </Link>
                     <button
                       type="button"
                       onClick={handleLogout}
@@ -266,6 +303,18 @@ function Navbar() {
                       className="block rounded-lg px-3.5 py-2.5 text-left text-[13px] font-medium text-brand-brown no-underline hover:bg-gray-100"
                     >
                       Dashboard
+                    </Link>
+                    <Link
+                      to="/messages"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center justify-between rounded-lg px-3.5 py-2.5 text-left text-[13px] font-medium text-brand-brown no-underline hover:bg-gray-100"
+                    >
+                      Messages
+                      {unread > 0 && (
+                        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-orange px-1.5 text-[10px] font-bold text-white">
+                          {unread}
+                        </span>
+                      )}
                     </Link>
                     <button
                       type="button"

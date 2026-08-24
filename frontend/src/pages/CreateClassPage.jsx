@@ -111,6 +111,7 @@ export default function CreateClassPage() {
     whatToBring: "",
   });
   const [learnList, setLearnList] = useState([""]);
+  const [faqList, setFaqList] = useState([{ question: "", answer: "" }]);
   const [sessions, setSessions] = useState([{ date: "", startTime: "" }]);
 
   /* images: [{ file, previewUrl, status: "pending"|"uploading"|"done"|"error" }] */
@@ -154,6 +155,16 @@ export default function CreateClassPage() {
   const addLearn = () => setLearnList((l) => [...l, ""]);
   const removeLearn = (i) =>
     setLearnList((l) => l.filter((_, idx) => idx !== i));
+
+  /* FAQs */
+  const setFaqQuestion = (i, v) =>
+    setFaqList((l) => l.map((f, idx) => (idx === i ? { ...f, question: v } : f)));
+  const setFaqAnswer = (i, v) =>
+    setFaqList((l) => l.map((f, idx) => (idx === i ? { ...f, answer: v } : f)));
+  const addFaq = () =>
+    setFaqList((l) => [...l, { question: "", answer: "" }]);
+  const removeFaq = (i) =>
+    setFaqList((l) => l.filter((_, idx) => idx !== i));
 
   /* sessions */
   const setSession = (i, k, v) =>
@@ -266,6 +277,9 @@ export default function CreateClassPage() {
       title: form.title.trim(),
       description: form.description.trim(),
       whatChildrenLearn: learnList.map((x) => x.trim()).filter(Boolean),
+      faqs: faqList
+        .map((f) => ({ question: f.question.trim(), answer: f.answer.trim() }))
+        .filter((f) => f.question && f.answer),
       ageMin: Number(form.ageMin),
       ageMax: Number(form.ageMax),
       price: Number(form.price),
@@ -649,6 +663,53 @@ export default function CreateClassPage() {
             className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-brand-orange px-3.5 py-2 text-xs font-semibold text-brand-orange"
           >
             <IcPlus size={15} /> Add learning point
+          </button>
+        </Section>
+
+        {/* 5b. FAQs */}
+        <Section
+          title="Frequently Asked Questions"
+          subtitle="Answer the questions parents ask most (optional)"
+        >
+          <div className="space-y-3">
+            {faqList.map((item, i) => (
+              <div
+                key={i}
+                className="flex gap-2 rounded-lg border border-gray-100 p-3"
+              >
+                <div className="flex-1 space-y-2">
+                  <input
+                    className={inputCls}
+                    value={item.question}
+                    onChange={(e) => setFaqQuestion(i, e.target.value)}
+                    placeholder={`Question ${i + 1}`}
+                    maxLength={150}
+                  />
+                  <textarea
+                    className={`${inputCls} min-h-[64px] resize-y`}
+                    value={item.answer}
+                    onChange={(e) => setFaqAnswer(i, e.target.value)}
+                    placeholder="Answer"
+                    maxLength={500}
+                  />
+                </div>
+                {faqList.length > 1 && (
+                  <button
+                    onClick={() => removeFaq(i)}
+                    className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white hover:border-red-300"
+                  >
+                    <IcX size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={addFaq}
+            disabled={faqList.length >= 20}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-brand-orange px-3.5 py-2 text-xs font-semibold text-brand-orange disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <IcPlus size={15} /> Add question
           </button>
         </Section>
 

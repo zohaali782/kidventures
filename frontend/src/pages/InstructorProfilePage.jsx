@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -206,6 +206,7 @@ const cId = (c) => c?.id || c?._id;
 
 export default function InstructorProfilePage() {
   const { id } = useParams(); // = instructor ka USER id
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -305,7 +306,8 @@ export default function InstructorProfilePage() {
       flash("Message bhejne ke liye pehle log in karein.");
       return;
     }
-    flash("Direct messaging jald aa rahi hai.");
+    if (!profile?.userId) return;
+    navigate(`/messages/${profile.userId}`);
   };
 
   /* ---- derived overall rating (agar instructor.rating maintain nahi) ---- */

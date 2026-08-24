@@ -131,6 +131,7 @@ app.use("/api/uploads", require("./routes/uploadRoutes"));
 app.use("/api/children", require("./routes/childRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
+app.use("/api/messages", require("./routes/messageRoutes"));
 app.use("/api/class-requests", require("./routes/classRequestRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 

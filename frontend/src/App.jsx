@@ -26,6 +26,9 @@ import RefundPolicyPage from "./pages/RefundPolicyPage";
 import HowItWorksPage from "./pages/HowItWorksPage";
 import BecomeInstructorPage from "./pages/BecomeInstructorPage";
 import InstructorsPage from "./pages/InstructorsPage";
+import MessagesPage from "./pages/MessagesPage";
+import NotFoundPage from "./pages/NotFoundPage";
+import CampsPage from "./pages/CampsPage";
 
 function App() {
   return (
@@ -50,6 +53,7 @@ function App() {
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/become-instructor" element={<BecomeInstructorPage />} />
         <Route path="/instructors" element={<InstructorsPage />} />
+        <Route path="/camps" element={<CampsPage />} />
 
         {/* Instructor-only pages */}
         <Route
@@ -104,6 +108,24 @@ function App() {
         />
         <Route path="/favorites" element={<FavoritesPage />} />
 
+        {/* Any logged-in user — parent or instructor */}
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <MessagesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/:userId"
+          element={
+            <ProtectedRoute>
+              <MessagesPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Admin-only page */}
         <Route
           path="/admin"
@@ -113,6 +135,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* No route matched — show a real 404 instead of a blank page */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );
