@@ -29,12 +29,9 @@ export default function AboutPage() {
       </section>
 
       <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <nav className="mb-6 text-xs opacity-60">
-          <Link to="/" className="hover:underline">
-            Home
-          </Link>{" "}
-          <span aria-hidden="true">›</span> About Us
-        </nav>
+        <h2 className="mb-3 text-xl font-bold text-brand-brown">
+          Why Kidventures
+        </h2>
 
         <p className="mb-8 text-base leading-7 text-brand-brown/80">
           At Kidventures, we believe childhood is meant to be filled with
