@@ -67,7 +67,7 @@ const benefits = [
   {
     icon: IcMoney,
     title: "Keep 85% of every booking",
-    text: "You set the price, parents pay exactly that — Kidventures takes a transparent 15% commission, nothing hidden.",
+    text: "You set the price, parents pay exactly that, Kidventures takes a transparent 15% commission, nothing hidden.",
   },
   {
     icon: IcCal,
@@ -77,12 +77,12 @@ const benefits = [
   {
     icon: IcUsers,
     title: "Reach families across Dubai",
-    text: "Get discovered by parents actively searching for classes like yours — no marketing spend required.",
+    text: "Get discovered by parents actively searching for classes like yours, no marketing spend required.",
   },
   {
     icon: IcVerify,
     title: "A trusted platform",
-    text: "Every instructor is verified, which means parents trust the classes they find here — and trust converts to bookings.",
+    text: "Every instructor is verified, which means parents trust the classes they find here, and trust converts to bookings.",
   },
 ];
 
@@ -90,7 +90,7 @@ const steps = [
   {
     icon: IcEdit,
     title: "Create your account",
-    text: "Sign up as an instructor — takes less than a minute, no documents needed yet.",
+    text: "Sign up as an instructor, takes less than a minute, no documents needed yet.",
   },
   {
     icon: IcVerify,
@@ -119,7 +119,7 @@ export default function BecomeInstructorPage() {
         </h1>
         <p className="mx-auto mb-7 max-w-xl text-sm leading-relaxed opacity-80 sm:text-base">
           Kidventures connects skilled instructors with parents looking for
-          quality kids' activities — from art and robotics to sports and music.
+          quality kids' activities, from art and robotics to sports and music.
           You bring the expertise, we bring the families.
         </p>
         <Link
