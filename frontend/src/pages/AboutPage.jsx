@@ -180,19 +180,16 @@ export default function AboutPage() {
           <h2 className="mb-2 text-xl font-bold text-brand-brown">
             Our Vision
           </h2>
-          <p className="mb-4 text-sm leading-7 text-brand-brown/80">
-            Every child has a spark waiting to be found, a talent, a passion,
-            a story they haven't discovered yet. We imagine a UAE where
-            finding it feels less like a chore and more like the start of an
-            adventure: search for what lights your child up, pick a day that
-            works, and book in minutes, no endless scrolling through groups
-            and pages, just one place that gets you there.
+          <p className="mx-auto mb-4 max-w-lg text-left text-sm leading-7 text-brand-brown/80">
+            We envision a UAE where finding something meaningful for your child
+            is as easy as searching for what they love, choosing when and where
+            they want to do it, and booking it all in one place.
           </p>
           <p className="text-lg font-bold text-brand-orange">
             Discover. Learn. Create. Explore.
           </p>
           <p className="mt-1 text-sm font-semibold text-brand-brown/70">
-            Because every child deserves an adventure worth having.
+            Your child's next adventure starts here.
           </p>
           <Link
             to="/activities"
