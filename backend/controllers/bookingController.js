@@ -13,20 +13,6 @@ const getCommissionPercent = () => {
 };
 
 /**
- * SIBLING DISCOUNT
- * Agar 2 ya zyada bachay ek hi booking me hon, to POORI booking ke
- * subtotal par ek hi baar yeh % discount lagta hai (har additional
- * bache par alag se NAHI - flat ek hi discount, chahe 2 bachay hon
- * ya 5). Yeh platform ki marketing decision hai - instructor ki
- * earning is se NAHI ghatti (neeche dekho: instructorEarning hamesha
- * full-price ke hisaab se calculate hoti hai). Platform apne commission
- * me se yeh discount fund karta hai - aur kabhi bhi apne hi commission
- * se zyada discount nahi deta (taake platform kisi bhi booking par
- * loss me na jaye).
- */
-const SIBLING_DISCOUNT_PERCENT = 10;
-
-/**
  * Payment na hone par seat kitni der rok kar rakhni hai.
  */
 const RESERVATION_MINUTES = 15;
@@ -191,23 +177,29 @@ const createBooking = async (req, res, next) => {
      * koi extra "service fee" upar se nahi jorha jata. Commission
      * instructor ki earning me se kaata jata hai.
      *
-     * SIBLING DISCOUNT: agar ek se zyada bacchay book ho rahe hain,
-     * 2nd bache se lekar aage har bache par 10% off. Yeh discount
-     * PLATFORM apne commission me se deta hai - instructor ki earning
-     * is se bilkul unaffected rehti hai (wo hamesha full-price ke
-     * hisaab se apna hissa paata hai). Discount kabhi bhi platform ke
-     * apne commission amount se zyada nahi ho sakta - taake platform
-     * kisi bhi booking par loss me na jaye.
+     * SIBLING DISCOUNT: ab yeh PLATFORM ka faisla nahi - har instructor
+     * apni class par khud decide karta hai ke sibling discount ho ya
+     * nahi, aur kitne percent (activity.siblingDiscount, 0-50%,
+     * activityController.js me hamesha sanitize/clamp hota hai).
      *
-     * Misaal (AED 175 ki class, 2 bachay, 15% commission):
+     * Kidventures ka 15% commission HAMESHA full (pre-discount) price par
+     * calculate hota hai - is discount ka POORA cost instructor ki apni
+     * earning se aata hai, platform ke commission se bilkul nahi
+     * (client ke saath confirm shuda faisla). Safety clamp sirf itna hai
+     * ke instructor ki earning kabhi negative na ho.
+     *
+     * Misaal (AED 175 ki class, 2 bachay, 15% commission, instructor ne
+     * 10% sibling discount rakha hai):
      *   subtotalBeforeDiscount = 350     (175 × 2)
-     *   discountAmount         = 35      (flat 10% of 350, 2+ bachon par)
+     *   commissionAmount       = 52.5    (15% of 350 - hamesha full price)
+     *   discountAmount         = 35      (10% of 350, instructor ka apna faisla)
      *   subtotal (parent pays) = 315     (350 - 35)
-     *   commissionAmount       = 52.5    (15% of 350 - full price base)
-     *   instructorEarning      = 297.5   (350 - 52.5 - discount se untouched)
+     *   instructorEarning      = 262.5   (350 - 52.5 - 35, discount instructor
+     *                                     ki earning se kata)
      *   totalAmount            = 315     (parent bilkul yehi deta hai)
      *
-     * Sab kuch server par calculate hota hai - body se kuch nahi liya jata.
+     * Sab kuch server par, database wali activity ke hisaab se calculate
+     * hota hai - body se kuch nahi liya jata.
      * NOTE: yahan jaan boojh kar decimal round nahi kiya - jo bhi asli
      * number bane wohi rakha jata hai (koi Math.round nahi).
      */
@@ -216,21 +208,33 @@ const createBooking = async (req, res, next) => {
     const commissionPercent = getCommissionPercent();
     const commissionAmount = subtotalBeforeDiscount * (commissionPercent / 100);
 
-    // Flat discount: 2 ya zyada bachay hon to POORI booking par ek hi
-    // baar yeh %, har additional bache par alag se nahi.
-    const hasSiblingDiscount = numberOfChildren > 1;
+    // Discount sirf 2+ bachon par, aur sirf agar is instructor ne apni
+    // class ke liye on kar rakha hai.
+    const hasSiblingDiscount =
+      numberOfChildren > 1 && !!activity.siblingDiscount?.enabled;
+    const discountPercent = hasSiblingDiscount
+      ? activity.siblingDiscount.percent
+      : 0;
     const rawDiscountAmount = hasSiblingDiscount
-      ? subtotalBeforeDiscount * (SIBLING_DISCOUNT_PERCENT / 100)
+      ? subtotalBeforeDiscount * (discountPercent / 100)
       : 0;
 
-    // Safety clamp: platform apne hi commission se zyada discount kabhi na de
-    const discountAmount = Math.min(rawDiscountAmount, commissionAmount);
-    const discountPercent = hasSiblingDiscount ? SIBLING_DISCOUNT_PERCENT : 0;
+    // Instructor ki earning discount se pehle hi.
+    const instructorEarningBeforeDiscount =
+      subtotalBeforeDiscount - commissionAmount;
+
+    // Safety clamp: instructor ki earning kabhi negative na ho -
+    // discount uski apni earning se zyada nahi kata ja sakta.
+    const discountAmount = Math.min(
+      rawDiscountAmount,
+      instructorEarningBeforeDiscount,
+    );
 
     const subtotal = subtotalBeforeDiscount - discountAmount;
 
-    // Instructor ki earning discount se untouched - hamesha full-price base par
-    const instructorEarning = subtotalBeforeDiscount - commissionAmount;
+    // Poora discount instructor ki earning se aata hai - commission par
+    // koi asar nahi (commission hamesha full price par tay ho chuka).
+    const instructorEarning = instructorEarningBeforeDiscount - discountAmount;
 
     const totalAmount = subtotal; // parent isse zyada kuch nahi deta
 

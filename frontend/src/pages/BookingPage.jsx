@@ -16,15 +16,6 @@ import { pickImg } from "../api/normalize";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-/**
- * Sibling discount - agar 2 ya zyada bachay hon to POORI booking ke
- * subtotal par ek hi baar flat yeh % discount (har additional bache
- * par alag se nahi). Yeh sirf ANDAZA (estimate) dikhane ke liye hai -
- * asli, final rakam hamesha server /api/bookings se milti hai (server
- * hi discount clamp karta hai agar zaroorat pare).
- */
-const SIBLING_DISCOUNT_PERCENT = 10;
-
 /* -------------------------------- icons -------------------------------- */
 const I = ({ children, size = 18, sw = 2 }) => (
   <svg
@@ -117,24 +108,28 @@ function fmtCountdown(ms) {
 }
 
 /**
- * Sibling discount ka andaza - 2 ya zyada bachay hon to poori booking
- * ke subtotal par ek hi baar flat SIBLING_DISCOUNT_PERCENT off. Server
- * final, clamp-ed rakam khud calculate karta hai jab /api/bookings
- * call hoti hai. Jaan boojh kar koi rounding nahi ki - asli number
- * jaisa bane wohi dikhaya jata hai.
+ * Sibling discount ka andaza - yeh ab is class ke apne instructor ke
+ * siblingDiscount setting (enabled + percent) se aata hai, koi platform-wide
+ * fixed % nahi. 2 ya zyada bachay hon to poori booking ke subtotal par
+ * ek hi baar flat yeh % off. Server final, clamp-ed rakam khud calculate
+ * karta hai jab /api/bookings call hoti hai. Jaan boojh kar koi rounding
+ * nahi ki - asli number jaisa bane wohi dikhaya jata hai.
  */
-function estimatePricing(pricePerChild, numberOfChildren) {
+function estimatePricing(pricePerChild, numberOfChildren, siblingDiscount) {
   const price = pricePerChild || 0;
   const count = numberOfChildren || 0;
   const subtotalBeforeDiscount = price * count;
-  const hasDiscount = count > 1;
+  const discountPercent =
+    count > 1 && siblingDiscount?.enabled ? siblingDiscount.percent || 0 : 0;
+  const hasDiscount = discountPercent > 0;
   const discountAmount = hasDiscount
-    ? subtotalBeforeDiscount * (SIBLING_DISCOUNT_PERCENT / 100)
+    ? subtotalBeforeDiscount * (discountPercent / 100)
     : 0;
   const total = subtotalBeforeDiscount - discountAmount;
   return {
     subtotalBeforeDiscount,
     discountAmount,
+    discountPercent,
     total,
     hasDiscount,
   };
@@ -443,11 +438,17 @@ export default function BookingPage() {
     selectedChildIds.includes(c._id || c.id),
   );
 
-  const pricing = estimatePricing(a.price, selectedChildIds.length);
+  const pricing = estimatePricing(
+    a.price,
+    selectedChildIds.length,
+    a.siblingDiscount,
+  );
   const estimatedSubtotal = pricing.subtotalBeforeDiscount;
   const estimatedDiscount = pricing.discountAmount;
+  const estimatedDiscountPercent = pricing.discountPercent;
   const estimatedTotal = pricing.total;
   const hasSiblingDiscount = pricing.hasDiscount;
+  const offersSiblingDiscount = !!a.siblingDiscount?.enabled;
 
   const toggleChild = (cid) =>
     setSelectedChildIds((ids) =>
@@ -659,10 +660,12 @@ export default function BookingPage() {
           {step === 2 && (
             <>
               <h2 className="mb-1 text-base font-bold">Who is attending?</h2>
-              <p className="mb-4 text-xs opacity-60">
-                You can select more than one child — booking 2 or more children
-                gets 10% off the total.
-              </p>
+              {offersSiblingDiscount && (
+                <p className="mb-4 text-xs opacity-60">
+                  You can select more than one child — booking 2 or more
+                  children gets {a.siblingDiscount.percent}% off the total.
+                </p>
+              )}
               {loadingChildren ? (
                 <div className="py-6 text-center text-sm opacity-60">
                   Loading…
@@ -721,7 +724,7 @@ export default function BookingPage() {
                   })}
                 </div>
               )}
-              {selectedChildIds.length > 1 && (
+              {selectedChildIds.length > 1 && hasSiblingDiscount && (
                 <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-brand-cream px-3 py-2 text-xs">
                   <IcTag size={14} />
                   {selectedChildIds.length} children selected — sibling discount
@@ -767,7 +770,8 @@ export default function BookingPage() {
               {hasSiblingDiscount && (
                 <div className="mb-1.5 flex items-center justify-between text-xs font-semibold text-green-700">
                   <span className="flex items-center gap-1">
-                    <IcTag size={13} /> Sibling discount (10% off total)
+                    <IcTag size={13} /> Sibling discount (
+                    {estimatedDiscountPercent}% off total)
                   </span>
                   <span>-AED {estimatedDiscount}</span>
                 </div>

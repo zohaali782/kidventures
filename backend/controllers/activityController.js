@@ -278,6 +278,7 @@ const EDITABLE_FIELDS = [
   "materialsNote",
   "whatToBring",
   "cancellationPolicy",
+  "siblingDiscount",
 ];
 
 /**
@@ -294,6 +295,19 @@ function sanitizeFaqs(input) {
     }))
     .filter((f) => f.question && f.answer)
     .slice(0, 20);
+}
+
+/**
+ * Sibling discount ab instructor apni marzi se on/off aur percent set karta
+ * hai — is liye body se aane wali value ko trust nahi karte, hamesha yahan
+ * clean/clamp karte hain (0-50%, off hone par 0).
+ */
+function sanitizeSiblingDiscount(input) {
+  const enabled = !!input?.enabled;
+  let percent = Number(input?.percent);
+  if (!Number.isFinite(percent) || percent < 0) percent = 0;
+  if (percent > 50) percent = 50;
+  return { enabled, percent: enabled ? Math.round(percent) : 0 };
 }
 
 /**
@@ -323,6 +337,10 @@ const createActivity = async (req, res, next) => {
 
     if (data.faqs !== undefined) {
       data.faqs = sanitizeFaqs(data.faqs);
+    }
+
+    if (data.siblingDiscount !== undefined) {
+      data.siblingDiscount = sanitizeSiblingDiscount(data.siblingDiscount);
     }
 
     // "Other" case: koi official category nahi, sirf free-text suggestion.
@@ -443,6 +461,12 @@ const updateActivity = async (req, res, next) => {
 
     if (req.body.faqs !== undefined) {
       req.body.faqs = sanitizeFaqs(req.body.faqs);
+    }
+
+    if (req.body.siblingDiscount !== undefined) {
+      req.body.siblingDiscount = sanitizeSiblingDiscount(
+        req.body.siblingDiscount,
+      );
     }
 
     const REVIEW_TRIGGERING_FIELDS = [

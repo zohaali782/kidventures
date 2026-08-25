@@ -156,6 +156,11 @@ function ActivityCard({ a }) {
               <PinIcon /> {a.location}
             </div>
           )}
+          {a.siblingDiscountPercent && (
+            <div className="mt-1.5 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700">
+              {a.siblingDiscountPercent}% off for siblings
+            </div>
+          )}
           <div className="mt-2 text-sm font-bold text-brand-brown">
             {a.price !== "" ? `AED ${a.price}` : ""}
           </div>

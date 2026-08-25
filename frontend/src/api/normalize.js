@@ -97,6 +97,13 @@ export const normActivity = (a) => {
     rating: asNum(a.rating?.average ?? a.rating),
     reviews: asNum(a.rating?.count ?? a.reviews ?? a.reviewCount),
     image: pickImg(a.images?.[0], a.coverImage, a.image),
+    // Instructor ne apni class par sibling discount on kiya ho to yahan
+    // percent milta hai, warna null — cards/listing isay highlight karne
+    // ke liye istemal karte hain.
+    siblingDiscountPercent:
+      a.siblingDiscount?.enabled && Number(a.siblingDiscount.percent) > 0
+        ? Number(a.siblingDiscount.percent)
+        : null,
   };
 };
 

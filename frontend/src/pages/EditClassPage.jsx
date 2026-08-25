@@ -161,6 +161,8 @@ export default function EditClassPage() {
           capacity: a.capacity ?? "",
           materialsIncluded: !!a.materialsIncluded,
           whatToBring: a.whatToBring || "",
+          siblingDiscountEnabled: !!a.siblingDiscount?.enabled,
+          siblingDiscountPercent: String(a.siblingDiscount?.percent || 10),
           status: a.status,
         });
         setLearnList(
@@ -242,6 +244,12 @@ export default function EditClassPage() {
     if (!form.price) e.price = "Enter a price";
     if (!form.capacity || Number(form.capacity) < 1)
       e.capacity = "Enter class capacity";
+    if (form.siblingDiscountEnabled) {
+      const pct = Number(form.siblingDiscountPercent);
+      if (!form.siblingDiscountPercent || pct <= 0 || pct > 50) {
+        e.siblingDiscount = "Enter a discount between 1% and 50%";
+      }
+    }
     return e;
   };
 
@@ -277,6 +285,12 @@ export default function EditClassPage() {
       capacity: Number(form.capacity),
       materialsIncluded: form.materialsIncluded,
       whatToBring: form.whatToBring.trim(),
+      siblingDiscount: {
+        enabled: form.siblingDiscountEnabled,
+        percent: form.siblingDiscountEnabled
+          ? Number(form.siblingDiscountPercent) || 0
+          : 0,
+      },
     };
     if (isOther) payload.suggestedCategory = form.suggestedCategory.trim();
     else payload.category = form.category;
@@ -623,6 +637,43 @@ export default function EditClassPage() {
           {priceHint && (
             <p className="mt-2 text-xs text-brand-orange">{priceHint}</p>
           )}
+
+          <div className="mt-4 rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={form.siblingDiscountEnabled}
+                onChange={(e) => set("siblingDiscountEnabled", e.target.checked)}
+                className="h-4 w-4 accent-brand-orange"
+              />
+              Offer a sibling discount
+            </label>
+            <p className="mt-1 text-xs opacity-60">
+              When 2 or more children are booked together in one booking, this
+              % is taken off the total. Kidventures' 15% commission is always
+              calculated on the full price — the discount comes entirely out
+              of your own earning.
+            </p>
+            {form.siblingDiscountEnabled && (
+              <div className="mt-3 max-w-[160px]">
+                <label className={labelCls}>Discount %</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  className={inputCls}
+                  value={form.siblingDiscountPercent}
+                  onChange={(e) => set("siblingDiscountPercent", e.target.value)}
+                  placeholder="10"
+                />
+              </div>
+            )}
+            {errors.siblingDiscount && (
+              <div className="mt-1 text-xs text-red-600">
+                {errors.siblingDiscount}
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* 4. sessions — live save */}

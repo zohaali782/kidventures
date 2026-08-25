@@ -97,6 +97,21 @@ const activitySchema = new mongoose.Schema(
     ageMax: { type: Number, required: true, min: 0, max: 18 },
     price: { type: Number, required: true, min: 0 }, // per child
     currency: { type: String, default: "AED" },
+
+    /**
+     * Sibling discount - ab yeh PLATFORM ka feature nahi, instructor ka
+     * apna control hai. Har instructor khud decide karta hai ke uski class
+     * par sibling discount ho ya nahi, aur kitne percent ho.
+     *
+     * Ahem: Kidventures ka 15% commission hamesha FULL (pre-discount)
+     * price par calculate hota hai - is discount ka poora cost instructor
+     * ki apni earning se aata hai, platform ki commission se nahi.
+     * (Dekho bookingController.js ka createBooking.)
+     */
+    siblingDiscount: {
+      enabled: { type: Boolean, default: false },
+      percent: { type: Number, min: 0, max: 50, default: 0 },
+    },
     durationMinutes: { type: Number, required: true, min: 15 },
     format: {
       type: String,
@@ -220,6 +235,11 @@ activitySchema.pre("save", function () {
   // Cap the number of FAQs per class, 20 is plenty.
   if (this.faqs && this.faqs.length > 20) {
     throw new Error("A class can have at most 20 FAQs");
+  }
+
+  // Sibling discount off hai to percent bhi clean rakho (0).
+  if (this.siblingDiscount && !this.siblingDiscount.enabled) {
+    this.siblingDiscount.percent = 0;
   }
 });
 

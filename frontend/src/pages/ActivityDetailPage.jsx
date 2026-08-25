@@ -466,6 +466,10 @@ function ActivityDetailPage() {
       : "English";
   // Parent bilkul yehi deta hai — commission instructor se katta hai
   const price = a.price ?? "";
+  const siblingDiscountPercent =
+    a.siblingDiscount?.enabled && Number(a.siblingDiscount.percent) > 0
+      ? Number(a.siblingDiscount.percent)
+      : null;
   const exactCoords = isOnline ? null : getCoords(a.location);
   const coords =
     exactCoords || (isOnline ? null : areaCoords(pickLocation(a.location)));
@@ -942,9 +946,14 @@ function ActivityDetailPage() {
             <div className="text-2xl font-bold text-brand-brown">
               {price !== "" ? `AED ${price}` : "—"}
             </div>
-            <div className="mb-4 border-b border-gray-100 pb-4 text-xs text-brand-brown/60">
-              per child
-            </div>
+            <div className="text-xs text-brand-brown/60">per child</div>
+            {siblingDiscountPercent && (
+              <div className="mt-2 inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
+                {siblingDiscountPercent}% off when you book 2+ children
+                together
+              </div>
+            )}
+            <div className="mb-4 mt-3 border-b border-gray-100 pb-4" />
 
             {dates.length === 0 ? (
               <div className="rounded-[10px] bg-brand-cream/60 px-4 py-4 text-center text-[13px] text-brand-brown/70">
