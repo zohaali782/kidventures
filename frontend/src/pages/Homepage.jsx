@@ -440,6 +440,42 @@ function MomentsMarquee() {
   );
 }
 
+function HeartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
+      <path d="M12 21s-6.7-4.35-9.3-8.1C1 10.2 1.6 6.9 4.4 5.4c2.3-1.2 4.9-.4 6.1 1.6.3.5.9.5 1.2 0 1.2-2 3.8-2.8 6.1-1.6 2.8 1.5 3.4 4.8 1.7 7.5C18.7 16.65 12 21 12 21z" />
+    </svg>
+  );
+}
+
+/* Homepage ke sabse upar, Navbar se pehle, ek chhoti si scrolling strip —
+   donation/impact message ke liye. Same marquee technique jo neeche
+   "MOMENTS FROM OUR CLASSES" mein use hui hai (strip ko duplicate kar ke
+   -50% translate karna, taake loop seamless dikhe). */
+function HopeBanner() {
+  const message =
+    "Every booking brings hope. 5% of your class fee helps provide food and basic education for displaced children.";
+
+  const items = [0, 1, 2, 3];
+
+  return (
+    <div className="overflow-hidden bg-brand-orange">
+      <div className="flex w-max animate-[kvhopeticker_30s_linear_infinite] motion-reduce:animate-none">
+        {[...items, ...items].map((_, i) => (
+          <span
+            key={i}
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap px-6 py-2 text-[13px] font-semibold text-white"
+          >
+            <HeartIcon />
+            {message}
+          </span>
+        ))}
+      </div>
+      <style>{`@keyframes kvhopeticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+    </div>
+  );
+}
+
 /* ============================================================
    HOMEPAGE
    ============================================================ */
@@ -512,6 +548,7 @@ function Homepage() {
         />
       </Helmet>
 
+      <HopeBanner />
       <Navbar />
 
       {/* ================= HERO ================= */}
