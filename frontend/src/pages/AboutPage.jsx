@@ -25,16 +25,18 @@ export default function AboutPage() {
       <Navbar />
 
       <section className="bg-brand-cream px-5 py-12 text-center sm:px-10">
-        <nav className="mx-auto mb-4 max-w-2xl text-left text-xs opacity-60">
+        <h1 className="mb-2 text-3xl font-bold">About Us</h1>
+      </section>
+
+      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+        <nav className="mb-6 text-xs opacity-60">
           <Link to="/" className="hover:underline">
             Home
           </Link>{" "}
           <span aria-hidden="true">›</span> About Us
         </nav>
-        <h1 className="mb-3 text-3xl font-bold text-brand-brown sm:text-4xl">
-          Welcome to Kidventures
-        </h1>
-        <p className="mx-auto max-w-2xl text-sm leading-relaxed text-brand-brown/80 sm:text-base">
+
+        <p className="mb-8 text-base leading-7 text-brand-brown/80">
           At Kidventures, we believe childhood is meant to be filled with
           curiosity, creativity, learning and adventure. Kidventures is a
           UAE-based platform that makes it easier for families to{" "}
@@ -45,9 +47,7 @@ export default function AboutPage() {
           , based on what they're looking for, when they want it and where
           they want it.
         </p>
-      </section>
 
-      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <section className="mb-8">
           <h2 className="mb-3 text-xl font-bold text-brand-brown">
             Making It Easier for Parents
