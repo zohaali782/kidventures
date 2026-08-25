@@ -17,6 +17,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import RequestClassPage from "./pages/RequestClassPage";
 import FavoritesPage from "./pages/FavoritesPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ScrollToTop from "./components/ScrollToTop";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import FAQPage from "./pages/FAQPage";
@@ -33,6 +34,7 @@ import CampsPage from "./pages/CampsPage";
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* Public pages — koi bhi dekh sakta hai */}
         <Route path="/" element={<Homepage />} />
