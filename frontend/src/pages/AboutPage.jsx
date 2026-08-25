@@ -24,16 +24,13 @@ export default function AboutPage() {
 
       <Navbar />
 
-      <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
-        <nav className="mb-2 text-xs opacity-60">
+      <section className="bg-brand-cream px-5 py-12 text-center sm:px-10">
+        <nav className="mx-auto mb-4 max-w-2xl text-left text-xs opacity-60">
           <Link to="/" className="hover:underline">
             Home
           </Link>{" "}
           <span aria-hidden="true">›</span> About Us
         </nav>
-      </div>
-
-      <section className="bg-brand-cream px-5 py-12 text-center sm:px-10">
         <h1 className="mb-3 text-3xl font-bold text-brand-brown sm:text-4xl">
           Welcome to Kidventures
         </h1>
