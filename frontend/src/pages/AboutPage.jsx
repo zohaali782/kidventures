@@ -58,33 +58,25 @@ export default function AboutPage() {
           <p className="mb-3 font-semibold text-brand-orange">
             Kidventures brings it all together in one place.
           </p>
-          <p className="mb-2 text-sm text-brand-brown/80">
-            Parents can search and discover activities based on:
+          <p className="mb-3 text-sm text-brand-brown/80">
+            Parents can search and discover activities by:
           </p>
-          <ul className="mb-3 list-disc space-y-1.5 pl-5 text-sm leading-6 text-brand-brown/80">
-            <li>
-              <strong>What their child is interested in</strong>, arts and
-              crafts, educational workshops, cooking, technology, creative
-              activities and more
-            </li>
-            <li>
-              <strong>Date</strong>, find activities available on a specific
-              day
-            </li>
-            <li>
-              <strong>Location</strong>, discover activities in a convenient
-              area
-            </li>
-            <li>
-              <strong>Age group</strong>, find experiences suitable for their
-              child's age
-            </li>
-          </ul>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {["Interest", "Date", "Location", "Age Group"].map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-brand-orange px-4 py-1.5 text-xs font-bold text-white"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
           <p className="text-sm leading-7 text-brand-brown/80">
-            Whether a parent is looking for something to do this weekend, during
-            the school holidays, after school or on a specific date, Kidventures
-            makes it easier to find relevant options without having to search
-            across multiple places.
+            From arts and crafts to coding workshops, cooking classes to
+            sports camps, just tell Kidventures what your child loves, when
+            you're free and where you'd like to go. Whether it's this
+            weekend, the school holidays or a specific date, we'll show you
+            what's available, without the endless searching.
           </p>
         </section>
 
