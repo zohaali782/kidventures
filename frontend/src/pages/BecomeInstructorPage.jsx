@@ -195,6 +195,44 @@ export default function BecomeInstructorPage() {
         </div>
       </section>
 
+      {/* service fees & pricing */}
+      <section className="bg-brand-cream px-5 py-14 sm:px-10">
+        <div className="mx-auto max-w-3xl rounded-2xl bg-white p-6 shadow-sm sm:p-8">
+          <h2 className="mb-4 text-2xl font-bold">Service Fees &amp; Pricing</h2>
+          <div className="space-y-3 text-sm leading-relaxed opacity-85">
+            <p>
+              Kidventures charges a{" "}
+              <strong>15% service fee on each successful booking</strong>.
+              This supports the platform, activity promotion, booking
+              management, payment processing and customer support.
+            </p>
+            <p>
+              The 15% service fee is added to the instructor&apos;s listed
+              price and paid by the parent at checkout. For example, if a
+              workshop is listed at AED 100, the parent pays AED 115, and the
+              instructor receives their AED 100 workshop price.
+            </p>
+            <p className="font-semibold">Instructors agree that:</p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>
+                To ensure fair pricing, the final price on Kidventures,
+                including the 15% service fee, must not be higher than the
+                publicly available price for the same activity elsewhere.
+              </li>
+              <li>
+                Instructors must not redirect Kidventures customers to book
+                privately. Violations will result in listing suspension or
+                removal from Kidventures.
+              </li>
+              <li>
+                Genuine promotions and special sibling offers are permitted
+                on the Kidventures platform.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="px-5 pb-16 text-center sm:px-10">
         <Link

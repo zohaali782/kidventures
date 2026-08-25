@@ -81,6 +81,11 @@ const instructorProfileSchema = new mongoose.Schema(
     agreedVenuePolicy: { type: Boolean, default: false },
     agreedVenuePolicyAt: Date,
 
+    // Client ki 15% service fee & pricing policy par razamandi
+    // (agreedVenuePolicy jaisa hi pattern hai).
+    agreedFeesPolicy: { type: Boolean, default: false },
+    agreedFeesPolicyAt: Date,
+
     /* ------------------------- Verification documents --------------------- */
     /**
      * SECURITY: "select: false" - ye field normal query me wapas

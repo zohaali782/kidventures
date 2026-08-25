@@ -76,6 +76,7 @@ export default function InstructorVerification({
     },
     introVideoUrl: profile?.introVideoUrl || "",
     agreedVenuePolicy: !!profile?.agreedVenuePolicy,
+    agreedFeesPolicy: !!profile?.agreedFeesPolicy,
   }));
 
   const [langInput, setLangInput] = useState("");
@@ -139,6 +140,10 @@ export default function InstructorVerification({
       ok: f.agreedVenuePolicy,
       label: "Agreed to venue & safety policy",
     });
+    list.push({
+      ok: f.agreedFeesPolicy,
+      label: "Agreed to service fees & pricing policy",
+    });
     return list;
   }, [f, docs, hasSocial]);
 
@@ -166,6 +171,7 @@ export default function InstructorVerification({
         socialLinks: f.socialLinks,
         introVideoUrl: f.introVideoUrl,
         agreedVenuePolicy: f.agreedVenuePolicy,
+        agreedFeesPolicy: f.agreedFeesPolicy,
       };
       await api.put("/instructors/me", payload);
       await onRefetch?.();
@@ -618,6 +624,57 @@ export default function InstructorVerification({
                 I confirm my classes will take place in a safe, supervised,
                 child-appropriate venue, and I agree to the Kidventures venue
                 &amp; safety policy.
+              </span>
+            </label>
+          </section>
+
+          {/* service fees & pricing policy */}
+          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-bold text-brand-brown">
+              Service Fees &amp; Pricing
+            </h3>
+            <div className="mb-4 space-y-3 text-xs leading-6 text-brand-brown/85">
+              <p>
+                Kidventures charges a{" "}
+                <strong>15% service fee on each successful booking</strong>.
+                This supports the platform, activity promotion, booking
+                management, payment processing and customer support.
+              </p>
+              <p>
+                The 15% service fee is added to the instructor&apos;s listed
+                price and paid by the parent at checkout. For example, if a
+                workshop is listed at AED 100, the parent pays AED 115, and
+                the instructor receives their AED 100 workshop price.
+              </p>
+              <p className="font-semibold">Instructors agree that:</p>
+              <ul className="list-disc space-y-1.5 pl-4">
+                <li>
+                  To ensure fair pricing, the final price on Kidventures,
+                  including the 15% service fee, must not be higher than the
+                  publicly available price for the same activity elsewhere.
+                </li>
+                <li>
+                  Instructors must not redirect Kidventures customers to book
+                  privately. Violations will result in listing suspension or
+                  removal from Kidventures.
+                </li>
+                <li>
+                  Genuine promotions and special sibling offers are permitted
+                  on the Kidventures platform.
+                </li>
+              </ul>
+            </div>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                disabled={!editable}
+                checked={f.agreedFeesPolicy}
+                onChange={(e) => set("agreedFeesPolicy", e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-brand-orange"
+              />
+              <span className="text-xs leading-6 text-brand-brown/85">
+                I have read and agree to the Kidventures Service Fees &amp;
+                Pricing Policy.
               </span>
             </label>
           </section>

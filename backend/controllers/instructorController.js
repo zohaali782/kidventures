@@ -30,6 +30,7 @@ const EDITABLE_FIELDS = [
   "inUAE",
   "introVideoUrl",
   "agreedVenuePolicy",
+  "agreedFeesPolicy",
 ];
 
 /**
@@ -92,6 +93,14 @@ const updateMyProfile = async (req, res, next) => {
     // Agar razamandi wapas le li, to timestamp bhi hata do.
     if (!profile.agreedVenuePolicy) {
       profile.agreedVenuePolicyAt = undefined;
+    }
+
+    // Service fees & pricing policy — same pattern.
+    if (profile.agreedFeesPolicy && !profile.agreedFeesPolicyAt) {
+      profile.agreedFeesPolicyAt = new Date();
+    }
+    if (!profile.agreedFeesPolicy) {
+      profile.agreedFeesPolicyAt = undefined;
     }
 
     // Agar admin ne reject kiya tha aur ab ye edit kar raha hai,
@@ -184,6 +193,11 @@ const submitForVerification = async (req, res, next) => {
     // Venue / safety policy par razamandi zaroori
     if (!profile.agreedVenuePolicy) {
       missing.push("agreement to the venue & safety policy");
+    }
+
+    // Service fees & pricing policy par razamandi zaroori
+    if (!profile.agreedFeesPolicy) {
+      missing.push("agreement to the service fees & pricing policy");
     }
 
     if (missing.length > 0) {
