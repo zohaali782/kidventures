@@ -172,11 +172,15 @@ export default function AboutPage() {
           <h2 className="mb-2 text-xl font-bold text-brand-brown">
             Our Vision
           </h2>
-          <p className="mx-auto mb-4 max-w-lg text-left text-sm leading-7 text-brand-brown/80">
-            We envision a UAE where finding something meaningful for your child
-            is as easy as searching for what they love, choosing when and where
-            they want to do it, and booking it all in one place.
+          <p className="mx-auto mb-3 max-w-lg text-left text-sm text-brand-brown/80">
+            We envision a UAE where finding something meaningful for your
+            child is as easy as:
           </p>
+          <ul className="mx-auto mb-4 max-w-lg list-disc space-y-1.5 pl-5 text-left text-sm leading-6 text-brand-brown/80">
+            <li>Searching for what they love</li>
+            <li>Choosing when and where they want to do it</li>
+            <li>Booking it all in one place</li>
+          </ul>
           <p className="text-lg font-bold text-brand-orange">
             Discover. Learn. Create. Explore.
           </p>
