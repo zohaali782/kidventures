@@ -327,7 +327,15 @@ const RetryBox = ({ onRetry }) => (
   </div>
 );
 
-function Dropdown({ icon, label, value, options, onChange, placeholder }) {
+function Dropdown({
+  icon,
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  align = "left",
+}) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   return (
@@ -356,7 +364,23 @@ function Dropdown({ icon, label, value, options, onChange, placeholder }) {
             className="fixed inset-0 z-[998]"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 top-full z-[999] mt-2 max-h-[240px] min-w-[180px] overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
+          {/*
+            SCROLL BUG FIX: pehle yeh hamesha "left-0" tha, jis ki wajah se
+            teesre (rightmost) dropdown — jaise mobile par "Age" — ka panel
+            (min-w-[180px]) screen ke right edge se bahar nikal jata tha.
+            Us se poori page ki scrollWidth viewport se zyada ho jati thi,
+            aur page mobile par side-to-side drag/scroll hone lagti thi
+            (jaisa user ne report kiya: "screen fixed nahi rehti, hath se
+            move hoti hai"). Ab rightmost dropdown "right-0" (align="right")
+            leta hai taake panel screen ke andar hi khule, bahar na nikle.
+            max-w-[calc(100vw-2rem)] ek extra safety hai taake chhoti
+            screens par bhi panel kabhi viewport se bara na ho.
+          */}
+          <div
+            className={`absolute top-full z-[999] mt-2 max-h-[240px] w-max max-w-[calc(100vw-2rem)] min-w-[180px] overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.15)] ${
+              align === "right" ? "right-0" : "left-0"
+            }`}
+          >
             {options.map((o) => (
               <button
                 type="button"
@@ -536,7 +560,7 @@ function Homepage() {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
+    <div className="min-h-screen overflow-x-hidden bg-white font-sans text-brand-brown [color-scheme:light]">
       {/* SEO */}
       <Helmet>
         <title>
@@ -628,6 +652,7 @@ function Homepage() {
                   placeholder="Any age"
                   value={age}
                   onChange={setAge}
+                  align="right"
                   options={[
                     { value: "", label: "Any age" },
                     { value: "3-5", label: "3 - 5 years" },
