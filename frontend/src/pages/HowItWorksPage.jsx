@@ -75,7 +75,7 @@ const parentSteps = [
   {
     icon: IcSearch,
     title: "Search & discover",
-    text: "Browse classes by category, age group, and area — or use filters to find exactly what your child needs.",
+    text: "Browse classes by category, age group, and area, or use filters to find exactly what your child needs.",
   },
   {
     icon: IcCal,
@@ -85,12 +85,12 @@ const parentSteps = [
   {
     icon: IcLock,
     title: "Pay securely",
-    text: "Complete payment with Stripe. The price you see is exactly what you pay — no hidden fees. Your seat is confirmed instantly.",
+    text: "Complete payment with Stripe. The price you see is exactly what you pay, no hidden fees. Your seat is confirmed instantly.",
   },
   {
     icon: IcSmile,
     title: "Attend & enjoy",
-    text: "Show up on the day — your instructor already has everything they need to know about your child, including any allergies.",
+    text: "Show up on the day, your instructor already has everything they need to know about your child, including any allergies.",
   },
 ];
 
@@ -98,7 +98,7 @@ const instructorSteps = [
   {
     icon: IcEdit,
     title: "Sign up",
-    text: "Create your instructor account in minutes — no documents needed to get started.",
+    text: "Create your instructor account in minutes, no documents needed to get started.",
   },
   {
     icon: IcVerify,
@@ -113,7 +113,7 @@ const instructorSteps = [
   {
     icon: IcMoney,
     title: "Get paid",
-    text: "You keep 85% of the price you set — Kidventures takes a 15% commission. Track your earnings from your dashboard.",
+    text: "You keep 85% of the price you set, Kidventures takes a 15% commission. Track your earnings from your dashboard.",
   },
 ];
 

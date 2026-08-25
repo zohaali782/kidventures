@@ -24,29 +24,33 @@ export default function AboutPage() {
 
       <Navbar />
 
-      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <nav className="mb-6 text-xs opacity-60">
+      <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
+        <nav className="mb-2 text-xs opacity-60">
           <Link to="/" className="hover:underline">
             Home
           </Link>{" "}
           <span aria-hidden="true">›</span> About Us
         </nav>
+      </div>
 
-        <h1 className="mb-2 text-3xl font-bold text-brand-brown sm:text-4xl">
+      <section className="bg-brand-cream px-5 py-12 text-center sm:px-10">
+        <h1 className="mb-3 text-3xl font-bold text-brand-brown sm:text-4xl">
           Welcome to Kidventures
         </h1>
-        <p className="mb-8 text-base leading-7 text-brand-brown/80">
+        <p className="mx-auto max-w-2xl text-sm leading-relaxed text-brand-brown/80 sm:text-base">
           At Kidventures, we believe childhood is meant to be filled with
           curiosity, creativity, learning and adventure. Kidventures is a
           UAE-based platform that makes it easier for families to{" "}
           <strong>
             discover and book children's activities, classes, workshops, camps
             and experiences
-          </strong>{" "}
-          — based on what they're looking for, when they want it and where they
-          want it.
+          </strong>
+          , based on what they're looking for, when they want it and where
+          they want it.
         </p>
+      </section>
 
+      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <section className="mb-8">
           <h2 className="mb-3 text-xl font-bold text-brand-brown">
             Making It Easier for Parents
@@ -65,20 +69,20 @@ export default function AboutPage() {
           </p>
           <ul className="mb-3 list-disc space-y-1.5 pl-5 text-sm leading-6 text-brand-brown/80">
             <li>
-              <strong>What their child is interested in</strong> — arts and
+              <strong>What their child is interested in</strong>, arts and
               crafts, educational workshops, cooking, technology, creative
               activities and more
             </li>
             <li>
-              <strong>Date</strong> — find activities available on a specific
+              <strong>Date</strong>, find activities available on a specific
               day
             </li>
             <li>
-              <strong>Location</strong> — discover activities in a convenient
+              <strong>Location</strong>, discover activities in a convenient
               area
             </li>
             <li>
-              <strong>Age group</strong> — find experiences suitable for their
+              <strong>Age group</strong>, find experiences suitable for their
               child's age
             </li>
           </ul>
@@ -119,7 +123,7 @@ export default function AboutPage() {
             We want to make discovering children's activities easier for parents
             while giving children more opportunities to explore their interests,
             develop skills, build confidence and have fun. We believe the right
-            activity can become more than just something to do — it can spark a
+            activity can become more than just something to do, it can spark a
             passion, uncover a talent, build a friendship or become a lifelong
             interest.
           </p>
@@ -136,8 +140,8 @@ export default function AboutPage() {
           </p>
           <p className="text-sm leading-7 text-brand-brown/80">
             Instead of asking "Where can I find a children's activity?", parents
-            can simply tell Kidventures what they're looking for — what
-            activity, what date, what location and for what age group — and book
+            can simply tell Kidventures what they're looking for, what
+            activity, what date, what location and for what age group, and book
             relevant experiences in one place.
           </p>
         </section>
@@ -149,8 +153,8 @@ export default function AboutPage() {
             </h2>
             <p className="text-sm leading-6 text-brand-brown/80">
               We want Kidventures to become a trusted destination for parents
-              looking for quality activities and experiences for their children
-              — saving time, making discovery easier and helping families find
+              looking for quality activities and experiences for their children,
+              saving time, making discovery easier and helping families find
               activities they may never have discovered otherwise.
             </p>
           </section>
