@@ -198,6 +198,51 @@ const BookingIcon = () => (
   </svg>
 );
 
+/* "How It Works" step icons — currentColor taake har card apna accent
+   rang khud de sake (bg-brand-cream badge ke andar). */
+const HowIcon = ({ children, size = 24 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {children}
+  </svg>
+);
+const IcDiscoverStep = (p) => (
+  <HowIcon {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </HowIcon>
+);
+const IcBookStep = (p) => (
+  <HowIcon {...p}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+    <path d="M9 16l2 2 4-4" />
+  </HowIcon>
+);
+const IcAttendStep = (p) => (
+  <HowIcon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 13.5s1.5 2 4 2 4-2 4-2" />
+    <line x1="9" y1="9" x2="9.01" y2="9" />
+    <line x1="15" y1="9" x2="15.01" y2="9" />
+  </HowIcon>
+);
+const IcReviewStep = (p) => (
+  <HowIcon {...p}>
+    <polygon points="12 2 15 8.5 22 9.5 17 14.5 18.5 21.5 12 18 5.5 21.5 7 14.5 2 9.5 9 8.5 12 2" />
+  </HowIcon>
+);
+
 /* ============================================================
    API RESPONSE NORMALIZERS  <-- backend ka data yahan safe text/number/url mein badalta hai
    Ye helpers guarantee dete hain ke React ko kabhi RAW object na mile (warna page blank ho jata hai).
@@ -909,28 +954,52 @@ function Homepage() {
         <h2 className="mb-8 text-xl font-bold text-brand-brown sm:text-2xl">
           How Kidventures Works
         </h2>
-        <div className="flex flex-wrap justify-center gap-8 md:gap-10">
+        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-3 sm:gap-5 md:grid-cols-4">
           {[
             {
-              step: "1. Discover",
+              step: "Discover",
               desc: "Explore activities by category, age, location and more.",
+              Icon: IcDiscoverStep,
+              color: "#F5941F",
             },
             {
-              step: "2. Book",
+              step: "Book",
               desc: "Choose your preferred date and book in minutes.",
+              Icon: IcBookStep,
+              color: "#3FA9E0",
             },
             {
-              step: "3. Attend",
+              step: "Attend",
               desc: "Enjoy the class and have an amazing experience!",
+              Icon: IcAttendStep,
+              color: "#D9A400",
             },
             {
-              step: "4. Review",
+              step: "Review",
               desc: "Share your feedback and help others choose.",
+              Icon: IcReviewStep,
+              color: "#F5941F",
             },
-          ].map((s) => (
-            <div key={s.step} className="max-w-[180px]">
-              <div className="mb-2 font-bold text-brand-orange">{s.step}</div>
-              <div className="text-[13px] text-brand-brown/70">{s.desc}</div>
+          ].map((s, i) => (
+            <div
+              key={s.step}
+              className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5"
+            >
+              <div
+                className="relative mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-cream sm:h-14 sm:w-14"
+                style={{ color: s.color }}
+              >
+                <s.Icon size={24} />
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand-orange text-[10px] font-bold text-white">
+                  {i + 1}
+                </span>
+              </div>
+              <div className="mb-1 text-sm font-bold text-brand-brown sm:text-base">
+                {s.step}
+              </div>
+              <div className="text-xs leading-relaxed text-brand-brown/70 sm:text-[13px]">
+                {s.desc}
+              </div>
             </div>
           ))}
         </div>
