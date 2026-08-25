@@ -71,10 +71,10 @@ export default function ContactPage() {
       <section className="mx-auto grid max-w-4xl grid-cols-1 gap-5 px-5 py-14 sm:grid-cols-2 sm:px-10">
         <Card icon={IcMail} title="Email">
           <a
-            href="mailto:support@kidventures.com"
+            href="mailto:kidventuresevents@gmail.com"
             className="font-semibold text-brand-orange no-underline"
           >
-            support@kidventures.com
+            kidventuresevents@gmail.com
           </a>
           <p className="mt-1.5 text-xs opacity-60">
             We typically reply within 24 hours.
@@ -82,10 +82,12 @@ export default function ContactPage() {
         </Card>
         <Card icon={IcPhone} title="Phone / WhatsApp">
           <a
-            href="tel:+97140000000"
+            href="https://wa.me/971568376461"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-semibold text-brand-orange no-underline"
           >
-            +971 4 000 0000
+            +971 56 837 6461
           </a>
           <p className="mt-1.5 text-xs opacity-60">Sunday–Thursday, 9am–6pm</p>
         </Card>
