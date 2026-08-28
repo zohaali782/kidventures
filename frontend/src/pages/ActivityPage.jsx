@@ -494,7 +494,7 @@ function ActivityPage() {
                 No classes match your search yet
               </h3>
               <p className="mx-auto mb-5 max-w-md text-[13px] text-brand-brown/65">
-                Try clearing a filter — or tell us what you&apos;re looking for
+                Try clearing a filter, or tell us what you&apos;re looking for
                 and we&apos;ll work on bringing it to your area.
               </p>
               <Link

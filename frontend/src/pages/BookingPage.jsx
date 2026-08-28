@@ -202,7 +202,7 @@ function PaymentForm({ booking, onConfirmed }) {
     }
     setConfirming(false);
     setErr(
-      "Payment succeeded but confirmation is taking longer than usual — check My Bookings in a few minutes, you'll also get an email.",
+      "Payment succeeded but confirmation is taking longer than usual. Check My Bookings in a few minutes, you'll also get an email.",
     );
   };
 
@@ -533,7 +533,7 @@ export default function BookingPage() {
 
         {restoredNotice && step === 4 && !reservationExpired && (
           <div className="mb-4 rounded-lg bg-brand-cream px-3.5 py-2.5 text-[13px]">
-            Picking up where you left off — your seat is still held.
+            Picking up where you left off, your seat is still held.
           </div>
         )}
 
@@ -662,7 +662,7 @@ export default function BookingPage() {
               <h2 className="mb-1 text-base font-bold">Who is attending?</h2>
               {offersSiblingDiscount && (
                 <p className="mb-4 text-xs opacity-60">
-                  You can select more than one child — booking 2 or more
+                  You can select more than one child, booking 2 or more
                   children gets {a.siblingDiscount.percent}% off the total.
                 </p>
               )}
@@ -727,7 +727,7 @@ export default function BookingPage() {
               {selectedChildIds.length > 1 && hasSiblingDiscount && (
                 <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-brand-cream px-3 py-2 text-xs">
                   <IcTag size={14} />
-                  {selectedChildIds.length} children selected — sibling discount
+                  {selectedChildIds.length} children selected, sibling discount
                   applied, total AED {estimatedTotal}
                 </div>
               )}

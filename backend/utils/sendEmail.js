@@ -33,11 +33,16 @@ function getTransporter() {
  * Newline ya comma wali "email" se header injection ho sakti hai —
  * attacker apne Bcc/extra recipients daal kar aap ke SMTP account se
  * spam bhej sakta hai. Is liye ek hi saaf email address allow karte hain.
+ *
+ * NOTE: pehle yahan apostrophe (') bhi excluded thi, is liye "o'brien@..."
+ * jaisi (bilkul valid) emails "invalid recipient" bol kar chup chaap skip
+ * ho jati thin — un accounts ko koi verification/reset email kabhi nahi
+ * jati thi. Apostrophe local-part mein valid hai, is liye ab allowed hai.
  */
 const isValidRecipient = (value) =>
   typeof value === "string" &&
   value.length <= 254 &&
-  /^[^\s@,;:<>"'\\]+@[^\s@,;:<>"'\\]+\.[^\s@,;:<>"'\\]+$/.test(value.trim());
+  /^[^\s@,;:<>"\\]+@[^\s@,;:<>"\\]+\.[^\s@,;:<>"\\]+$/.test(value.trim());
 
 /**
  * Logs me poora email address na jaye — woh PII hai aur hosting platform

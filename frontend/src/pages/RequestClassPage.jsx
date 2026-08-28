@@ -152,7 +152,7 @@ export default function RequestClassPage() {
               <IcCheck size={34} className="text-green-600" />
             </div>
             <h1 className="mb-2.5 text-xl font-bold">
-              Thanks — request received!
+              Thanks, request received!
             </h1>
             <p className="mb-6 text-[13px] leading-relaxed opacity-75">
               We're collecting requests like yours to decide which classes to
@@ -202,7 +202,7 @@ export default function RequestClassPage() {
           </h1>
           <p className="text-[13px] leading-relaxed opacity-70">
             Tell us what your child wants to learn and where. We use these
-            requests to decide which instructors to bring on next — and we'll
+            requests to decide which instructors to bring on next, and we'll
             email you the moment it's available.
           </p>
         </div>
@@ -223,7 +223,7 @@ export default function RequestClassPage() {
               className={inputCls}
               value={form.category}
               onChange={(e) => set("category", e.target.value)}
-              placeholder="Type anything — e.g. Fencing, Ballet, Arabic calligraphy"
+              placeholder="Type anything, e.g. Fencing, Ballet, Arabic calligraphy"
             />
             <datalist id="category-suggestions">
               {categories.map((c) => (
@@ -231,7 +231,7 @@ export default function RequestClassPage() {
               ))}
             </datalist>
             <div className="mt-1.5 text-[11px] opacity-55">
-              Not on our list? Type it anyway — that's exactly what we want to
+              Not on our list? Type it anyway, that's exactly what we want to
               hear about.
             </div>
             {errors.category && (

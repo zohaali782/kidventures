@@ -12,6 +12,27 @@ import {
 
 const POLL_MS = 15000;
 
+/**
+ * Personal info (phone number / email) chat mein type ho rahi ho to detect
+ * karta hai — taake parents aur instructors ko yaad dilaya ja sake ke sab
+ * communication aur booking Kidventures ke andar hi rahe (safety + platform
+ * protection dono). Jab tak yeh detect hoti hai, Send button disabled rehta
+ * hai aur "Send" try karne par bhi bheja nahi jata — draft delete nahi hota,
+ * bas number/email hataye baghair message nahi jayega.
+ */
+const EMAIL_PATTERN = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+const PHONE_PATTERN = /(\+?\d[\d\s\-().]{5,}\d)/;
+function containsPersonalInfo(text) {
+  if (!text) return false;
+  if (EMAIL_PATTERN.test(text)) return true;
+  const phoneMatch = text.match(PHONE_PATTERN);
+  if (phoneMatch) {
+    const digitCount = (phoneMatch[0].match(/\d/g) || []).length;
+    if (digitCount >= 7) return true;
+  }
+  return false;
+}
+
 const cldOptimize = (url, width = 80) => {
   if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com"))
     return url;
@@ -135,6 +156,12 @@ export default function MessagesPage() {
     e.preventDefault();
     const text = draft.trim();
     if (!text || !userId || sending) return;
+    if (containsPersonalInfo(text)) {
+      setError(
+        "This message wasn't sent because it looks like it contains a phone number or email address. Please remove it and try again.",
+      );
+      return;
+    }
     setSending(true);
     setError("");
     try {
@@ -152,6 +179,8 @@ export default function MessagesPage() {
   const activeConvo =
     conversations.find((c) => c.userId === userId) ||
     (otherUser ? { userId, name: otherUser.name, avatar: otherUser.avatar } : null);
+
+  const draftHasPersonalInfo = containsPersonalInfo(draft);
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -275,6 +304,14 @@ export default function MessagesPage() {
                   <div className="px-4 pb-1 text-xs text-[#c0392b]">{error}</div>
                 )}
 
+                {draftHasPersonalInfo && (
+                  <div className="mx-3 mb-2 rounded-lg bg-[#c0392b]/10 px-3 py-2 text-[12px] font-semibold text-[#c0392b]">
+                    This looks like a phone number or email address. For your
+                    safety, please remove it — sending is blocked until you
+                    do. Keep all communication and bookings on Kidventures.
+                  </div>
+                )}
+
                 <form
                   onSubmit={handleSend}
                   className="flex items-center gap-2 border-t border-gray-100 p-3"
@@ -288,7 +325,7 @@ export default function MessagesPage() {
                   />
                   <button
                     type="submit"
-                    disabled={sending || !draft.trim()}
+                    disabled={sending || !draft.trim() || draftHasPersonalInfo}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-orange text-white disabled:opacity-50"
                     aria-label="Send"
                   >

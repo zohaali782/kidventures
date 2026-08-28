@@ -36,8 +36,8 @@ export default function TermsPage() {
           <p>
             Kidventures is a marketplace that connects parents in Dubai with
             independent instructors offering kids' activities and classes.
-            Instructors are independent providers, not employees of Kidventures
-            — Kidventures facilitates discovery, booking, and payment.
+            Instructors are independent providers, not employees of Kidventures.
+            Kidventures facilitates discovery, booking, and payment.
           </p>
         </Section>
 
@@ -53,7 +53,7 @@ export default function TermsPage() {
           <p>
             When you book a class, your seat is reserved for 15 minutes while
             you complete payment. A booking is only confirmed once payment is
-            successfully processed. Prices shown are exactly what you pay — no
+            successfully processed. Prices shown are exactly what you pay. No
             hidden fees are added at checkout.
           </p>
         </Section>

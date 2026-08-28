@@ -74,11 +74,11 @@ const signup = async (req, res, next) => {
   try {
     const { name, email, password, phone, role } = req.body;
 
-    // 1. Zaroori fields aaye hain ya nahi
-    if (!name || !email || !password) {
+    // 1. Zaroori fields aaye hain ya nahi (phone bhi ab compulsory hai)
+    if (!name || !email || !password || !phone) {
       return res.status(400).json({
         success: false,
-        message: "Name, email and password are required",
+        message: "Name, email, password and phone number are required",
       });
     }
 

@@ -188,11 +188,6 @@ const DirectionsArrowIcon = () => (
     <path d="M7 17 17 7M8 7h9v9" />
   </svg>
 );
-const WhatsAppIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366">
-    <path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-2.8.7.7-2.7-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5 0a6.5 6.5 0 0 1-1.9-1.2 7.3 7.3 0 0 1-1.4-1.7c-.1-.2 0-.4.1-.5l.4-.4.2-.4a.4.4 0 0 0 0-.4l-.7-1.7c-.2-.4-.4-.4-.5-.4h-.5a.9.9 0 0 0-.6.3 2.6 2.6 0 0 0-.8 2 4.5 4.5 0 0 0 1 2.4 10.3 10.3 0 0 0 4 3.5c1.9.8 1.9.5 2.3.5a2.3 2.3 0 0 0 1.5-1 1.9 1.9 0 0 0 .1-1c0-.1-.2-.2-.4-.3z" />
-  </svg>
-);
 const VerifiedBadge = () => (
   <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2F9E44]">
     <svg
@@ -479,7 +474,6 @@ function ActivityDetailPage() {
   const canReview = getStoredUser()?.role === "parent";
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${a.title} — ${shareUrl}`)}`;
   const favItem = {
     id: a._id || a.id,
     title: a.title,
@@ -650,14 +644,6 @@ function ActivityDetailPage() {
             >
               <ShareIcon /> {copied ? "Link copied!" : "Share"}
             </button>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-[10px] border-2 border-gray-200 px-4 py-2 text-[13px] font-bold text-brand-brown no-underline"
-            >
-              <WhatsAppIcon /> WhatsApp
-            </a>
           </div>
 
           {/* Quick facts */}
@@ -751,10 +737,21 @@ function ActivityDetailPage() {
                   }
                 />
                 <DetailRow label="Language" value={language} />
-                <DetailRow
-                  label="Cancellation Policy"
-                  value={asText(a.cancellationPolicy)}
-                />
+                <div className="flex justify-between gap-4 border-b border-gray-100 py-2.5 text-[13px]">
+                  <span className="text-brand-brown/70">
+                    Cancellation Policy
+                  </span>
+                  <span className="max-w-[60%] text-right font-semibold text-brand-brown">
+                    For this,{" "}
+                    <Link
+                      to="/refund-policy"
+                      className="text-brand-orange no-underline"
+                    >
+                      refer to our Refund Policy
+                    </Link>
+                    .
+                  </span>
+                </div>
               </div>
               <div className="min-w-[260px] flex-1">
                 {coords ? (

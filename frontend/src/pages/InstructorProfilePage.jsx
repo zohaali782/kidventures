@@ -303,7 +303,7 @@ export default function InstructorProfilePage() {
 
   const onMessage = () => {
     if (!isLoggedIn()) {
-      flash("Message bhejne ke liye pehle log in karein.");
+      flash("Please log in to send a message.");
       return;
     }
     if (!profile?.userId) return;

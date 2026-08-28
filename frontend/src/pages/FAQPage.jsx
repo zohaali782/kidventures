@@ -42,7 +42,7 @@ const faqGroups = [
       },
       {
         q: "Do you offer a sibling discount?",
-        a: "Yes — when you book 2 or more children in the same booking, you automatically get 10% off the total.",
+        a: "Yes, when you book 2 or more children in the same booking, you automatically get 10% off the total.",
       },
       {
         q: "Can't find a class you're looking for?",
@@ -63,7 +63,7 @@ const faqGroups = [
       },
       {
         q: "How much does Kidventures take?",
-        a: "Kidventures keeps a 15% commission on the price you set. Whatever price you list is exactly what parents pay — there's no extra fee added on top for them.",
+        a: "Kidventures keeps a 15% commission on the price you set. Whatever price you list is exactly what parents pay. There's no extra fee added on top for them.",
       },
       {
         q: "When do I get paid?",
@@ -71,11 +71,11 @@ const faqGroups = [
       },
       {
         q: "Can I edit a class after publishing it?",
-        a: "Yes — you can edit your class details, add new sessions, and manage photos any time from My Classes. Sessions with existing bookings are cancelled rather than deleted, to protect families who've already booked.",
+        a: "Yes, you can edit your class details, add new sessions, and manage photos any time from My Classes. Sessions with existing bookings are cancelled rather than deleted, to protect families who've already booked.",
       },
       {
         q: "What if my category isn't listed?",
-        a: "You can type any category when creating a class. Our team reviews it and assigns the right category — your class stays pending until that's resolved.",
+        a: "You can type any category when creating a class. Our team reviews it and assigns the right category. Your class stays pending until that's resolved.",
       },
     ],
   },

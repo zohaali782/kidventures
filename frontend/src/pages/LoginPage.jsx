@@ -23,7 +23,7 @@ function LoginPage() {
   const notice =
     {
       "verify=1":
-        "Almost done — we've emailed you a confirmation link. Click it, then log in here.",
+        "Almost done, we've emailed you a confirmation link. Click it, then log in here.",
       "verified=1": "Email confirmed! You can log in now.",
       "verified=expired":
         "That confirmation link has expired. Request a new one below.",

@@ -45,8 +45,15 @@ function SignupPage() {
     if (!form.name.trim()) e.name = "Enter your full name";
     if (!form.email.trim()) e.email = "Enter your email";
     else if (!emailOk(form.email)) e.email = "Enter a valid email";
+    if (!form.phone.trim()) e.phone = "Enter your phone number";
+    else if (form.phone.replace(/\D/g, "").length < 7)
+      e.phone = "Enter a valid phone number";
     if (!form.password) e.password = "Create a password";
-    else if (form.password.length < 6) e.password = "At least 6 characters";
+    else if (form.password.length < 8) e.password = "At least 8 characters";
+    else if (!/[a-zA-Z]/.test(form.password) || !/[0-9]/.test(form.password))
+      // Backend ka bhi yehi qanoon hai (User.validatePasswordStrength) —
+      // yahan pehle bata dete hain taake signup reject na ho
+      e.password = "Must include at least one letter and one number";
     if (form.confirm !== form.password) e.confirm = "Passwords do not match";
     return e;
   };
@@ -146,7 +153,7 @@ function SignupPage() {
           {/* Instructor note */}
           {role === "instructor" && (
             <div className="mb-5 rounded-[10px] border border-brand-sky/30 bg-brand-sky/10 px-4 py-3 text-[12px] leading-relaxed text-brand-brown/80">
-              Create your account now — you&apos;ll add your profile, teaching
+              Create your account now, you&apos;ll add your profile, teaching
               details and verification documents from your dashboard. You can
               publish classes once our team verifies you.
             </div>
@@ -171,9 +178,9 @@ function SignupPage() {
             />
           </Field>
 
-          <Field label="Phone number (optional)">
+          <Field label="Phone number" error={errors.phone}>
             <input
-              className={inputCls(false)}
+              className={inputCls(errors.phone)}
               value={form.phone}
               onChange={(e) => set("phone", e.target.value)}
               placeholder="+971 ..."
@@ -187,7 +194,7 @@ function SignupPage() {
               value={form.password}
               onChange={(e) => set("password", e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters, 1 letter & 1 number"
             />
           </Field>
 

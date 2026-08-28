@@ -492,7 +492,7 @@ function MomentsMarquee() {
       </p>
       <div className="group relative flex overflow-hidden">
         {/* strip do baar (duplicate) taake loop seamless rahe */}
-        <div className="flex w-max animate-[kvmarquee_35s_linear_infinite] gap-4 pr-4 group-hover:[animation-play-state:paused] motion-reduce:animate-none">
+        <div className="flex w-max animate-[kvmarquee_16s_linear_infinite] gap-4 pr-4 group-hover:[animation-play-state:paused] motion-reduce:animate-none sm:animate-[kvmarquee_28s_linear_infinite]">
           {[...galleryImages, ...galleryImages].map((src, i) => (
             <img
               key={i}
