@@ -54,6 +54,7 @@ export default function InstructorVerification({
   const status = profile?.verificationStatus || "incomplete";
   const editable = status !== "pending"; // locked while pending
   const docs = profile?.documents || {};
+  const introVideo = profile?.introVideo || null;
 
   const [f, setF] = useState(() => ({
     headline: profile?.headline || "",
@@ -74,7 +75,6 @@ export default function InstructorVerification({
       website: "",
       ...(profile?.socialLinks || {}),
     },
-    introVideoUrl: profile?.introVideoUrl || "",
     agreedVenuePolicy: !!profile?.agreedVenuePolicy,
     agreedFeesPolicy: !!profile?.agreedFeesPolicy,
   }));
@@ -133,8 +133,8 @@ export default function InstructorVerification({
       });
     if (!hasSocial)
       list.push({
-        ok: !!f.introVideoUrl.trim(),
-        label: "Intro video link (no social handle)",
+        ok: !!introVideo?.url,
+        label: "Intro video (no social handle)",
       });
     list.push({
       ok: f.agreedVenuePolicy,
@@ -145,7 +145,7 @@ export default function InstructorVerification({
       label: "Agreed to service fees & pricing policy",
     });
     return list;
-  }, [f, docs, hasSocial]);
+  }, [f, docs, hasSocial, introVideo]);
 
   const allOk = checklist.every((c) => c.ok);
 
@@ -169,7 +169,6 @@ export default function InstructorVerification({
         location: { area: f.area, city: f.city, address: f.address },
         inUAE: f.inUAE,
         socialLinks: f.socialLinks,
-        introVideoUrl: f.introVideoUrl,
         agreedVenuePolicy: f.agreedVenuePolicy,
         agreedFeesPolicy: f.agreedFeesPolicy,
       };
@@ -214,6 +213,37 @@ export default function InstructorVerification({
       flash("Photo updated");
     } catch (e) {
       flash(e?.response?.data?.message || "Upload failed", true);
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function uploadIntroVideo(file) {
+    if (!file) return;
+    setUploading("introVideo");
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await api.post("/uploads/intro-video", fd);
+      await onRefetch?.();
+      flash("Video uploaded");
+    } catch (e) {
+      flash(e?.response?.data?.message || "Upload failed", true);
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function removeIntroVideo() {
+    setUploading("introVideo");
+    setErr("");
+    try {
+      await api.delete("/uploads/intro-video");
+      await onRefetch?.();
+      flash("Video removed");
+    } catch (e) {
+      flash(e?.response?.data?.message || "Could not remove video", true);
     } finally {
       setUploading(null);
     }
@@ -555,20 +585,24 @@ export default function InstructorVerification({
             {/* intro video — required only when there's no social handle */}
             <div>
               <label className={labelCls}>
-                Intro video link{" "}
+                Intro video{" "}
                 {hasSocial ? "(optional)" : "(required — no social handle)"}
               </label>
-              <input
-                className={inputCls}
+              <p className="mb-2 text-xs font-medium text-brand-orange">
+                A short video of yourself helps parents trust you faster and
+                significantly increases your chances of getting bookings.
+              </p>
+              <VideoUpload
+                video={introVideo}
+                busy={uploading === "introVideo"}
                 disabled={!editable}
-                value={f.introVideoUrl}
-                onChange={(e) => set("introVideoUrl", e.target.value)}
-                placeholder="YouTube / Vimeo link — introduce yourself and show your work"
+                onFile={uploadIntroVideo}
+                onRemove={removeIntroVideo}
               />
               {!hasSocial && (
                 <p className="mt-1.5 text-xs opacity-70">
                   If you don't have any social media, a short intro video (you +
-                  your work) link is required.
+                  your work) is required.
                 </p>
               )}
             </div>
@@ -785,6 +819,58 @@ function AvatarUpload({ avatarUrl, busy, onFile }) {
           {busy ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------- video upload ------------------------------ */
+function VideoUpload({ video, busy, disabled, onFile, onRemove }) {
+  const ref = useRef(null);
+  return (
+    <div className="space-y-2">
+      {video?.url && (
+        <video
+          key={video.url}
+          src={video.url}
+          controls
+          preload="metadata"
+          className="max-h-56 w-full rounded-lg bg-black object-contain sm:w-72"
+        />
+      )}
+      <input
+        ref={ref}
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) onFile(file);
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={disabled || busy}
+          onClick={() => ref.current?.click()}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-brown hover:border-brand-orange disabled:opacity-50"
+        >
+          {busy ? "Uploading…" : video?.url ? "Replace video" : "Upload video"}
+        </button>
+        {video?.url && (
+          <button
+            type="button"
+            disabled={disabled || busy}
+            onClick={onRemove}
+            className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:border-red-400 disabled:opacity-50"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] opacity-60">
+        MP4, MOV or WebM — up to 90 seconds, max 50MB.
+      </p>
     </div>
   );
 }

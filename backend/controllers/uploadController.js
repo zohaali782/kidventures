@@ -1,5 +1,6 @@
 const {
   uploadPublic,
+  uploadVideo,
   uploadPrivate,
   getSignedUrl,
   deleteFile,
@@ -7,6 +8,11 @@ const {
 const InstructorProfile = require("../models/InstructorProfile");
 const Activity = require("../models/Activity");
 const User = require("../models/User");
+
+// Chhoti intro video hi maqsad hai - site fast rahe aur parent poori
+// video dekh len. Isse zyada lambi video reject hoti hai (upload ke
+// baad, Cloudinary ki di hui duration se).
+const MAX_INTRO_VIDEO_SECONDS = 90;
 
 /**
  * @desc    Profile photo upload (parent ya instructor)
@@ -235,6 +241,105 @@ const uploadGalleryImage = async (req, res, next) => {
 };
 
 /**
+ * @desc    Instructor intro video upload (profile ke liye — YouTube link
+ *          ki jagah ab seedha upload)
+ * @route   POST /api/uploads/intro-video
+ * @access  Instructor
+ */
+const uploadIntroVideo = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please select a video" });
+    }
+
+    let profile = await InstructorProfile.findOne({ user: req.user._id });
+    if (!profile) {
+      profile = new InstructorProfile({ user: req.user._id });
+    }
+
+    const result = await uploadVideo(req.file.buffer, "intro-videos");
+
+    // Lambi video allow nahi — foran hata do warna Cloudinary par
+    // bekar jagah aur bandwidth kharch hoti rahegi.
+    if (result.duration && result.duration > MAX_INTRO_VIDEO_SECONDS) {
+      deleteFile(result.public_id, "video").catch((err) =>
+        console.error(
+          `! Oversized intro video delete failed (${result.public_id}): ${err.message}`,
+        ),
+      );
+      return res.status(400).json({
+        success: false,
+        message: `Video is too long (${Math.round(
+          result.duration,
+        )}s). Please keep it under ${MAX_INTRO_VIDEO_SECONDS} seconds.`,
+      });
+    }
+
+    // Purani video Cloudinary se hata do
+    if (profile.introVideo?.publicId) {
+      deleteFile(profile.introVideo.publicId, "video").catch((err) =>
+        console.error(
+          `! Old intro video delete failed (${profile.introVideo.publicId}): ${err.message}`,
+        ),
+      );
+    }
+
+    profile.introVideo = {
+      url: result.secure_url,
+      publicId: result.public_id,
+      duration: result.duration,
+    };
+
+    // Reject hua tha to status wapas incomplete - dobara submit karna hoga
+    if (profile.verificationStatus === "rejected") {
+      profile.verificationStatus = "incomplete";
+    }
+
+    await profile.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Video uploaded",
+      introVideo: profile.introVideo,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Intro video hatana
+ * @route   DELETE /api/uploads/intro-video
+ * @access  Instructor
+ */
+const deleteIntroVideo = async (req, res, next) => {
+  try {
+    const profile = await InstructorProfile.findOne({ user: req.user._id });
+
+    if (!profile || !profile.introVideo?.publicId) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No intro video to remove" });
+    }
+
+    deleteFile(profile.introVideo.publicId, "video").catch((err) =>
+      console.error(
+        `! Intro video delete failed (${profile.introVideo.publicId}): ${err.message}`,
+      ),
+    );
+
+    profile.introVideo = undefined;
+    await profile.save();
+
+    res.json({ success: true, message: "Video removed" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Verification document upload (PRIVATE)
  * @route   POST /api/uploads/documents
  * @access  Instructor
@@ -442,6 +547,8 @@ module.exports = {
   uploadActivityImage,
   deleteActivityImage,
   uploadGalleryImage,
+  uploadIntroVideo,
+  deleteIntroVideo,
   uploadVerificationDocument,
   getMyDocumentList,
   getDocumentLinksForAdmin,

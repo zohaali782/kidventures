@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import "../datepicker-theme.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import FavoriteButton from "../components/FavoriteButton";
@@ -450,6 +453,73 @@ function Dropdown({
   );
 }
 
+/* Date filter — ab preset codes ("today"/"weekend"...) ki jagah asli
+   calendar hai. Panel wahi "Dropdown" jaisa dikhta hai, andar sirf
+   react-datepicker inline calendar hai. */
+function DateDropdown({ icon, label, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const display = value
+    ? value.toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
+  return (
+    <div className="relative flex flex-col rounded-lg bg-white px-2 py-1.5 md:min-w-[130px] md:flex-1 md:rounded-none md:bg-transparent md:px-3 md:py-2">
+      <div className="flex items-center gap-1">
+        {icon}
+        <span className="text-[11px] font-bold text-brand-brown md:text-[13px]">
+          {label}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="mt-0.5 flex items-center justify-between gap-1 overflow-hidden whitespace-nowrap text-left text-[11px] md:mt-1 md:text-[13px]"
+      >
+        <span
+          className={`truncate ${value ? "text-brand-brown" : "text-gray-400"}`}
+        >
+          {value ? display : "Any date"}
+        </span>
+        <span className="text-[9px] text-gray-400">▼</span>
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-[998]"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute left-0 top-full z-[999] mt-2 w-max max-w-[calc(100vw-2rem)] rounded-xl bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
+            <DatePicker
+              selected={value}
+              onChange={(date) => {
+                onChange(date);
+                setOpen(false);
+              }}
+              minDate={new Date()}
+              inline
+            />
+            {value && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+                className="mt-1 w-full rounded-lg px-3 py-2 text-center text-[12px] font-semibold text-brand-orange hover:bg-brand-cream"
+              >
+                Clear date
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SectionHeader({ title, link }) {
   return (
     <div className="mb-5 flex items-center justify-between">
@@ -509,42 +579,6 @@ function MomentsMarquee() {
   );
 }
 
-function HeartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
-      <path d="M12 21s-6.7-4.35-9.3-8.1C1 10.2 1.6 6.9 4.4 5.4c2.3-1.2 4.9-.4 6.1 1.6.3.5.9.5 1.2 0 1.2-2 3.8-2.8 6.1-1.6 2.8 1.5 3.4 4.8 1.7 7.5C18.7 16.65 12 21 12 21z" />
-    </svg>
-  );
-}
-
-/* Homepage ke sabse upar, Navbar se pehle, ek chhoti si scrolling strip —
-   donation/impact message ke liye. Same marquee technique jo neeche
-   "MOMENTS FROM OUR CLASSES" mein use hui hai (strip ko duplicate kar ke
-   -50% translate karna, taake loop seamless dikhe). */
-function HopeBanner() {
-  const message =
-    "Every booking brings hope. 5% of your class fee helps provide food and basic education for displaced children.";
-
-  const items = [0, 1, 2, 3];
-
-  return (
-    <div className="overflow-hidden bg-brand-orange">
-      <div className="flex w-max animate-[kvhopeticker_30s_linear_infinite] motion-reduce:animate-none">
-        {[...items, ...items].map((_, i) => (
-          <span
-            key={i}
-            className="flex shrink-0 items-center gap-2 whitespace-nowrap px-6 py-2 text-[13px] font-semibold text-white"
-          >
-            <HeartIcon />
-            {message}
-          </span>
-        ))}
-      </div>
-      <style>{`@keyframes kvhopeticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
-    </div>
-  );
-}
-
 /* ============================================================
    HOMEPAGE
    ============================================================ */
@@ -552,8 +586,20 @@ function Homepage() {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState("");
   const [location, setLocation] = useState("");
-  const [dateMode, setDateMode] = useState("");
+  const [onlineOnly, setOnlineOnly] = useState(false);
+  const [dateValue, setDateValue] = useState(null);
   const [age, setAge] = useState("");
+
+  // Location aur "Online classes only" ek doosre ko exclude karte hain -
+  // ek class ya to kisi jagah par hoti hai ya online, dono nahi.
+  const handleLocationChange = (val) => {
+    setLocation(val);
+    if (val) setOnlineOnly(false);
+  };
+  const handleOnlineToggle = (checked) => {
+    setOnlineOnly(checked);
+    if (checked) setLocation("");
+  };
 
   const [categories, setCategories] = useState([]);
   const [featured, setFeatured] = useState([]);
@@ -598,8 +644,16 @@ function Homepage() {
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (keyword) params.append("search", keyword);
-    if (location) params.append("location", location);
-    if (dateMode) params.append("date", dateMode);
+    if (onlineOnly) params.append("location", "Online");
+    else if (location) params.append("location", location);
+    if (dateValue) {
+      // Local date (YYYY-MM-DD) — toISOString() UTC ki wajah se ek din
+      // peeche/aage chali jati, is liye khud bana rahe hain.
+      const y = dateValue.getFullYear();
+      const m = String(dateValue.getMonth() + 1).padStart(2, "0");
+      const d = String(dateValue.getDate()).padStart(2, "0");
+      params.append("date", `${y}-${m}-${d}`);
+    }
     if (age) params.append("age", age);
     navigate(`/activities?${params.toString()}`);
   };
@@ -617,7 +671,6 @@ function Homepage() {
         />
       </Helmet>
 
-      <HopeBanner />
       <Navbar />
 
       {/* ================= HERO ================= */}
@@ -668,28 +721,19 @@ function Homepage() {
                   label="Location"
                   placeholder="Any location"
                   value={location}
-                  onChange={setLocation}
+                  onChange={handleLocationChange}
                   options={[
                     { value: "", label: "Any location" },
                     { value: "Jumeirah", label: "Jumeirah" },
                     { value: "Mirdif", label: "Mirdif" },
                     { value: "Arabian Ranches", label: "Arabian Ranches" },
-                    { value: "Online", label: "Online" },
                   ]}
                 />
-                <Dropdown
+                <DateDropdown
                   icon={<CalIcon />}
                   label="Date"
-                  placeholder="Any date"
-                  value={dateMode}
-                  onChange={setDateMode}
-                  options={[
-                    { value: "", label: "Any date" },
-                    { value: "today", label: "Today" },
-                    { value: "weekend", label: "This Weekend" },
-                    { value: "week", label: "This Week" },
-                    { value: "month", label: "This Month" },
-                  ]}
+                  value={dateValue}
+                  onChange={setDateValue}
                 />
                 <Dropdown
                   icon={<UserIcon />}
@@ -716,6 +760,18 @@ function Homepage() {
                 Find Activities
               </button>
             </div>
+
+            {/* "Online" ab Location dropdown me nahi — apna alag toggle hai,
+                kyunke ek class ya to kisi jagah hoti hai ya online, dono nahi */}
+            <label className="mt-1.5 flex w-fit cursor-pointer items-center gap-2 px-3 text-[12px] font-medium text-brand-brown/80">
+              <input
+                type="checkbox"
+                checked={onlineOnly}
+                onChange={(e) => handleOnlineToggle(e.target.checked)}
+                className="h-3.5 w-3.5 accent-brand-orange"
+              />
+              Online classes only
+            </label>
           </div>
 
           {/* INFO CARDS */}
@@ -1044,7 +1100,7 @@ function Homepage() {
               Can&apos;t find the class you&apos;re looking for?
             </h3>
             <p className="text-[13px] text-brand-brown/70">
-              Tell us what your child wants to learn — we&apos;ll work on
+              Tell us what your child wants to learn, and we&apos;ll work on
               bringing it to your area.
             </p>
           </div>

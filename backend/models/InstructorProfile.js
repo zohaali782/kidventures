@@ -72,12 +72,18 @@ const instructorProfileSchema = new mongoose.Schema(
 
     /* ----------------- Client ke naye verification requirements ----------- *
      * - inUAE            : agar UAE-based hai to trade licence compulsory
-     * - introVideoUrl    : agar koi social handle nahi to intro video LINK
-     *                      (YouTube/Vimeo) - upload nahi, sirf link.
+     * - introVideo       : agar koi social handle nahi to intro video
+     *                      zaroori - ab seedha UPLOAD hai (Cloudinary),
+     *                      YouTube/Vimeo LINK nahi (POST /uploads/intro-video
+     *                      se set hoti hai, PUT /instructors/me se nahi).
      * - agreedVenuePolicy: residential/venue safety policy par razamandi
      * -------------------------------------------------------------------- */
     inUAE: { type: Boolean, default: false },
-    introVideoUrl: { type: String, trim: true },
+    introVideo: {
+      url: String,
+      publicId: String,
+      duration: Number, // seconds - Cloudinary result se
+    },
     agreedVenuePolicy: { type: Boolean, default: false },
     agreedVenuePolicyAt: Date,
 

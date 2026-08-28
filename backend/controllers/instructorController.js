@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const InstructorProfile = require("../models/InstructorProfile");
 const Activity = require("../models/Activity");
-const { cleanVideoUrl } = require("../utils/safeUrl");
 
 /**
  * Instructor jo fields khud edit kar sakta hai.
@@ -28,7 +27,8 @@ const EDITABLE_FIELDS = [
   "socialLinks",
   // client ke naye fields:
   "inUAE",
-  "introVideoUrl",
+  // "introVideo" JAAN BOOJH KAR yahan nahi hai - ab woh upload se aati hai
+  // (POST /uploads/intro-video), is route se seedha set nahi ho sakti.
   "agreedVenuePolicy",
   "agreedFeesPolicy",
 ];
@@ -67,19 +67,6 @@ const updateMyProfile = async (req, res, next) => {
 
     if (!profile) {
       profile = new InstructorProfile({ user: req.user._id });
-    }
-
-    // Intro video sirf https YouTube/Vimeo — warna "javascript:" ya koi bhi
-    // bahri link profile par embed ho sakta hai
-    if (req.body.introVideoUrl !== undefined) {
-      const safeVideo = cleanVideoUrl(req.body.introVideoUrl);
-      if (safeVideo === null) {
-        return res.status(400).json({
-          success: false,
-          message: "Intro video must be a YouTube or Vimeo https link",
-        });
-      }
-      req.body.introVideoUrl = safeVideo;
     }
 
     EDITABLE_FIELDS.forEach((field) => {
@@ -185,9 +172,9 @@ const submitForVerification = async (req, res, next) => {
       missing.push("trade licence (required for UAE-based instructors)");
     }
 
-    // Koi social handle nahi -> intro video link zaroori
-    if (!profile.hasSocial && !profile.introVideoUrl) {
-      missing.push("an intro video link (or add a social media handle)");
+    // Koi social handle nahi -> intro video zaroori
+    if (!profile.hasSocial && !profile.introVideo?.url) {
+      missing.push("an intro video (or add a social media handle)");
     }
 
     // Venue / safety policy par razamandi zaroori

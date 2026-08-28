@@ -7,6 +7,8 @@ const {
   uploadActivityImage,
   deleteActivityImage,
   uploadGalleryImage,
+  uploadIntroVideo,
+  deleteIntroVideo,
   uploadVerificationDocument,
   getMyDocumentList,
   getDocumentLinksForAdmin,
@@ -16,9 +18,11 @@ const { protect, authorize } = require("../middleware/auth");
 const {
   uploadImage,
   uploadDocument,
+  uploadVideo,
   handleUploadError,
   verifyImage,
   verifyDocument,
+  verifyVideo,
 } = require("../middleware/upload");
 
 /**
@@ -33,6 +37,21 @@ const uploadLimiter = rateLimit({
   message: {
     success: false,
     message: "Upload limit reached. Please try again later.",
+  },
+});
+
+/**
+ * Video images se bohot bhari hoti hai — is route par alag, zyada sakht
+ * limit (10/hour), upar wali 30/hour ke ilawa.
+ */
+const videoUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Video upload limit reached. Please try again later.",
   },
 });
 
@@ -74,6 +93,19 @@ router.post(
   verifyImage,
   uploadGalleryImage,
 );
+
+/* --------------------- Intro video (instructor profile) ------------------ */
+router.post(
+  "/intro-video",
+  authorize("instructor"),
+  videoUploadLimiter,
+  uploadVideo.single("file"),
+  handleUploadError,
+  verifyVideo,
+  uploadIntroVideo,
+);
+
+router.delete("/intro-video", authorize("instructor"), deleteIntroVideo);
 
 /* ------------------------- Documents (PRIVATE) -------------------------- */
 router.post(

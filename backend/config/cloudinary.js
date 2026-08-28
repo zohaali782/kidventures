@@ -66,6 +66,31 @@ const uploadPrivate = (fileBuffer, folder, mimetype) =>
   });
 
 /**
+ * VIDEO upload - instructor ki intro video (profile ke liye).
+ *
+ * Video seedha Cloudinary CDN par jati hai, hamare Node server par kabhi
+ * nahi rukti - is liye website slow nahi hoti chahe video kitni bhi baar
+ * dekhi jaye. Yahan koi bhari "eager" transformation nahi lagayi - upload
+ * turant khatam ho jata hai. Compression/format optimisation delivery ke
+ * waqt URL parameters se hoti hai (dekho frontend ka video URL banane wala
+ * helper), Cloudinary use pehli dafa transform karke CDN par cache kar
+ * leta hai.
+ */
+const uploadVideo = (fileBuffer, folder) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: `kidventures/${folder}`,
+        resource_type: "video",
+        type: "upload", // publicly accessible
+      },
+      (error, result) => (error ? reject(error) : resolve(result)),
+    );
+
+    stream.end(fileBuffer);
+  });
+
+/**
  * Private file ke liye waqti link banata hai.
  * expiresInMinutes ke baad link khud mar jata hai.
  */
@@ -93,6 +118,7 @@ const deleteFile = (publicId, resourceType = "image", type = "upload") =>
 module.exports = {
   cloudinary,
   uploadPublic,
+  uploadVideo,
   uploadPrivate,
   getSignedUrl,
   deleteFile,

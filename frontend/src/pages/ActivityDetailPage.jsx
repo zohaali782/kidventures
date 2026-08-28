@@ -789,14 +789,14 @@ function ActivityDetailPage() {
                     </a>
                     {approxLocation && (
                       <div className="mt-1 text-[11px] text-brand-brown/50">
-                        Approximate area — exact address shared after booking.
+                        Approximate area, exact address shared after booking.
                       </div>
                     )}
                   </>
                 ) : (
                   <div className="flex h-[220px] items-center justify-center rounded-xl bg-[#e8eef2] text-[13px] text-brand-brown/60">
                     {isOnline
-                      ? "Online class — no location"
+                      ? "Online class, no location"
                       : asText(a.location?.address) ||
                         "Location shared after booking"}
                   </div>
@@ -808,9 +808,9 @@ function ActivityDetailPage() {
             <div className="text-sm leading-relaxed text-brand-brown/85">
               <b>{insName}</b>
               {insProfile?.bio ? (
-                <> — {insProfile.bio}</>
+                <>, {insProfile.bio}</>
               ) : (
-                " — profile details will appear here."
+                ", profile details will appear here."
               )}
             </div>
           )}
@@ -1019,8 +1019,8 @@ function ActivityDetailPage() {
                     </div>
                   ) : seatsLeft <= 5 ? (
                     <div className="mb-3.5 rounded-lg bg-brand-orange/10 px-3 py-2 text-center text-xs font-bold text-brand-orange">
-                      Only {seatsLeft} {seatsLeft === 1 ? "spot" : "spots"} left
-                      — book soon!
+                      Only {seatsLeft} {seatsLeft === 1 ? "spot" : "spots"} left,
+                      book soon!
                     </div>
                   ) : (
                     <div className="mb-3.5 flex items-center gap-1.5 text-xs text-[#2F9E44]">

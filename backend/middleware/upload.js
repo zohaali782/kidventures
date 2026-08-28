@@ -63,6 +63,22 @@ const uploadDocument = multer({
   fileFilter: makeFileFilter(DOC_MIMES, DOC_EXTS),
 });
 
+/* --------------------------------- Video --------------------------------- */
+// Sirf chhoti intro video — bari file na server par bharosa dalti hai
+// na Cloudinary ke bandwidth par. 50 MB ek short (30-90 second) clip ke
+// liye kaafi zyada hai.
+const VIDEO_MIMES = ["video/mp4", "video/quicktime", "video/webm"];
+const VIDEO_EXTS = [".mp4", ".mov", ".webm"];
+
+const uploadVideo = multer({
+  storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50 MB
+    files: 1,
+  },
+  fileFilter: makeFileFilter(VIDEO_MIMES, VIDEO_EXTS),
+});
+
 /**
  * Multer ke errors ko saaf message me badalta hai.
  * Iske baghair user ko "LIMIT_FILE_SIZE" jaisa technical lafz nazar aata hai.
@@ -158,10 +174,63 @@ const verifyFileSignature = (allowedTypes) => (req, res, next) => {
 const verifyImage = verifyFileSignature(IMAGE_MIMES);
 const verifyDocument = verifyFileSignature(DOC_MIMES);
 
+/**
+ * VIDEO magic bytes.
+ *
+ * MP4 aur MOV dono "ftyp" box se shuru hote hain (byte 4-7) — brand
+ * (byte 8-11) se farq pata chalta hai ("qt  " = QuickTime/.mov, baaqi
+ * jaise "isom"/"mp42"/"M4V " sab MP4 family hain). WebM ek alag container
+ * hai jo EBML header (0x1A45DFA3) se shuru hota hai.
+ */
+const isWebmVideo = (buffer) =>
+  buffer.length >= 4 &&
+  buffer[0] === 0x1a &&
+  buffer[1] === 0x45 &&
+  buffer[2] === 0xdf &&
+  buffer[3] === 0xa3;
+
+const hasFtypBox = (buffer) =>
+  buffer.length >= 12 && buffer.toString("ascii", 4, 8) === "ftyp";
+
+const detectVideoType = (buffer) => {
+  if (!buffer || buffer.length < 12) return null;
+  if (isWebmVideo(buffer)) return "video/webm";
+  if (hasFtypBox(buffer)) {
+    const brand = buffer.toString("ascii", 8, 12).trim().toLowerCase();
+    return brand === "qt" ? "video/quicktime" : "video/mp4";
+  }
+  return null;
+};
+
+const verifyVideo = (req, res, next) => {
+  if (!req.file) return next();
+
+  const actualType = detectVideoType(req.file.buffer);
+
+  if (!actualType || !VIDEO_MIMES.includes(actualType)) {
+    console.warn(
+      `[upload] video signature mismatch — claimed "${req.file.mimetype}", ` +
+        `detected "${actualType || "unknown"}" (user ${req.user?._id})`,
+    );
+
+    return res.status(400).json({
+      success: false,
+      message:
+        "That file doesn't look like a real video. Please upload a genuine MP4, MOV or WebM file.",
+    });
+  }
+
+  req.file.mimetype = actualType;
+
+  next();
+};
+
 module.exports = {
   uploadImage,
   uploadDocument,
+  uploadVideo,
   handleUploadError,
   verifyImage,
   verifyDocument,
+  verifyVideo,
 };
