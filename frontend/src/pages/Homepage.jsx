@@ -682,14 +682,14 @@ function Homepage() {
             className="h-full w-full object-cover object-right [filter:saturate(1.15)_contrast(1.06)]"
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-brand-cream/70 via-brand-cream/25 to-transparent md:bg-gradient-to-r md:from-brand-cream/85 md:via-brand-cream/15 md:via-40% md:to-transparent md:to-70%" />
+          <div className="absolute inset-0 bg-gradient-to-b from-brand-cream/70 via-brand-cream/25 to-transparent md:bg-gradient-to-r md:from-brand-cream/90 md:via-brand-cream/35 md:via-55% md:to-transparent md:to-88%" />
         </div>
 
         <div className="relative w-full max-w-3xl">
-          <h1 className="mb-2 text-[23px] font-bold leading-tight text-brand-brown [text-shadow:0_1px_14px_rgba(255,255,255,0.7)] sm:text-[28px] md:text-[32px] md:[text-shadow:none]">
+          <h1 className="mb-2 text-[23px] font-bold leading-tight text-brand-brown [text-shadow:0_1px_14px_rgba(255,255,255,0.7)] sm:text-[28px] md:text-[32px] md:[text-shadow:0_1px_16px_rgba(255,255,255,0.6)]">
             Discover Inspiring Activities for Every Child
           </h1>
-          <p className="mb-5 text-sm font-medium text-brand-brown [text-shadow:0_1px_10px_rgba(255,255,255,0.85)] md:font-normal md:text-brand-brown/85 md:[text-shadow:none]">
+          <p className="mb-5 text-sm font-medium text-brand-brown [text-shadow:0_1px_10px_rgba(255,255,255,0.85)] md:font-normal md:text-brand-brown/85 md:[text-shadow:0_1px_12px_rgba(255,255,255,0.5)]">
             Trusted instructors. Exciting experiences. Endless possibilities.
           </p>
 
