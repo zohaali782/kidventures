@@ -119,6 +119,12 @@ const IcTrash = (p) => (
     <line x1="14" y1="11" x2="14" y2="17" />
   </I>
 );
+const IcEdit = (p) => (
+  <I {...p}>
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </I>
+);
 const IcMenu = (p) => (
   <I {...p}>
     <line x1="3" y1="6" x2="21" y2="6" />
@@ -584,9 +590,9 @@ export default function AdminDashboard() {
   const [newCatName, setNewCatName] = useState("");
   const [catSaving, setCatSaving] = useState(false);
   const [catDeletingId, setCatDeletingId] = useState(null);
-  const [mergeKeepId, setMergeKeepId] = useState("");
-  const [mergeAwayId, setMergeAwayId] = useState("");
-  const [mergeSaving, setMergeSaving] = useState(false);
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [editCatName, setEditCatName] = useState("");
+  const [catEditSaving, setCatEditSaving] = useState(false);
   const loadCategoriesTab = useCallback(async () => {
     try {
       const { data } = await api.get("/categories");
@@ -627,36 +633,31 @@ export default function AdminDashboard() {
       setCatDeletingId(null);
     }
   };
-  const mergeCategoriesHandler = async () => {
-    if (!mergeKeepId || !mergeAwayId || mergeKeepId === mergeAwayId) return;
-    const keepName = catList.find((c) => (c._id || c.id) === mergeKeepId)?.name;
-    const awayName = catList.find((c) => (c._id || c.id) === mergeAwayId)?.name;
-    if (
-      !window.confirm(
-        `Merge "${awayName}" into "${keepName}"? All its classes will move to "${keepName}" and "${awayName}" will be removed.`,
-      )
-    )
-      return;
-    setMergeSaving(true);
+  const startEditCategory = (c) => {
+    setEditingCatId(c._id || c.id);
+    setEditCatName(c.name);
+  };
+  const cancelEditCategory = () => {
+    setEditingCatId(null);
+    setEditCatName("");
+  };
+  const saveEditCategory = async (id) => {
+    if (!editCatName.trim()) return;
+    setCatEditSaving(true);
     try {
-      const { data } = await api.post("/categories/merge", {
-        keepId: mergeKeepId,
-        mergeId: mergeAwayId,
+      const { data } = await api.put(`/categories/${id}`, {
+        name: editCatName.trim(),
       });
       setCatList((cl) =>
-        cl
-          .filter((c) => (c._id || c.id) !== mergeAwayId)
-          .map((c) =>
-            (c._id || c.id) === mergeKeepId ? data.category || c : c,
-          ),
+        cl.map((c) => ((c._id || c.id) === id ? data.category || data : c)),
       );
-      setMergeKeepId("");
-      setMergeAwayId("");
-      flash(data.message || "Categories merged.");
+      setEditingCatId(null);
+      setEditCatName("");
+      flash("Category updated.");
     } catch (err) {
-      flash(err?.response?.data?.message || "Couldn't merge categories.");
+      flash(err?.response?.data?.message || "Couldn't update category.");
     } finally {
-      setMergeSaving(false);
+      setCatEditSaving(false);
     }
   };
 
@@ -1312,12 +1313,54 @@ export default function AdminDashboard() {
               <div className="mb-4 flex flex-wrap gap-2.5">
                 {catList.map((c) => {
                   const id = c._id || c.id;
+
+                  if (editingCatId === id) {
+                    return (
+                      <div
+                        key={id}
+                        className="flex items-center gap-1.5 rounded-full bg-brand-cream py-1.5 pl-3.5 pr-1.5"
+                      >
+                        <input
+                          value={editCatName}
+                          onChange={(e) => setEditCatName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEditCategory(id);
+                            if (e.key === "Escape") cancelEditCategory();
+                          }}
+                          autoFocus
+                          className="w-32 rounded-md border border-gray-200 bg-white px-2 py-1 text-[13px] outline-none focus:border-brand-orange"
+                        />
+                        <button
+                          onClick={() => saveEditCategory(id)}
+                          disabled={catEditSaving || !editCatName.trim()}
+                          className="rounded-md bg-brand-orange px-2 py-1 text-[11px] font-bold text-white disabled:opacity-60"
+                        >
+                          {catEditSaving ? "…" : "Save"}
+                        </button>
+                        <button
+                          onClick={cancelEditCategory}
+                          disabled={catEditSaving}
+                          className="rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    );
+                  }
+
                   return (
                     <span
                       key={id}
                       className="flex items-center gap-2 rounded-full bg-brand-cream px-3.5 py-2 text-[13px] font-semibold"
                     >
                       {c.name}
+                      <button
+                        onClick={() => startEditCategory(c)}
+                        title={`Edit ${c.name}`}
+                        className="flex h-4 w-4 items-center justify-center text-brand-brown/50 hover:text-brand-orange"
+                      >
+                        <IcEdit size={12} />
+                      </button>
                       <button
                         onClick={() => removeCategory(c)}
                         disabled={catDeletingId === id}
@@ -1330,7 +1373,7 @@ export default function AdminDashboard() {
                   );
                 })}
               </div>
-              <div className="mb-6 flex gap-2.5">
+              <div className="flex gap-2.5">
                 <input
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
@@ -1344,50 +1387,6 @@ export default function AdminDashboard() {
                 >
                   {catSaving ? "Adding…" : "Add"}
                 </button>
-              </div>
-
-              <div className="border-t border-gray-100 pt-5">
-                <h3 className="mb-1 text-sm font-bold">Merge two categories</h3>
-                <p className="mb-3 text-xs opacity-60">
-                  All classes from the second category move to the first, then
-                  the second one is removed.
-                </p>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <select
-                    value={mergeKeepId}
-                    onChange={(e) => setMergeKeepId(e.target.value)}
-                    className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-orange"
-                  >
-                    <option value="">Keep this category…</option>
-                    {catList.map((c) => (
-                      <option key={c._id || c.id} value={c._id || c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-xs opacity-50">merge with</span>
-                  <select
-                    value={mergeAwayId}
-                    onChange={(e) => setMergeAwayId(e.target.value)}
-                    className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-orange"
-                  >
-                    <option value="">…and remove this one</option>
-                    {catList
-                      .filter((c) => (c._id || c.id) !== mergeKeepId)
-                      .map((c) => (
-                        <option key={c._id || c.id} value={c._id || c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </select>
-                  <button
-                    onClick={mergeCategoriesHandler}
-                    disabled={mergeSaving || !mergeKeepId || !mergeAwayId}
-                    className="rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-                  >
-                    {mergeSaving ? "Merging…" : "Merge"}
-                  </button>
-                </div>
               </div>
             </div>
           )}
