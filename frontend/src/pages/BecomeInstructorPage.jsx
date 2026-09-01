@@ -234,7 +234,7 @@ export default function BecomeInstructorPage() {
       </section>
 
       {/* CTA */}
-      <section className="px-5 pb-16 text-center sm:px-10">
+      <section className="px-5 py-14 text-center sm:px-10">
         <Link
           to="/signup"
           className="inline-block rounded-xl bg-brand-orange px-7 py-3.5 text-sm font-bold text-white no-underline"
