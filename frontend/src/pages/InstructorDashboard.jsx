@@ -140,6 +140,10 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  // Stripe Connect - payout account status
+  const [connectStatus, setConnectStatus] = useState(null); // null = not loaded yet
+  const [connectBusy, setConnectBusy] = useState(false);
+
   const [view, setView] = useState("dashboard"); // "dashboard" | "profile"
   const [drawer, setDrawer] = useState(false);
   const [toast, setToast] = useState("");
@@ -169,10 +173,11 @@ export default function InstructorDashboard() {
         );
 
         // secondary data (non-blocking)
-        const [clsRes, bkRes, eRes] = await Promise.allSettled([
+        const [clsRes, bkRes, eRes, connRes] = await Promise.allSettled([
           api.get("/activities/my-classes"),
           api.get("/bookings/instructor"),
           api.get("/payments/earnings"),
+          api.get("/instructors/me/connect/status"),
         ]);
         if (!alive) return;
         if (clsRes.status === "fulfilled")
@@ -186,6 +191,7 @@ export default function InstructorDashboard() {
         if (bkRes.status === "fulfilled")
           setBookings(toList(bkRes.value.data.bookings || bkRes.value.data));
         if (eRes.status === "fulfilled") setEarnings(eRes.value.data);
+        if (connRes.status === "fulfilled") setConnectStatus(connRes.value.data);
       } catch (e) {
         if (alive)
           setErr(
@@ -298,6 +304,31 @@ export default function InstructorDashboard() {
   const showToast = (m) => {
     setToast(m);
     setTimeout(() => setToast(""), 2200);
+  };
+
+  /**
+   * "Set up payouts" / "Finish setup" button - Stripe ka hosted onboarding
+   * page khulwata hai (poori tab redirect hoti hai, popup nahi - Stripe
+   * isi tarah recommend karta hai). Wapas aane par dashboard reload hoga
+   * aur status khud taaza ho jayega (useEffect connect status bhi fetch
+   * karta hai).
+   */
+  const handleConnectPayouts = async () => {
+    setConnectBusy(true);
+    try {
+      const { data } = await api.post("/instructors/me/connect/onboarding-link");
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        showToast("Couldn't start payout setup. Please try again.");
+      }
+    } catch (e) {
+      showToast(
+        e?.response?.data?.message || "Couldn't start payout setup. Please try again.",
+      );
+    } finally {
+      setConnectBusy(false);
+    }
   };
 
   const doLogout = async () => {
@@ -632,6 +663,40 @@ export default function InstructorDashboard() {
                   <div className="mt-2 text-xs opacity-70">
                     Pending payout: <b>{AED(earn.pending)}</b>
                   </div>
+                </Panel>
+
+                {/* payout setup - stripe connect */}
+                <Panel title="Payout Setup">
+                  {connectStatus?.chargesEnabled ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+                        ✓
+                      </span>
+                      <span>
+                        Payouts are set up. You'll be paid automatically for
+                        every booking.
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-xs leading-relaxed opacity-70">
+                        {connectStatus?.connected
+                          ? "You've started payout setup but a few details are still missing — finish it so parents can book your classes."
+                          : "Set up your payout account so you can get paid directly for every booking, on a weekly schedule."}
+                      </p>
+                      <button
+                        onClick={handleConnectPayouts}
+                        disabled={connectBusy}
+                        className="rounded-xl bg-brand-orange px-5 py-2.5 text-xs font-bold text-white disabled:opacity-60"
+                      >
+                        {connectBusy
+                          ? "Opening…"
+                          : connectStatus?.connected
+                            ? "Finish Setup"
+                            : "Set Up Payouts"}
+                      </button>
+                    </>
+                  )}
                 </Panel>
 
                 {/* quick actions */}

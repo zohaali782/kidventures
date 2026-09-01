@@ -2,6 +2,7 @@ const stripe = require("../config/stripe");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Activity = require("../models/Activity");
+const InstructorProfile = require("../models/InstructorProfile");
 const { sendEmail } = require("../utils/sendEmail");
 const tpl = require("../utils/emailTemplates");
 
@@ -97,9 +98,39 @@ const createPaymentIntent = async (req, res, next) => {
     }
 
     if (!paymentIntent) {
+      /**
+       * STRIPE CONNECT: is charge ka paisa seedha instructor ke apne
+       * account mein split hona hai (destination charge) - Kidventures
+       * ka commission (application_fee_amount) apne pass rehta hai, baaki
+       * turant instructor ke Stripe balance mein chala jata hai. Kisi ko
+       * manually ye hisaab nahi lagana parta ke kis parent ka paisa kis
+       * instructor ka tha - Stripe khud track karta hai.
+       *
+       * Agar instructor ne abhi apna Connect account set up hi nahi kiya
+       * (ya Stripe ne uski verification abhi tak charges ke liye enable
+       * nahi ki), to payment banane ka koi matlab nahi - paisa jayega
+       * kahan? Is liye yahan hi rok dete hain, saaf message ke sath.
+       */
+      const instructorProfile = await InstructorProfile.findOne({
+        user: booking.instructor,
+      }).select("stripeConnect");
+
+      if (!instructorProfile?.stripeConnect?.chargesEnabled) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "This instructor hasn't finished setting up payouts yet. Please try again later or contact support.",
+        });
+      }
+
       paymentIntent = await stripe.paymentIntents.create({
         amount: toFils(booking.totalAmount),
         currency: (booking.currency || "AED").toLowerCase(),
+        // Kidventures ka commission - baaki sab neeche destination ko jayega
+        application_fee_amount: toFils(booking.commissionAmount),
+        transfer_data: {
+          destination: instructorProfile.stripeConnect.accountId,
+        },
         // metadata webhook me kaam aati hai - kaunsi booking hai
         metadata: {
           bookingId: booking._id.toString(),
@@ -211,6 +242,22 @@ const handleWebhook = async (req, res) => {
        */
       case "charge.refunded":
         await onChargeRefunded(event.data.object);
+        break;
+
+      /**
+       * Connect account ki verification status badli - misaal ke taur par
+       * instructor ne Stripe ka onboarding form poora kiya aur ab
+       * charges_enabled true ho gaya. Is ke baghair humein khud is se
+       * pata nahi chalta ke instructor ab payment receive karne ke qabil
+       * hai - agla booking us waqt tak reject hota rehta jab tak koi
+       * getConnectStatus na bulaye.
+       *
+       * NOTE: ye event sirf tab aata hai jab Stripe Dashboard me webhook
+       * endpoint par "Listen to events on Connected accounts" on ho -
+       * platform events se alag toggle hai.
+       */
+      case "account.updated":
+        await onAccountUpdated(event.data.object);
         break;
 
       default:
@@ -458,6 +505,30 @@ const onChargeRefunded = async (charge) => {
 };
 
 /**
+ * Instructor ke Connect account ki status Stripe se taaza sync karo.
+ * (webhook se aata hai - getConnectStatus wala hi kaam, bas khud-ba-khud)
+ */
+const onAccountUpdated = async (account) => {
+  const result = await InstructorProfile.updateOne(
+    { "stripeConnect.accountId": account.id },
+    {
+      $set: {
+        "stripeConnect.chargesEnabled": account.charges_enabled,
+        "stripeConnect.payoutsEnabled": account.payouts_enabled,
+        "stripeConnect.detailsSubmitted": account.details_submitted,
+        "stripeConnect.lastSyncedAt": new Date(),
+      },
+    },
+  );
+
+  if (result.matchedCount === 0) {
+    // Kisi doosre platform ka account ho sakta hai (agar webhook secret
+    // share hua ho) - ya humari taraf ka data kabhi corrupt hua ho.
+    console.warn(`! account.updated for unknown Connect account ${account.id}`);
+  }
+};
+
+/**
  * Payment fail - seat wapas chhor do.
  */
 const onPaymentFailed = async (paymentIntent) => {
@@ -584,6 +655,27 @@ const refundPayment = async (req, res, next) => {
       });
     }
 
+    /**
+     * STRIPE CONNECT: parent ko refund karne se instructor ka paisa
+     * (jo destination charge se already uske account mein ja chuka hai)
+     * apne aap wapas nahi aata - Stripe ko alag se batana parta hai.
+     *
+     *   reverseFromInstructor -> instructor ke share ka utna hi hissa
+     *     platform mein wapas khinch lo jitna refund ho raha hai
+     *     (poora refund = poora share wapas; partial = proportional).
+     *   refundOurCommission   -> Kidventures ka apna 15% commission bhi
+     *     usi tarah proportionally wapas ho jaye.
+     *
+     * Default dono TRUE hain - matlab jab bhi admin refund kare, parent
+     * ko poora paisa milta hai aur na Kidventures na instructor us
+     * refund ka nuqsaan akele uthata hai. Agar kabhi instructor ko apna
+     * hissa rakhne dena ho (misaal: goodwill refund jahan class ho chuki
+     * thi), admin body mein { reverseFromInstructor: false } bhej sakta
+     * hai.
+     */
+    const reverseFromInstructor = req.body.reverseFromInstructor !== false;
+    const refundOurCommission = req.body.refundOurCommission !== false;
+
     // Stripe par refund
     let refund;
     try {
@@ -591,6 +683,8 @@ const refundPayment = async (req, res, next) => {
         payment_intent: payment.stripePaymentIntentId,
         amount: toFils(refundAmount),
         reason: "requested_by_customer",
+        reverse_transfer: reverseFromInstructor,
+        refund_application_fee: reverseFromInstructor && refundOurCommission,
       });
     } catch (stripeError) {
       // Stripe ne mana kar diya — reserve ki hui rakam wapas chhor do,

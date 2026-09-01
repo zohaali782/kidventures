@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const InstructorProfile = require("../models/InstructorProfile");
 const Activity = require("../models/Activity");
+const stripe = require("../config/stripe");
 
 /**
  * Instructor jo fields khud edit kar sakta hai.
@@ -308,10 +309,123 @@ const getInstructorById = async (req, res, next) => {
   }
 };
 
+/* ------------------------------ Stripe Connect ----------------------------
+ *
+ * Instructor ko paisa Stripe Connect ke through milta hai - is ke liye
+ * unka apna "connected account" chahiye (Express type - onboarding sabse
+ * aasan, aur unko apna basic Stripe dashboard bhi mil jata hai).
+ *
+ * Flow: instructor "Set up payouts" dabata hai -> yahan se account ban
+ * (agar pehle se nahi hai) -> Stripe ka hosted onboarding link milta hai
+ * -> instructor apni ID/bank details khud Stripe ko deta hai (Kidventures
+ * ke server tak wo details kabhi nahi aatin) -> wapas aane par status
+ * check hota hai.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * @desc    Connect account banao (agar nahi hai) aur onboarding link do
+ * @route   POST /api/instructors/me/connect/onboarding-link
+ * @access  Instructor
+ */
+const startConnectOnboarding = async (req, res, next) => {
+  try {
+    let profile = await InstructorProfile.findOne({ user: req.user._id });
+    if (!profile) {
+      profile = await InstructorProfile.create({ user: req.user._id });
+    }
+
+    // Pehli dafa - Stripe par Express account banao
+    if (!profile.stripeConnect?.accountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        country: "AE",
+        email: req.user.email,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_type: "individual",
+        // Weekly payout - na daily jitni baar-baar fee lage, na monthly
+        // jitna lamba wait. Instructor apni bank details onboarding me
+        // dega, us ke baad ye schedule khud chalta rahega.
+        settings: {
+          payouts: {
+            schedule: { interval: "weekly", weekly_anchor: "monday" },
+          },
+        },
+        metadata: { instructorUserId: req.user._id.toString() },
+      });
+
+      profile.stripeConnect = {
+        ...(profile.stripeConnect?.toObject?.() || profile.stripeConnect || {}),
+        accountId: account.id,
+        onboardingStartedAt: new Date(),
+      };
+      await profile.save();
+    }
+
+    // Onboarding link har baar naya banate hain - purana kuch der me
+    // expire ho jata hai (Stripe ka apna rule), aur re-onboarding
+    // (missing info poori karna) ke liye bhi yehi link chalta hai.
+    const base = process.env.CLIENT_URL || "http://localhost:5173";
+    const accountLink = await stripe.accountLinks.create({
+      account: profile.stripeConnect.accountId,
+      refresh_url: `${base}/instructor/dashboard?connect=refresh`,
+      return_url: `${base}/instructor/dashboard?connect=return`,
+      type: "account_onboarding",
+    });
+
+    res.json({ success: true, url: accountLink.url });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Connect account ka status - Stripe se taaza karke batata hai
+ * @route   GET /api/instructors/me/connect/status
+ * @access  Instructor
+ *
+ * chargesEnabled/payoutsEnabled ka asal source Stripe hai - webhook
+ * (account.updated) se ye khud sync hota rehta hai, lekin instructor
+ * jab dashboard khole to yahan se bhi taaza confirm ho jata hai.
+ */
+const getConnectStatus = async (req, res, next) => {
+  try {
+    const profile = await InstructorProfile.findOne({ user: req.user._id });
+
+    if (!profile?.stripeConnect?.accountId) {
+      return res.json({ success: true, connected: false });
+    }
+
+    const account = await stripe.accounts.retrieve(
+      profile.stripeConnect.accountId,
+    );
+
+    profile.stripeConnect.chargesEnabled = account.charges_enabled;
+    profile.stripeConnect.payoutsEnabled = account.payouts_enabled;
+    profile.stripeConnect.detailsSubmitted = account.details_submitted;
+    profile.stripeConnect.lastSyncedAt = new Date();
+    await profile.save();
+
+    res.json({
+      success: true,
+      connected: true,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      detailsSubmitted: account.details_submitted,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   submitForVerification,
   getInstructors,
   getInstructorById,
+  startConnectOnboarding,
+  getConnectStatus,
 };

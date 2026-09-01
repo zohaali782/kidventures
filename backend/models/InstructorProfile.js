@@ -141,6 +141,8 @@ const instructorProfileSchema = new mongoose.Schema(
     },
 
     /* ------------------------------- Payouts ------------------------------ */
+    // Manual-payout ka purana record - Stripe Connect aane ke baad bhi
+    // display/audit ke liye rakha hai, active payout path ab niche hai.
     payout: {
       type: {
         accountHolderName: String,
@@ -152,6 +154,32 @@ const instructorProfileSchema = new mongoose.Schema(
         totalPaidOut: { type: Number, default: 0 },
       },
       select: false,
+      default: {},
+    },
+
+    /**
+     * Stripe Connect - instructor ka apna "connected account".
+     *
+     * Bookings ka paisa parent se seedha yahan split hota hai (destination
+     * charge) - instructorAmount is account me jata hai, Kidventures ka
+     * commission platform account me rehta hai. Kis instructor ko kitna
+     * milega, is ka hisaab ab Kidventures ko khud rakhne ki zaroorat nahi -
+     * Stripe khud track karta hai.
+     *
+     * chargesEnabled false ho to us instructor ke liye payment hi nahi
+     * banti (paymentController me check hai) - warna paisa kahan jayega,
+     * pata nahi chalega.
+     */
+    stripeConnect: {
+      type: {
+        accountId: String, // "acct_..."
+        chargesEnabled: { type: Boolean, default: false },
+        payoutsEnabled: { type: Boolean, default: false },
+        detailsSubmitted: { type: Boolean, default: false },
+        onboardingStartedAt: Date,
+        // Stripe ke "account.updated" webhook se, ya manual status-check se
+        lastSyncedAt: Date,
+      },
       default: {},
     },
   },

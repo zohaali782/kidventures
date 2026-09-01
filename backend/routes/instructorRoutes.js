@@ -7,6 +7,8 @@ const {
   submitForVerification,
   getInstructors,
   getInstructorById,
+  startConnectOnboarding,
+  getConnectStatus,
 } = require("../controllers/instructorController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -24,6 +26,20 @@ router.post(
   protect,
   authorize("instructor"),
   submitForVerification,
+);
+
+/* ------------------------- Stripe Connect (payouts) ---------------------- */
+router.post(
+  "/me/connect/onboarding-link",
+  protect,
+  authorize("instructor"),
+  startConnectOnboarding,
+);
+router.get(
+  "/me/connect/status",
+  protect,
+  authorize("instructor"),
+  getConnectStatus,
 );
 
 /* -------------------------------- PUBLIC -------------------------------- */
