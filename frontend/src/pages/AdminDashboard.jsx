@@ -583,6 +583,10 @@ export default function AdminDashboard() {
   const [catList, setCatList] = useState([]);
   const [newCatName, setNewCatName] = useState("");
   const [catSaving, setCatSaving] = useState(false);
+  const [catDeletingId, setCatDeletingId] = useState(null);
+  const [mergeKeepId, setMergeKeepId] = useState("");
+  const [mergeAwayId, setMergeAwayId] = useState("");
+  const [mergeSaving, setMergeSaving] = useState(false);
   const loadCategoriesTab = useCallback(async () => {
     try {
       const { data } = await api.get("/categories");
@@ -605,6 +609,54 @@ export default function AdminDashboard() {
       flash(err?.response?.data?.message || "Couldn't add category.");
     } finally {
       setCatSaving(false);
+    }
+  };
+  const removeCategory = async (cat) => {
+    const id = cat._id || cat.id;
+    if (!window.confirm(`Remove "${cat.name}" category?`)) return;
+    setCatDeletingId(id);
+    try {
+      const { data } = await api.delete(`/categories/${id}`);
+      // Agar classes maujood thin to backend usay sirf hide karta hai
+      // (isActive: false) instead of delete — is-liye list se hata dena hi theek hai.
+      setCatList((cl) => cl.filter((c) => (c._id || c.id) !== id));
+      flash(data.message || "Category removed.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't remove category.");
+    } finally {
+      setCatDeletingId(null);
+    }
+  };
+  const mergeCategoriesHandler = async () => {
+    if (!mergeKeepId || !mergeAwayId || mergeKeepId === mergeAwayId) return;
+    const keepName = catList.find((c) => (c._id || c.id) === mergeKeepId)?.name;
+    const awayName = catList.find((c) => (c._id || c.id) === mergeAwayId)?.name;
+    if (
+      !window.confirm(
+        `Merge "${awayName}" into "${keepName}"? All its classes will move to "${keepName}" and "${awayName}" will be removed.`,
+      )
+    )
+      return;
+    setMergeSaving(true);
+    try {
+      const { data } = await api.post("/categories/merge", {
+        keepId: mergeKeepId,
+        mergeId: mergeAwayId,
+      });
+      setCatList((cl) =>
+        cl
+          .filter((c) => (c._id || c.id) !== mergeAwayId)
+          .map((c) =>
+            (c._id || c.id) === mergeKeepId ? data.category || c : c,
+          ),
+      );
+      setMergeKeepId("");
+      setMergeAwayId("");
+      flash(data.message || "Categories merged.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't merge categories.");
+    } finally {
+      setMergeSaving(false);
     }
   };
 
@@ -1258,16 +1310,27 @@ export default function AdminDashboard() {
           {tab === "categories" && (
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <div className="mb-4 flex flex-wrap gap-2.5">
-                {catList.map((c) => (
-                  <span
-                    key={c._id || c.id}
-                    className="rounded-full bg-brand-cream px-3.5 py-2 text-[13px] font-semibold"
-                  >
-                    {c.name}
-                  </span>
-                ))}
+                {catList.map((c) => {
+                  const id = c._id || c.id;
+                  return (
+                    <span
+                      key={id}
+                      className="flex items-center gap-2 rounded-full bg-brand-cream px-3.5 py-2 text-[13px] font-semibold"
+                    >
+                      {c.name}
+                      <button
+                        onClick={() => removeCategory(c)}
+                        disabled={catDeletingId === id}
+                        title={`Remove ${c.name}`}
+                        className="flex h-4 w-4 items-center justify-center rounded-full text-brand-brown/50 hover:bg-brand-orange hover:text-white disabled:opacity-40"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
-              <div className="flex gap-2.5">
+              <div className="mb-6 flex gap-2.5">
                 <input
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
@@ -1281,6 +1344,50 @@ export default function AdminDashboard() {
                 >
                   {catSaving ? "Adding…" : "Add"}
                 </button>
+              </div>
+
+              <div className="border-t border-gray-100 pt-5">
+                <h3 className="mb-1 text-sm font-bold">Merge two categories</h3>
+                <p className="mb-3 text-xs opacity-60">
+                  All classes from the second category move to the first, then
+                  the second one is removed.
+                </p>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <select
+                    value={mergeKeepId}
+                    onChange={(e) => setMergeKeepId(e.target.value)}
+                    className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-orange"
+                  >
+                    <option value="">Keep this category…</option>
+                    {catList.map((c) => (
+                      <option key={c._id || c.id} value={c._id || c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs opacity-50">merge with</span>
+                  <select
+                    value={mergeAwayId}
+                    onChange={(e) => setMergeAwayId(e.target.value)}
+                    className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-orange"
+                  >
+                    <option value="">…and remove this one</option>
+                    {catList
+                      .filter((c) => (c._id || c.id) !== mergeKeepId)
+                      .map((c) => (
+                        <option key={c._id || c.id} value={c._id || c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={mergeCategoriesHandler}
+                    disabled={mergeSaving || !mergeKeepId || !mergeAwayId}
+                    className="rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {mergeSaving ? "Merging…" : "Merge"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
