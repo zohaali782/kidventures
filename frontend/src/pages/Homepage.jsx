@@ -674,20 +674,26 @@ function Homepage() {
       <Navbar />
 
       {/* ================= HERO ================= */}
-      {/* Text and image are separate columns (not image-as-background-behind-text) —
-          this guarantees the headline can NEVER overlap the photo, at any viewport
-          width, including "Desktop site" mode on a phone browser. */}
-      <section className="bg-brand-cream px-4 py-8 sm:px-6 md:px-10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-7 md:flex-row md:items-center md:gap-10">
-          <div className="w-full md:w-1/2 md:max-w-xl">
-            <h1 className="mb-2 text-[23px] font-bold leading-tight text-brand-brown sm:text-[28px] md:text-[32px]">
-              Discover Inspiring Activities for Every Child
-            </h1>
-            <p className="mb-5 text-sm font-medium text-brand-brown md:font-normal md:text-brand-brown/85">
-              Trusted instructors. Exciting experiences. Endless possibilities.
-            </p>
+      <section className="relative flex min-h-[440px] items-center px-4 py-8 sm:px-6 md:px-10">
+        <div className="absolute inset-0 overflow-hidden">
+          <img
+            src={heroImg}
+            alt="Children happily taking part in creative and educational activities"
+            className="h-full w-full object-cover object-right [filter:saturate(1.15)_contrast(1.06)]"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-brand-cream/70 via-brand-cream/25 to-transparent md:bg-gradient-to-r md:from-brand-cream/90 md:via-brand-cream/35 md:via-55% md:to-transparent md:to-88%" />
+        </div>
 
-            {/* SEARCH BAR */}
+        <div className="relative w-full max-w-3xl">
+          <h1 className="mb-2 text-[23px] font-bold leading-tight text-brand-brown [text-shadow:0_1px_14px_rgba(255,255,255,0.7)] sm:text-[28px] md:text-[32px] md:[text-shadow:0_1px_16px_rgba(255,255,255,0.6)]">
+            Discover Inspiring Activities for Every Child
+          </h1>
+          <p className="mb-5 text-sm font-medium text-brand-brown [text-shadow:0_1px_10px_rgba(255,255,255,0.85)] md:font-normal md:text-brand-brown/85 md:[text-shadow:0_1px_12px_rgba(255,255,255,0.5)]">
+            Trusted instructors. Exciting experiences. Endless possibilities.
+          </p>
+
+          {/* SEARCH BAR */}
           <div className="rounded-2xl bg-white p-2 shadow-[0_4px_20px_rgba(0,0,0,0.12)]">
             <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch md:gap-0">
               {/* Keyword — mobile pe full width, desktop pe pehla khaana */}
@@ -793,16 +799,6 @@ function Homepage() {
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="h-[220px] w-full overflow-hidden rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] sm:h-[280px] md:h-[400px] md:w-1/2">
-          <img
-            src={heroImg}
-            alt="Children happily taking part in creative and educational activities"
-            className="h-full w-full object-cover [filter:saturate(1.15)_contrast(1.06)]"
-            loading="eager"
-          />
-        </div>
         </div>
       </section>
 
