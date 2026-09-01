@@ -344,7 +344,12 @@ const startConnectOnboarding = async (req, res, next) => {
           card_payments: { requested: true },
           transfers: { requested: true },
         },
-        business_type: "individual",
+        // NOTE: "business_type" jaan-boojh kar yahan set NAHI kar rahe.
+        // UAE mein "individual" supported nahi hai (Stripe error deta hai),
+        // aur har instructor ka type alag ho sakta hai (freelancer, trade
+        // licence wala, waghera). Isay khali chhorne se Stripe khud
+        // onboarding form mein instructor se poochta hai - jo bhi us ke
+        // mulk/case ke liye sahi option ho.
         // Weekly payout - na daily jitni baar-baar fee lage, na monthly
         // jitna lamba wait. Instructor apni bank details onboarding me
         // dega, us ke baad ye schedule khud chalta rahega.
