@@ -679,7 +679,7 @@ function Homepage() {
           <img
             src={heroImg}
             alt="Children happily taking part in creative and educational activities"
-            className="h-full w-full object-cover object-right [filter:saturate(1.15)_contrast(1.06)]"
+            className="h-full w-full object-cover object-right-top [filter:saturate(1.15)_contrast(1.06)]"
             loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-cream/70 via-brand-cream/25 to-transparent md:bg-gradient-to-r md:from-brand-cream/90 md:via-brand-cream/35 md:via-55% md:to-transparent md:to-88%" />
