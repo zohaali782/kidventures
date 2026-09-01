@@ -140,8 +140,8 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // Stripe Connect - payout account status
-  const [connectStatus, setConnectStatus] = useState(null); // null = not loaded yet
+  // Stripe Connect payout account status; null = not loaded yet
+  const [connectStatus, setConnectStatus] = useState(null);
   const [connectBusy, setConnectBusy] = useState(false);
 
   const [view, setView] = useState("dashboard"); // "dashboard" | "profile"
@@ -307,11 +307,9 @@ export default function InstructorDashboard() {
   };
 
   /**
-   * "Set up payouts" / "Finish setup" button - Stripe ka hosted onboarding
-   * page khulwata hai (poori tab redirect hoti hai, popup nahi - Stripe
-   * isi tarah recommend karta hai). Wapas aane par dashboard reload hoga
-   * aur status khud taaza ho jayega (useEffect connect status bhi fetch
-   * karta hai).
+   * Redirects to Stripe's hosted onboarding page (full-page redirect, as
+   * Stripe recommends, not a popup). Status refreshes automatically when
+   * the instructor returns to the dashboard.
    */
   const handleConnectPayouts = async () => {
     setConnectBusy(true);
@@ -665,7 +663,7 @@ export default function InstructorDashboard() {
                   </div>
                 </Panel>
 
-                {/* payout setup - stripe connect */}
+                {/* Stripe Connect payout setup */}
                 <Panel title="Payout Setup">
                   {connectStatus?.chargesEnabled ? (
                     <div className="flex items-center gap-2 text-sm">

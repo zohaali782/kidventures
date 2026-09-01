@@ -310,16 +310,10 @@ const getInstructorById = async (req, res, next) => {
 };
 
 /* ------------------------------ Stripe Connect ----------------------------
- *
- * Instructor ko paisa Stripe Connect ke through milta hai - is ke liye
- * unka apna "connected account" chahiye (Express type - onboarding sabse
- * aasan, aur unko apna basic Stripe dashboard bhi mil jata hai).
- *
- * Flow: instructor "Set up payouts" dabata hai -> yahan se account ban
- * (agar pehle se nahi hai) -> Stripe ka hosted onboarding link milta hai
- * -> instructor apni ID/bank details khud Stripe ko deta hai (Kidventures
- * ke server tak wo details kabhi nahi aatin) -> wapas aane par status
- * check hota hai.
+ * Instructors are paid out via a Stripe Express connected account. Flow:
+ * "Set up payouts" creates the account (if missing) and returns a
+ * Stripe-hosted onboarding link; the instructor submits their ID/bank
+ * details directly to Stripe; status is synced when they return.
  * ------------------------------------------------------------------------ */
 
 /**
@@ -334,31 +328,21 @@ const startConnectOnboarding = async (req, res, next) => {
       profile = await InstructorProfile.create({ user: req.user._id });
     }
 
-    // Pehli dafa - Stripe par Express account banao
+    // Create the Express account on the instructor's first onboarding attempt
     if (!profile.stripeConnect?.accountId) {
       const account = await stripe.accounts.create({
         type: "express",
         country: "AE",
         email: req.user.email,
-        // "card_payments" jaan-boojh kar NAHI maangi - instructor ka
-        // account khud card charge nahi karta (wo destination charge se
-        // Kidventures ke platform account par hota hai). Instructor ke
-        // account ko bas paisa RECEIVE karna hai, is liye sirf
-        // "transfers" capability chahiye. UAE me Express accounts
-        // "card_payments" support hi nahi karte, isi liye error aa raha
-        // tha.
+        // Only "transfers" is requested: the instructor's account only
+        // receives funds via destination charge, and UAE Express accounts
+        // don't support "card_payments".
         capabilities: {
           transfers: { requested: true },
         },
-        // NOTE: "business_type" jaan-boojh kar yahan set NAHI kar rahe.
-        // UAE mein "individual" supported nahi hai (Stripe error deta hai),
-        // aur har instructor ka type alag ho sakta hai (freelancer, trade
-        // licence wala, waghera). Isay khali chhorne se Stripe khud
-        // onboarding form mein instructor se poochta hai - jo bhi us ke
-        // mulk/case ke liye sahi option ho.
-        // Weekly payout - na daily jitni baar-baar fee lage, na monthly
-        // jitna lamba wait. Instructor apni bank details onboarding me
-        // dega, us ke baad ye schedule khud chalta rahega.
+        // business_type is intentionally left unset — UAE doesn't support
+        // "individual", and Stripe's hosted onboarding collects the
+        // correct type per instructor.
         settings: {
           payouts: {
             schedule: { interval: "weekly", weekly_anchor: "monday" },
@@ -375,9 +359,8 @@ const startConnectOnboarding = async (req, res, next) => {
       await profile.save();
     }
 
-    // Onboarding link har baar naya banate hain - purana kuch der me
-    // expire ho jata hai (Stripe ka apna rule), aur re-onboarding
-    // (missing info poori karna) ke liye bhi yehi link chalta hai.
+    // A fresh onboarding link is generated on every call — Stripe's links
+    // expire quickly, and the same link type also handles re-onboarding.
     const base = process.env.CLIENT_URL || "http://localhost:5173";
     const accountLink = await stripe.accountLinks.create({
       account: profile.stripeConnect.accountId,
@@ -393,13 +376,9 @@ const startConnectOnboarding = async (req, res, next) => {
 };
 
 /**
- * @desc    Connect account ka status - Stripe se taaza karke batata hai
+ * @desc    Returns the instructor's Connect status, refreshed from Stripe
  * @route   GET /api/instructors/me/connect/status
  * @access  Instructor
- *
- * chargesEnabled/payoutsEnabled ka asal source Stripe hai - webhook
- * (account.updated) se ye khud sync hota rehta hai, lekin instructor
- * jab dashboard khole to yahan se bhi taaza confirm ho jata hai.
  */
 const getConnectStatus = async (req, res, next) => {
   try {

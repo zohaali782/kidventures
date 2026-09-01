@@ -41,8 +41,8 @@ export default function AboutPage() {
             discover and book children's activities, classes, workshops, camps
             and experiences
           </strong>
-          , based on what they're looking for, when they want it and where
-          they want it.
+          , based on what they're looking for, when they want it and where they
+          want it.
         </p>
 
         <section className="mb-8">
@@ -72,11 +72,11 @@ export default function AboutPage() {
             ))}
           </div>
           <p className="text-sm leading-7 text-brand-brown/80">
-            From arts and crafts to coding workshops, cooking classes to
-            sports camps, just tell Kidventures what your child loves, when
-            you're free and where you'd like to go. Whether it's this
-            weekend, the school holidays or a specific date, we'll show you
-            what's available, without the endless searching.
+            From arts and crafts to coding workshops, cooking classes to sports
+            camps, just tell Kidventures what your child loves, when you're free
+            and where you'd like to go. Whether it's this weekend, the school
+            holidays or a specific date, we'll show you what's available,
+            without the endless searching.
           </p>
         </section>
 
@@ -126,9 +126,9 @@ export default function AboutPage() {
           </p>
           <p className="text-sm leading-7 text-brand-brown/80">
             Instead of asking "Where can I find a children's activity?", parents
-            can simply tell Kidventures what they're looking for, what
-            activity, what date, what location and for what age group, and book
-            relevant experiences in one place.
+            can simply tell Kidventures what they're looking for, what activity,
+            what date, what location and for what age group, and book relevant
+            experiences in one place.
           </p>
         </section>
 
@@ -173,13 +173,13 @@ export default function AboutPage() {
             Our Vision
           </h2>
           <p className="mx-auto mb-3 max-w-lg text-left text-sm text-brand-brown/80">
-            We envision a UAE where finding something meaningful for your
-            child is as easy as:
+            We envision a UAE where finding something meaningful for your child
+            is as easy as:
           </p>
           <ul className="mx-auto mb-4 max-w-lg list-disc space-y-1.5 pl-5 text-left text-sm leading-6 text-brand-brown/80">
-            <li>Searching for what they love</li>
-            <li>Choosing when and where they want to do it</li>
-            <li>Booking it all in one place</li>
+            <li>Searching for what they love.</li>
+            <li>Choosing when and where they want to do it.</li>
+            <li>Booking it all in one place.</li>
           </ul>
           <p className="text-lg font-bold text-brand-orange">
             Discover. Learn. Create. Explore.

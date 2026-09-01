@@ -158,17 +158,9 @@ const instructorProfileSchema = new mongoose.Schema(
     },
 
     /**
-     * Stripe Connect - instructor ka apna "connected account".
-     *
-     * Bookings ka paisa parent se seedha yahan split hota hai (destination
-     * charge) - instructorAmount is account me jata hai, Kidventures ka
-     * commission platform account me rehta hai. Kis instructor ko kitna
-     * milega, is ka hisaab ab Kidventures ko khud rakhne ki zaroorat nahi -
-     * Stripe khud track karta hai.
-     *
-     * chargesEnabled false ho to us instructor ke liye payment hi nahi
-     * banti (paymentController me check hai) - warna paisa kahan jayega,
-     * pata nahi chalega.
+     * Stripe Connect account for this instructor. Payments are split
+     * automatically via a destination charge (see paymentController).
+     * chargesEnabled must be true before a booking can be paid for.
      */
     stripeConnect: {
       type: {
@@ -177,8 +169,7 @@ const instructorProfileSchema = new mongoose.Schema(
         payoutsEnabled: { type: Boolean, default: false },
         detailsSubmitted: { type: Boolean, default: false },
         onboardingStartedAt: Date,
-        // Stripe ke "account.updated" webhook se, ya manual status-check se
-        lastSyncedAt: Date,
+        lastSyncedAt: Date, // set by the "account.updated" webhook or a manual status check
       },
       default: {},
     },

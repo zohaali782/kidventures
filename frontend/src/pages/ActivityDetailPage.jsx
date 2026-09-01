@@ -33,7 +33,6 @@ const markerIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
-/* location object se lat/lng nikaalo (jo bhi shape ho) */
 const getCoords = (loc) => {
   if (!loc || typeof loc !== "object") return null;
   if (typeof loc.lat === "number" && typeof loc.lng === "number")
@@ -51,7 +50,6 @@ const getCoords = (loc) => {
   return null;
 };
 
-/* known Dubai areas ke approx coordinates (backend me exact coords na hon to) */
 const AREA_COORDS = {
   jumeirah: { lat: 25.2088, lng: 55.2568 },
   mirdif: { lat: 25.2178, lng: 55.4183 },
@@ -946,8 +944,7 @@ function ActivityDetailPage() {
             <div className="text-xs text-brand-brown/60">per child</div>
             {siblingDiscountPercent && (
               <div className="mt-2 inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
-                {siblingDiscountPercent}% off when you book 2+ children
-                together
+                {siblingDiscountPercent}% off when you book 2+ children together
               </div>
             )}
             <div className="mb-4 mt-3 border-b border-gray-100 pb-4" />
@@ -1019,8 +1016,8 @@ function ActivityDetailPage() {
                     </div>
                   ) : seatsLeft <= 5 ? (
                     <div className="mb-3.5 rounded-lg bg-brand-orange/10 px-3 py-2 text-center text-xs font-bold text-brand-orange">
-                      Only {seatsLeft} {seatsLeft === 1 ? "spot" : "spots"} left,
-                      book soon!
+                      Only {seatsLeft} {seatsLeft === 1 ? "spot" : "spots"}{" "}
+                      left, book soon!
                     </div>
                   ) : (
                     <div className="mb-3.5 flex items-center gap-1.5 text-xs text-[#2F9E44]">
