@@ -340,8 +340,14 @@ const startConnectOnboarding = async (req, res, next) => {
         type: "express",
         country: "AE",
         email: req.user.email,
+        // "card_payments" jaan-boojh kar NAHI maangi - instructor ka
+        // account khud card charge nahi karta (wo destination charge se
+        // Kidventures ke platform account par hota hai). Instructor ke
+        // account ko bas paisa RECEIVE karna hai, is liye sirf
+        // "transfers" capability chahiye. UAE me Express accounts
+        // "card_payments" support hi nahi karte, isi liye error aa raha
+        // tha.
         capabilities: {
-          card_payments: { requested: true },
           transfers: { requested: true },
         },
         // NOTE: "business_type" jaan-boojh kar yahan set NAHI kar rahe.
