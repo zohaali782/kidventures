@@ -10,6 +10,9 @@ import FavoriteButton from "../components/FavoriteButton";
 import RecentlyViewed from "../components/RecentlyViewed";
 import api from "../api/axios";
 import heroImg from "../assets/hero.jpg"; // hero image: src/assets/hero.jpg
+import moment1 from "../assets/moment-1.jpg";
+import moment2 from "../assets/moment-2.jpg";
+import moment3 from "../assets/moment-3.jpg";
 
 /* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
    ka na ho (jaise koi purani/manual image), waisi hi wapas kar deta hai. */
@@ -533,6 +536,9 @@ const galleryImages = [
   "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620674/kid5.png",
   "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620716/kid10.png",
   "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620716/kid9.png",
+  moment1,
+  moment2,
+  moment3,
 ];
 
 function MomentsMarquee() {
