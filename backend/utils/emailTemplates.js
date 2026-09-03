@@ -5,8 +5,12 @@ const BRAND = {
   cream: "#FBEDDE",
 };
 
+// CLIENT_URL ab CORS ke liye comma-separated list ho sakta hai — links ke
+// liye sirf pehla URL lete hain (dekhein authController.js ka APP_URL).
 const APP = () =>
-  process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:5173";
+  (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:5173")
+    .split(",")[0]
+    .trim();
 
 /**
  * SECURITY — esc()

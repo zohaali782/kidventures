@@ -24,8 +24,15 @@ const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 
 // Frontend (jahan user ko wapas bhejna hai)
+//
+// CLIENT_URL ab CORS ke liye comma-separated list ho sakta hai
+// (jaise "https://kidventures.ae,https://kidventures-six.vercel.app") —
+// links banane ke liye sirf pehla URL lete hain, warna dono URLs comma
+// ke sath jud kar ek hi (toote hue) link ban jate hain.
 const APP_URL = () =>
   (process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173")
+    .split(",")[0]
+    .trim()
     .replace(/\/$/, "");
 
 // Backend (jahan verification link click hone par jayega)
