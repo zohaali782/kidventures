@@ -167,37 +167,18 @@ const UserIcon = () => (
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
-const ShieldIcon = () => (
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#3FA9E0"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    <path d="M9 12l2 2 4-4" />
-  </svg>
-);
-const BookingIcon = () => (
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#F5941F"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="3" y="4" width="18" height="18" rx="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-    <path d="M9 16l2 2 4-4" />
+// Compact checkmark badge — used for the small trust-signal row under the
+// search bar (kept minimal on purpose so it doesn't take up much space).
+const CheckBadgeIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="#3FA9E0" />
+    <path
+      d="M8 12.5l2.5 2.5L16 9.5"
+      stroke="#fff"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -690,7 +671,7 @@ function Homepage() {
             Discover Inspiring Activities for Every Child
           </h1>
           <p className="mb-5 text-sm font-medium text-brand-brown [text-shadow:0_1px_10px_rgba(255,255,255,0.85)] md:font-normal md:text-brand-brown/85 md:[text-shadow:0_1px_12px_rgba(255,255,255,0.5)]">
-            Trusted instructors. Exciting experiences. Endless possibilities.
+            Trusted instructors. Exciting experiences.
           </p>
 
           {/* SEARCH BAR */}
@@ -774,36 +755,21 @@ function Homepage() {
             </label>
           </div>
 
-          {/* INFO CARDS */}
-          <div className="mt-[18px] flex flex-col gap-3.5 sm:flex-row">
-            <div className="flex items-center gap-2.5 rounded-[10px] bg-white px-4 py-3 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
-              <ShieldIcon />
-              <div>
-                <div className="text-xs font-bold text-brand-brown">
-                  Verified Instructors
-                </div>
-                <div className="text-[10px] text-brand-brown/60">
-                  All our instructors are vetted
-                </div>
-              </div>
+          {/* INFO CARDS — compact checkmark badges (kept short on purpose,
+              the old version had a full description under each and took up
+              too much room) */}
+          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-brand-brown">
+              <CheckBadgeIcon />
+              Verified Instructors
             </div>
-            <div className="flex items-center gap-2.5 rounded-[10px] bg-white px-4 py-3 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
-              <BookingIcon />
-              <div>
-                <div className="text-xs font-bold text-brand-brown">
-                  Easy Booking
-                </div>
-                <div className="text-[10px] text-brand-brown/60">
-                  Book in minutes, stress-free
-                </div>
-              </div>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-brand-brown">
+              <CheckBadgeIcon />
+              Easy Booking
             </div>
           </div>
         </div>
       </section>
-
-      {/* ================= MOMENTS MARQUEE ================= */}
-      <MomentsMarquee />
 
       {/* Recently viewed (agar koi class dekhi ho) */}
       <RecentlyViewed />
@@ -1004,6 +970,9 @@ function Homepage() {
           </div>
         )}
       </section>
+
+      {/* ================= MOMENTS MARQUEE ================= */}
+      <MomentsMarquee />
 
       {/* ================= HOW IT WORKS ================= */}
       <section className="bg-white px-4 py-12 text-center sm:px-6 md:px-10">
