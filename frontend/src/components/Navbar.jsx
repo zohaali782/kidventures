@@ -171,7 +171,7 @@ function Navbar() {
     <nav className="sticky top-0 z-[100] border-b-2 border-brand-cream bg-white">
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 md:gap-10 md:px-10">
         <Link to="/" className="flex-shrink-0" onClick={close}>
-          <img src={logo} alt="Kidventures" className="h-11 w-auto md:h-12" />
+          <img src={logo} alt="Kidventures" className="h-14 w-auto md:h-16" />
         </Link>
 
         <div className="hidden flex-1 items-center gap-5 md:flex">
