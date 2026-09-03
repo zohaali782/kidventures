@@ -171,10 +171,10 @@ const UserIcon = () => (
 // search bar (kept minimal on purpose so it doesn't take up much space).
 const CheckBadgeIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="#3FA9E0" />
+    <circle cx="12" cy="12" r="10" fill="#DCF1FB" />
     <path
       d="M8 12.5l2.5 2.5L16 9.5"
-      stroke="#fff"
+      stroke="#3FA9E0"
       strokeWidth="2.4"
       strokeLinecap="round"
       strokeLinejoin="round"
