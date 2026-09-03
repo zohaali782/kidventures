@@ -763,13 +763,15 @@ function Homepage() {
 
           {/* INFO CARDS — compact checkmark badges (kept short on purpose,
               the old version had a full description under each and took up
-              too much room) */}
-          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-brand-brown">
+              too much room). Each badge gets its own white pill background
+              so it stays readable over the hero photo instead of floating
+              directly on top of it. */}
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-brand-brown shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm">
               <CheckBadgeIcon />
               Verified Instructors
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-brand-brown">
+            <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-brand-brown shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm">
               <CheckBadgeIcon />
               Easy Booking
             </div>
