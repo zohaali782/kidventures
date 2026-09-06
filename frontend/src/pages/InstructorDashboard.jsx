@@ -144,7 +144,7 @@ export default function InstructorDashboard() {
   const [connectStatus, setConnectStatus] = useState(null);
   const [connectBusy, setConnectBusy] = useState(false);
 
-  const [view, setView] = useState("dashboard"); // "dashboard" | "profile"
+  const [view, setView] = useState("dashboard"); // "dashboard" | "profile" | "calendar"
   const [drawer, setDrawer] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -351,16 +351,15 @@ export default function InstructorDashboard() {
     },
     { label: "My Classes", icon: IcClasses, to: "/instructor/my-classes" },
     { label: "Create Class", icon: IcPlus, to: "/instructor/create-class" },
-    { label: "Calendar", icon: IcCal, onClick: noop },
+    {
+      label: "Calendar",
+      icon: IcCal,
+      onClick: () => (setView("calendar"), setDrawer(false)),
+    },
     {
       label: "Earnings",
       icon: IcMoney,
       onClick: () => (setView("dashboard"), setDrawer(false)),
-    },
-    {
-      label: "Documents",
-      icon: IcDocs,
-      onClick: () => (setView("profile"), setDrawer(false)),
     },
     { label: "View Website", icon: IcHome, to: "/" },
     { label: "Logout", icon: IcLogout, onClick: doLogout },
@@ -407,7 +406,8 @@ export default function InstructorDashboard() {
         {navItems.map(({ label, icon: Icon, to, onClick }) => {
           const on =
             (label === "Dashboard" && view === "dashboard") ||
-            (label === "Profile & Verification" && view === "profile");
+            (label === "Profile & Verification" && view === "profile") ||
+            (label === "Calendar" && view === "calendar");
           const cls = `flex items-center gap-3 px-5 py-2.5 text-sm ${
             on
               ? "border-l-[3px] border-brand-gold bg-brand-gold/15 font-bold text-brand-gold"
@@ -529,6 +529,8 @@ export default function InstructorDashboard() {
               categories={categories}
               onRefetch={refetchProfile}
             />
+          ) : view === "calendar" ? (
+            <InstructorCalendarView classes={classes} />
           ) : (
             <>
               {/* not-approved nudge on dashboard view */}
@@ -771,6 +773,190 @@ function Empty({ text }) {
   return (
     <div className="flex h-full items-center py-6 text-sm opacity-50">
       {text}
+    </div>
+  );
+}
+
+/* ------------------------------- calendar -------------------------------- */
+// YYYY-MM-DD key in the LOCAL timezone (not toISOString, which shifts by UTC
+// offset and can put a session on the wrong day near midnight).
+const dayKey = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function InstructorCalendarView({ classes }) {
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const [cursor, setCursor] = useState(
+    () => new Date(today.getFullYear(), today.getMonth(), 1),
+  );
+  const [selected, setSelected] = useState(today);
+
+  // every session, across all of this instructor's classes, grouped by day
+  const eventsByDay = useMemo(() => {
+    const map = {};
+    classes.forEach((a) => {
+      toList(a.sessions).forEach((s) => {
+        const d = new Date(s.date);
+        if (isNaN(d)) return;
+        const key = dayKey(d);
+        (map[key] ||= []).push({
+          title: a.title,
+          startTime: s.startTime,
+          booked: s.seatsBooked ?? 0,
+          capacity: s.capacity ?? 0,
+        });
+      });
+    });
+    Object.values(map).forEach((list) =>
+      list.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || "")),
+    );
+    return map;
+  }, [classes]);
+
+  const monthLabel = cursor.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+
+  // calendar grid: leading blanks so day 1 lands under the right weekday,
+  // then every day of the month, padded to a full row at the end
+  const cells = useMemo(() => {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+    const startOffset = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const list = [];
+    for (let i = 0; i < startOffset; i++) list.push(null);
+    for (let day = 1; day <= daysInMonth; day++) list.push(new Date(year, month, day));
+    while (list.length % 7 !== 0) list.push(null);
+    return list;
+  }, [cursor]);
+
+  const goPrev = () =>
+    setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1));
+  const goNext = () =>
+    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1));
+  const goToday = () => {
+    setCursor(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelected(today);
+  };
+
+  const selectedEvents = eventsByDay[dayKey(selected)] || [];
+
+  return (
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
+      {/* month grid */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-bold sm:text-lg">{monthLabel}</h2>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={goToday}
+              className="rounded-lg px-3 py-1.5 text-xs font-bold text-brand-orange hover:bg-brand-cream"
+            >
+              Today
+            </button>
+            <button
+              onClick={goPrev}
+              aria-label="Previous month"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
+            >
+              ‹
+            </button>
+            <button
+              onClick={goNext}
+              aria-label="Next month"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-gray-400 sm:text-xs">
+          {WEEKDAYS.map((w) => (
+            <div key={w} className="py-1.5">
+              {w}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (!d) return <div key={i} className="aspect-square" />;
+            const key = dayKey(d);
+            const events = eventsByDay[key] || [];
+            const isToday = key === dayKey(today);
+            const isSelected = key === dayKey(selected);
+            return (
+              <button
+                key={i}
+                onClick={() => setSelected(d)}
+                className={`flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border text-xs transition sm:text-sm ${
+                  isSelected
+                    ? "border-brand-orange bg-brand-orange/10 font-bold text-brand-orange"
+                    : isToday
+                      ? "border-brand-gold/60 bg-brand-cream font-bold"
+                      : "border-transparent hover:bg-gray-50"
+                }`}
+              >
+                <span>{d.getDate()}</span>
+                {events.length > 0 && (
+                  <span className="flex gap-0.5">
+                    {events.slice(0, 3).map((_, idx) => (
+                      <span
+                        key={idx}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          isSelected ? "bg-brand-orange" : "bg-brand-gold"
+                        }`}
+                      />
+                    ))}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* selected day's sessions */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+        <h3 className="mb-3 text-sm font-bold">
+          {selected.toLocaleDateString("en-GB", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          })}
+        </h3>
+        {selectedEvents.length === 0 ? (
+          <Empty text="No classes scheduled this day." />
+        ) : (
+          <div className="space-y-2.5">
+            {selectedEvents.map((e, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-gray-100 bg-brand-cream/40 p-3"
+              >
+                <div className="truncate text-sm font-bold">{e.title}</div>
+                <div className="mt-1 flex items-center justify-between text-xs opacity-70">
+                  <span>{e.startTime || "Time TBA"}</span>
+                  <span>
+                    {e.booked}/{e.capacity} booked
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
