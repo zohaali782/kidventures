@@ -114,8 +114,16 @@ export default function InstructorsPage() {
                     initial={initial}
                   />
 
-                  <h2 className="font-bold text-brand-brown text-lg mb-1">
+                  <h2 className="font-bold text-brand-brown text-lg mb-1 flex items-center gap-1">
                     {name}
+                    {profile.hasBadge && (
+                      <span
+                        title="Badged instructor"
+                        className="text-base leading-none text-[#D4AF37]"
+                      >
+                        🏅
+                      </span>
+                    )}
                   </h2>
 
                   {tagline && (

@@ -236,6 +236,43 @@ const toggleFeatureInstructor = async (req, res, next) => {
 };
 
 /**
+ * @desc    Instructor ko golden "badge" dena/hatana - admin apni marzi se
+ *          award karta hai (aksar zyada experience wale instructors ko),
+ *          taake unhe ek incentive/trust signal mile.
+ * @route   PUT /api/admin/instructors/:id/badge
+ * @access  Admin
+ */
+const toggleBadgeInstructor = async (req, res, next) => {
+  try {
+    const profile = await InstructorProfile.findById(req.params.id);
+
+    if (!profile) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Instructor not found" });
+    }
+
+    if (profile.verificationStatus !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Only approved instructors can get a badge",
+      });
+    }
+
+    profile.hasBadge = !profile.hasBadge;
+    await profile.save();
+
+    res.json({
+      success: true,
+      message: profile.hasBadge ? "Badge awarded" : "Badge removed",
+      profile,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Class approve karna (live kar dena)
  * @route   PUT /api/admin/activities/:id/approve
  * @access  Admin
@@ -717,6 +754,7 @@ module.exports = {
   rejectInstructor,
   toggleSuspendInstructor,
   toggleFeatureInstructor,
+  toggleBadgeInstructor,
   approveActivity,
   toggleSuspendActivity,
   removeActivity,

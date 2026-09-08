@@ -376,6 +376,17 @@ export default function AdminDashboard() {
       flash(err?.response?.data?.message || "Couldn't update.");
     }
   };
+  const toggleBadge = async (id) => {
+    try {
+      const { data } = await api.put(`/admin/instructors/${id}/badge`);
+      setInstructors((list) =>
+        list.map((x) => (x._id === id ? data.profile : x)),
+      );
+      flash(data.message);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't update.");
+    }
+  };
 
   /* -------------------------------- classes -------------------------------- */
   const [classes, setClasses] = useState([]);
@@ -939,9 +950,22 @@ export default function AdminDashboard() {
                       <div className="h-10 w-10 shrink-0 rounded-full bg-brand-gold" />
                     )}
                     <div className="min-w-[160px] flex-1">
-                      <div className="text-sm font-bold">{ins.user?.name}</div>
+                      <div className="flex items-center gap-1.5 text-sm font-bold">
+                        {ins.user?.name}
+                        {ins.hasBadge && (
+                          <span
+                            title="Has badge"
+                            className="text-sm leading-none text-[#D4AF37]"
+                          >
+                            🏅
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs opacity-60">
                         {(ins.categories || []).map((c) => c.name).join(", ")}
+                        {ins.experienceYears
+                          ? ` · ${ins.experienceYears} yrs experience`
+                          : ""}
                         {ins.isFeatured ? " · Featured" : ""}
                       </div>
                     </div>
@@ -953,6 +977,16 @@ export default function AdminDashboard() {
                       className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold"
                     >
                       {ins.isFeatured ? "Unfeature" : "Feature"}
+                    </button>
+                    <button
+                      onClick={() => toggleBadge(ins._id)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                        ins.hasBadge
+                          ? "border-[#D4AF37] bg-[#FDF6E3] text-[#8a6d1a]"
+                          : "border-gray-200 bg-white"
+                      }`}
+                    >
+                      {ins.hasBadge ? "🏅 Remove Badge" : "🏅 Give Badge"}
                     </button>
                     {ins.isSuspended ? (
                       <button

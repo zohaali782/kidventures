@@ -41,6 +41,7 @@ function normProfile(p = {}) {
     socialLinks: p.socialLinks || {},
     rating: p.rating || { average: 0, count: 0 },
     verified: p.verificationStatus === "approved",
+    hasBadge: Boolean(p.hasBadge),
     joinedAt: p.createdAt || null,
   };
 }
@@ -523,6 +524,14 @@ export default function InstructorProfilePage() {
                 {profile.name}
               </h1>
               {profile.verified && <VerifiedBadge />}
+              {profile.hasBadge && (
+                <span
+                  title="Badged instructor"
+                  className="text-2xl leading-none text-[#D4AF37]"
+                >
+                  🏅
+                </span>
+              )}
             </div>
 
             {profile.headline && (

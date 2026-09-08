@@ -335,6 +335,7 @@ const normInstructor = (i) => ({
   location:
     pickLocation(i.location) || pickLocation(i.area) || pickLocation(i.city),
   photo: pickImg(i.photo, i.avatar, i.profilePhoto, i.user?.avatar),
+  hasBadge: Boolean(i.hasBadge),
 });
 
 /* ============================================================
@@ -933,7 +934,17 @@ function Homepage() {
                 ) : (
                   <div className="mx-auto mb-2.5 h-[60px] w-[60px] rounded-full bg-brand-gold" />
                 )}
-                <div className="font-bold text-brand-brown">{ins.name}</div>
+                <div className="flex items-center justify-center gap-1 font-bold text-brand-brown">
+                  {ins.name}
+                  {ins.hasBadge && (
+                    <span
+                      title="Badged instructor"
+                      className="text-sm leading-none text-[#D4AF37]"
+                    >
+                      🏅
+                    </span>
+                  )}
+                </div>
                 {ins.subject && (
                   <div className="text-xs text-brand-brown/70">
                     {ins.subject}

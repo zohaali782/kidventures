@@ -8,6 +8,7 @@ const {
   rejectInstructor,
   toggleSuspendInstructor,
   toggleFeatureInstructor,
+  toggleBadgeInstructor,
   approveActivity,
   toggleSuspendActivity,
   removeActivity,
@@ -41,6 +42,7 @@ router.put("/instructors/:id/approve", approveInstructor);
 router.put("/instructors/:id/reject", rejectInstructor);
 router.put("/instructors/:id/suspend", toggleSuspendInstructor);
 router.put("/instructors/:id/feature", toggleFeatureInstructor);
+router.put("/instructors/:id/badge", toggleBadgeInstructor);
 
 /* -------------------------------- Classes -------------------------------- */
 router.get("/activities", getAllActivities);

@@ -127,6 +127,11 @@ const instructorProfileSchema = new mongoose.Schema(
 
     /* ----------------------------- Marketplace ---------------------------- */
     isFeatured: { type: Boolean, default: false },
+    // Admin apni marzi se award karta hai - aksar zyada experience wale
+    // instructors ko - taake unhe ek golden "badge" milay (incentive).
+    // isFeatured se alag hai: featured homepage par upar dikhata hai,
+    // badge sirf ek trust/achievement signal hai.
+    hasBadge: { type: Boolean, default: false },
     isSuspended: { type: Boolean, default: false },
     suspensionReason: String,
 
