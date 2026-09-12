@@ -12,7 +12,9 @@
  * `size` medal ki width (px) hai. `showRibbon` false ho to sirf coin
  * (list/card me chote inline badge ke liye). `showLabel` + size >= 40 par
  * medal ke andar engraved do-line text bhi dikhta hai (badges info page,
- * instructor hero jaisi badi jagah ke liye).
+ * instructor hero jaisi badi jagah ke liye) - lambe words (jaise
+ * "Kidventures") automatically thoda compress ho jate hain (SVG
+ * textLength) taake circle se bahar na niklein.
  */
 export const BADGE_META = {
   founding: {
@@ -65,6 +67,18 @@ export const BADGE_META = {
 // badalta hai (jaisa asli medal sets me hota hai: ribbon same, rank alag).
 const RIBBON_STRIPES = ["#4A2F16", "#D9720C", "#F2C94C", "#D9720C", "#4A2F16"];
 
+const FONT_SIZE = 7;
+const MAX_TEXT_WIDTH = 32; // viewBox units - circle ke andar safe text area
+
+/** Line lambi ho to compress kar deti hai (textLength), warna natural chhod deti hai. */
+function fitText(line) {
+  const estWidth = line.length * FONT_SIZE * 0.6;
+  if (estWidth > MAX_TEXT_WIDTH) {
+    return { textLength: MAX_TEXT_WIDTH, lengthAdjust: "spacingAndGlyphs" };
+  }
+  return {};
+}
+
 export default function BadgeMedal({
   type,
   size = 26,
@@ -81,9 +95,11 @@ export default function BadgeMedal({
   const glowId = `${uid}-glow`;
 
   const vbW = 60;
-  const vbH = showRibbon ? 92 : 60;
-  const cy = showRibbon ? 60 : 30;
   const r = 21;
+  // Ribbon tail chhoti rakhi hai (medal ke top se bas thoda upar) - taake
+  // hanging medal ka clearance zyada bada na ho aur upar wala content na dabay.
+  const vbH = showRibbon ? 74 : 60;
+  const cy = showRibbon ? 50 : 30;
   const height = size * (vbH / vbW);
   const bigLabel = showLabel && size >= 40;
 
@@ -130,22 +146,13 @@ export default function BadgeMedal({
         {showRibbon && (
           <>
             <polygon
-              points="16,0 27,0 27,38 21.5,32 16,38"
+              points="16,0 27,0 27,34 21.5,27 16,34"
               fill={`url(#${ribId})`}
             />
             <polygon
-              points="33,0 44,0 44,38 38.5,32 33,38"
+              points="33,0 44,0 44,34 38.5,27 33,34"
               fill={`url(#${ribId})`}
               opacity="0.88"
-            />
-            {/* Fold shadow where the ribbon disappears behind the medal */}
-            <ellipse
-              cx="30"
-              cy={cy - r + 3}
-              rx="13"
-              ry="4"
-              fill="#000"
-              opacity="0.18"
             />
           </>
         )}
@@ -186,27 +193,25 @@ export default function BadgeMedal({
           <>
             <text
               x="30"
-              y={cy - 1}
+              y={cy - 4.5}
               textAnchor="middle"
-              fontSize="6.6"
+              fontSize={FONT_SIZE}
               fontWeight="700"
               fill={meta.ring}
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-              }}
+              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+              {...fitText(meta.lines[0])}
             >
               {meta.lines[0]}
             </text>
             <text
               x="30"
-              y={cy + 7}
+              y={cy + 6.5}
               textAnchor="middle"
-              fontSize="6.6"
+              fontSize={FONT_SIZE}
               fontWeight="700"
               fill={meta.ring}
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-              }}
+              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+              {...fitText(meta.lines[1])}
             >
               {meta.lines[1]}
             </text>

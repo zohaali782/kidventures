@@ -47,7 +47,7 @@ export default function BadgesInfoPage() {
       <Navbar />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-12">
-        <div className="text-center mb-10">
+        <div className="text-center mb-16">
           <h1 className="text-3xl font-bold text-brand-brown mb-3">
             Instructor Badges
           </h1>
@@ -58,18 +58,18 @@ export default function BadgesInfoPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-14 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-20">
           {BADGE_ORDER.map((type) => {
             const meta = BADGE_META[type];
             const details = BADGE_DETAILS[type];
             return (
               <div
                 key={type}
-                className="relative overflow-visible rounded-2xl bg-white pt-24 pb-6 px-6 shadow-md flex flex-col items-center text-center"
+                className="relative overflow-visible rounded-2xl bg-white pt-10 pb-6 px-6 shadow-md flex flex-col items-center text-center"
               >
                 {/* Medal hangs off the top edge of the card, like a real
                     award ribbon pinned to it. */}
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2">
+                <div className="absolute -top-[72px] left-1/2 -translate-x-1/2">
                   <BadgeMedal type={type} size={88} showLabel />
                 </div>
 
