@@ -58,17 +58,22 @@ export default function BadgesInfoPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-14 mt-4">
           {BADGE_ORDER.map((type) => {
             const meta = BADGE_META[type];
             const details = BADGE_DETAILS[type];
             return (
               <div
                 key={type}
-                className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center text-center"
+                className="relative overflow-visible rounded-2xl bg-white pt-24 pb-6 px-6 shadow-md flex flex-col items-center text-center"
               >
-                <BadgeMedal type={type} size={72} showLabel />
-                <h2 className="mt-3 font-bold text-brand-brown text-lg">
+                {/* Medal hangs off the top edge of the card, like a real
+                    award ribbon pinned to it. */}
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2">
+                  <BadgeMedal type={type} size={88} showLabel />
+                </div>
+
+                <h2 className="font-bold text-brand-brown text-lg">
                   {meta.label}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">

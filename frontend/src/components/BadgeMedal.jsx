@@ -1,60 +1,69 @@
 /**
- * BadgeMedal — chota, brand-colored (yellow/orange/brown) medal icon.
+ * BadgeMedal — realistic gold/bronze medal icon with a striped ribbon
+ * (yellow/orange/brown, Kidventures brand colors), engraved two-line text,
+ * a glossy bevel and a soft drop shadow — built entirely in SVG (no image
+ * files), so it stays crisp at any size and never depends on an external
+ * asset.
  *
  * `type` in 4 me se ek hona chahiyeh: "founding" | "popular" | "bronze" | "admin".
- * Har type ka apna color aur label BADGE_META me define hai — naya badge
- * add karna ho to bas yahan ek entry aur bana do.
+ * Har type ka apna metal color BADGE_META me define hai — naya badge add
+ * karna ho to bas yahan ek entry aur bana do.
  *
- * `size` medal ki width (px) hai — 40px+ par medal ke andar chota
- * uppercase label bhi dikhta hai (badges info page, instructor hero jaisi
- * badi jagah ke liye), chote size par (list/card me) sirf medal + tooltip.
+ * `size` medal ki width (px) hai. `showRibbon` false ho to sirf coin
+ * (list/card me chote inline badge ke liye). `showLabel` + size >= 40 par
+ * medal ke andar engraved do-line text bhi dikhta hai (badges info page,
+ * instructor hero jaisi badi jagah ke liye).
  */
 export const BADGE_META = {
   founding: {
     label: "Founding Instructor",
     short: "Founding",
+    lines: ["Founding", "Instructor"],
     blurb:
       "Awarded automatically to the first instructors who joined Kidventures.",
-    faceFrom: "#FFE9A8",
-    faceTo: "#D9A521",
-    ring: "#8B5E34",
-    ribbonFrom: "#6B4226",
-    ribbonTo: "#8B5E34",
+    faceHi: "#FFF3C4",
+    faceMid: "#F2C94C",
+    faceLo: "#B8860B",
+    ring: "#6B4226",
   },
   popular: {
     label: "Popular This Month",
     short: "Popular",
+    lines: ["Popular", "This Month"],
     blurb:
       "Given to instructors with 5+ confirmed bookings in the current month.",
-    faceFrom: "#FFC98A",
-    faceTo: "#DE7A17",
-    ring: "#8B5E34",
-    ribbonFrom: "#6B4226",
-    ribbonTo: "#8B5E34",
+    faceHi: "#FFDCAE",
+    faceMid: "#F2994A",
+    faceLo: "#C25E00",
+    ring: "#6B4226",
   },
   bronze: {
     label: "Highly Rated",
     short: "Bronze",
+    lines: ["Highly", "Rated"],
     blurb:
       "For instructors with a 4.5★ average rating from at least 5 reviews.",
-    faceFrom: "#D8A768",
-    faceTo: "#8C5A2B",
-    ring: "#5C3D1E",
-    ribbonFrom: "#4A2F16",
-    ribbonTo: "#6B4226",
+    faceHi: "#E4C29A",
+    faceMid: "#B08D57",
+    faceLo: "#6B4226",
+    ring: "#4A2F16",
   },
   admin: {
     label: "Kidventures Pick",
     short: "Pick",
+    lines: ["Kidventures", "Pick"],
     blurb:
       "A hand-picked badge the Kidventures team awards to standout instructors.",
-    faceFrom: "#FFEFB0",
-    faceTo: "#C9971F",
-    ring: "#8B5E34",
-    ribbonFrom: "#6B4226",
-    ribbonTo: "#8B5E34",
+    faceHi: "#FFF6D8",
+    faceMid: "#FFD770",
+    faceLo: "#C9971F",
+    ring: "#6B4226",
   },
 };
+
+// Ribbon ek hi design/rang har badge ke liye - sirf medal ka metal color
+// badalta hai (jaisa asli medal sets me hota hai: ribbon same, rank alag).
+const RIBBON_STRIPES = ["#4A2F16", "#D9720C", "#F2C94C", "#D9720C", "#4A2F16"];
 
 export default function BadgeMedal({
   type,
@@ -66,11 +75,17 @@ export default function BadgeMedal({
   const meta = BADGE_META[type];
   if (!meta) return null;
 
-  const faceId = `bm-face-${type}`;
-  const ribId = `bm-rib-${type}`;
-  const vbH = showRibbon ? 80 : 60;
-  const cy = showRibbon ? 50 : 30;
-  const height = size * (vbH / 60);
+  const uid = `bm-${type}-${showRibbon ? "r" : "n"}-${showLabel ? "l" : "p"}`;
+  const faceId = `${uid}-face`;
+  const ribId = `${uid}-rib`;
+  const glowId = `${uid}-glow`;
+
+  const vbW = 60;
+  const vbH = showRibbon ? 92 : 60;
+  const cy = showRibbon ? 60 : 30;
+  const r = 21;
+  const height = size * (vbH / vbW);
+  const bigLabel = showLabel && size >= 40;
 
   return (
     <span
@@ -78,75 +93,132 @@ export default function BadgeMedal({
       role="img"
       aria-label={meta.label}
       className={`inline-block align-middle ${className}`}
-      style={{ width: size, height }}
+      style={{
+        width: size,
+        height,
+        filter: "drop-shadow(0 3px 3px rgba(0,0,0,0.35))",
+      }}
     >
       <svg
-        viewBox={`0 0 60 ${vbH}`}
+        viewBox={`0 0 ${vbW} ${vbH}`}
         width={size}
         height={height}
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id={faceId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={meta.faceFrom} />
-            <stop offset="100%" stopColor={meta.faceTo} />
+          {/* Glossy metal sphere: highlight offset toward the top-left */}
+          <radialGradient id={faceId} cx="38%" cy="32%" r="75%">
+            <stop offset="0%" stopColor={meta.faceHi} />
+            <stop offset="55%" stopColor={meta.faceMid} />
+            <stop offset="100%" stopColor={meta.faceLo} />
+          </radialGradient>
+          <linearGradient id={ribId} x1="0" y1="0" x2="1" y2="0">
+            {RIBBON_STRIPES.map((c, i) => (
+              <stop
+                key={i}
+                offset={`${(i / (RIBBON_STRIPES.length - 1)) * 100}%`}
+                stopColor={c}
+              />
+            ))}
           </linearGradient>
-          <linearGradient id={ribId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={meta.ribbonFrom} />
-            <stop offset="100%" stopColor={meta.ribbonTo} />
-          </linearGradient>
+          <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff" stopOpacity="0.65" />
+            <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+          </radialGradient>
         </defs>
 
         {showRibbon && (
           <>
-            <polygon points="19,0 27,0 33,32 13,32" fill={`url(#${ribId})`} />
             <polygon
-              points="33,0 41,0 47,32 27,32"
+              points="16,0 27,0 27,38 21.5,32 16,38"
               fill={`url(#${ribId})`}
-              opacity="0.82"
+            />
+            <polygon
+              points="33,0 44,0 44,38 38.5,32 33,38"
+              fill={`url(#${ribId})`}
+              opacity="0.88"
+            />
+            {/* Fold shadow where the ribbon disappears behind the medal */}
+            <ellipse
+              cx="30"
+              cy={cy - r + 3}
+              rx="13"
+              ry="4"
+              fill="#000"
+              opacity="0.18"
             />
           </>
         )}
 
+        {/* Outer bezel */}
+        <circle cx="30" cy={cy} r={r} fill={meta.ring} />
+        <circle cx="30" cy={cy} r={r - 2.2} fill={`url(#${faceId})`} />
+        {/* Inner bevel ring for a "rim" look */}
         <circle
           cx="30"
           cy={cy}
-          r="22"
-          fill={`url(#${faceId})`}
-          stroke={meta.ring}
-          strokeWidth="2.5"
-        />
-        <circle
-          cx="30"
-          cy={cy}
-          r="17.5"
+          r={r - 5.5}
           fill="none"
           stroke="#fff"
-          strokeOpacity="0.55"
+          strokeOpacity="0.4"
           strokeWidth="1"
         />
+        <circle
+          cx="30"
+          cy={cy}
+          r={r - 2.2}
+          fill="none"
+          stroke="#000"
+          strokeOpacity="0.18"
+          strokeWidth="1"
+        />
+        {/* Specular highlight */}
+        <ellipse
+          cx="23"
+          cy={cy - 8}
+          rx="10"
+          ry="6"
+          fill={`url(#${glowId})`}
+          transform={`rotate(-25 23 ${cy - 8})`}
+        />
 
-        {showLabel && size >= 40 ? (
-          <text
-            x="30"
-            y={cy + 3}
-            textAnchor="middle"
-            fontSize="7.5"
-            fontWeight="700"
-            fill="#fff"
-            fillOpacity="0.95"
-            style={{ fontFamily: "system-ui, sans-serif", letterSpacing: 0.3 }}
-          >
-            {meta.short.toUpperCase()}
-          </text>
+        {bigLabel ? (
+          <>
+            <text
+              x="30"
+              y={cy - 1}
+              textAnchor="middle"
+              fontSize="6.6"
+              fontWeight="700"
+              fill={meta.ring}
+              style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+              }}
+            >
+              {meta.lines[0]}
+            </text>
+            <text
+              x="30"
+              y={cy + 7}
+              textAnchor="middle"
+              fontSize="6.6"
+              fontWeight="700"
+              fill={meta.ring}
+              style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+              }}
+            >
+              {meta.lines[1]}
+            </text>
+          </>
         ) : (
           <text
             x="30"
-            y={cy + 6.5}
+            y={cy + 6}
             textAnchor="middle"
-            fontSize="18"
-            fill="#fff"
-            fillOpacity="0.95"
+            fontSize="17"
+            fill={meta.ring}
+            fillOpacity="0.9"
           >
             ★
           </text>
