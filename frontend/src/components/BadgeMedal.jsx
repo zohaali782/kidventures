@@ -67,7 +67,7 @@ export const BADGE_META = {
 // badalta hai (jaisa asli medal sets me hota hai: ribbon same, rank alag).
 const RIBBON_STRIPES = ["#4A2F16", "#D9720C", "#F2C94C", "#D9720C", "#4A2F16"];
 
-const FONT_SIZE = 7;
+const FONT_SIZE = 7.5;
 const MAX_TEXT_WIDTH = 32; // viewBox units - circle ke andar safe text area
 
 /** Line lambi ho to compress kar deti hai (textLength), warna natural chhod deti hai. */
@@ -190,32 +190,20 @@ export default function BadgeMedal({
         />
 
         {bigLabel ? (
-          <>
-            <text
-              x="30"
-              y={cy - 4.5}
-              textAnchor="middle"
-              fontSize={FONT_SIZE}
-              fontWeight="700"
-              fill={meta.ring}
-              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-              {...fitText(meta.lines[0])}
-            >
-              {meta.lines[0]}
-            </text>
-            <text
-              x="30"
-              y={cy + 6.5}
-              textAnchor="middle"
-              fontSize={FONT_SIZE}
-              fontWeight="700"
-              fill={meta.ring}
-              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-              {...fitText(meta.lines[1])}
-            >
-              {meta.lines[1]}
-            </text>
-          </>
+          // Sirf EK chhota word (meta.short) - do lines circle me kabhi
+          // theek se fit nahi hoti, ek chhota word hamesha saaf dikhta hai.
+          <text
+            x="30"
+            y={cy + 2.7}
+            textAnchor="middle"
+            fontSize={FONT_SIZE}
+            fontWeight="700"
+            fill={meta.ring}
+            style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+            {...fitText(meta.short)}
+          >
+            {meta.short}
+          </text>
         ) : (
           <text
             x="30"
