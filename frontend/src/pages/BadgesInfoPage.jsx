@@ -11,7 +11,7 @@ const BADGE_DETAILS = {
     howToGet:
       "Be one of the first 20 instructors to have your profile approved on Kidventures.",
     notes:
-      "This badge is permanent once earned and is awarded automatically — there is nothing extra to apply for.",
+      "This badge is permanent once earned and is awarded automatically, there is nothing extra to apply for.",
   },
   popular: {
     howToGet:
@@ -29,7 +29,7 @@ const BADGE_DETAILS = {
     howToGet:
       "Awarded at the discretion of the Kidventures team to instructors who go above and beyond.",
     notes:
-      "There's no fixed formula for this one — it's our way of highlighting instructors we personally vouch for.",
+      "There's no fixed formula for this one, it's our way of highlighting instructors we personally vouch for.",
   },
 };
 
