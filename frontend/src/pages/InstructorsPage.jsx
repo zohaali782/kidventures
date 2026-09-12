@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import axios from "../api/axios";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import BadgeMedal from "../components/BadgeMedal";
 
 export default function InstructorsPage() {
   const [searchParams] = useSearchParams();
@@ -114,17 +115,29 @@ export default function InstructorsPage() {
                     initial={initial}
                   />
 
-                  <h2 className="font-bold text-brand-brown text-lg mb-1 flex items-center gap-1">
+                  <h2 className="font-bold text-brand-brown text-lg mb-1">
                     {name}
-                    {profile.hasBadge && (
-                      <span
-                        title="Badged instructor"
-                        className="text-base leading-none text-[#D4AF37]"
-                      >
-                        🏅
-                      </span>
-                    )}
                   </h2>
+
+                  {(profile.badges?.founding ||
+                    profile.badges?.popular ||
+                    profile.badges?.bronze ||
+                    profile.badges?.admin) && (
+                    <div className="mb-2 flex items-center justify-center gap-1">
+                      {profile.badges.founding && (
+                        <BadgeMedal type="founding" size={22} showRibbon={false} />
+                      )}
+                      {profile.badges.popular && (
+                        <BadgeMedal type="popular" size={22} showRibbon={false} />
+                      )}
+                      {profile.badges.bronze && (
+                        <BadgeMedal type="bronze" size={22} showRibbon={false} />
+                      )}
+                      {profile.badges.admin && (
+                        <BadgeMedal type="admin" size={22} showRibbon={false} />
+                      )}
+                    </div>
+                  )}
 
                   {tagline && (
                     <p className="text-sm text-gray-500 mb-2">{tagline}</p>

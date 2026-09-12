@@ -3,6 +3,11 @@ const mongoose = require("mongoose");
 const InstructorProfile = require("../models/InstructorProfile");
 const Activity = require("../models/Activity");
 const stripe = require("../config/stripe");
+const {
+  getFoundingInstructorIds,
+  getPopularInstructorUserIds,
+  computeBadges,
+} = require("../utils/badges");
 
 /**
  * Instructor jo fields khud edit kar sakta hai.
@@ -243,7 +248,7 @@ const getInstructors = async (req, res, next) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 50);
 
-    const [profiles, total] = await Promise.all([
+    const [profiles, total, foundingIds, popularUserIds] = await Promise.all([
       InstructorProfile.find(filter)
         .populate("user", "name avatar city")
         .populate("categories", "name slug icon")
@@ -251,15 +256,26 @@ const getInstructors = async (req, res, next) => {
         .skip((page - 1) * limit)
         .limit(limit),
       InstructorProfile.countDocuments(filter),
+      getFoundingInstructorIds(),
+      getPopularInstructorUserIds(),
     ]);
+
+    // Har profile ke sath uske 4 badges ka computed flag object bhej dete
+    // hain (founding/popular/bronze/admin) - taake frontend ko khud
+    // calculate na karna pare.
+    const instructors = profiles.map((p) => {
+      const obj = p.toObject();
+      obj.badges = computeBadges(p, foundingIds, popularUserIds);
+      return obj;
+    });
 
     res.json({
       success: true,
-      count: profiles.length,
+      count: instructors.length,
       total,
       page,
       pages: Math.ceil(total / limit),
-      instructors: profiles,
+      instructors,
     });
   } catch (error) {
     next(error);
@@ -303,7 +319,14 @@ const getInstructorById = async (req, res, next) => {
       .populate("category", "name slug icon")
       .sort({ "rating.average": -1 });
 
-    res.json({ success: true, instructor: profile, activities });
+    const [foundingIds, popularUserIds] = await Promise.all([
+      getFoundingInstructorIds(),
+      getPopularInstructorUserIds(),
+    ]);
+    const instructor = profile.toObject();
+    instructor.badges = computeBadges(profile, foundingIds, popularUserIds);
+
+    res.json({ success: true, instructor, activities });
   } catch (error) {
     next(error);
   }

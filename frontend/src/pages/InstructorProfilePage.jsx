@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import BadgeMedal from "../components/BadgeMedal";
 import api from "../api/axios";
 import { normActivity, toList } from "../api/normalize";
 import { isLoggedIn } from "../api/auth";
@@ -42,6 +43,7 @@ function normProfile(p = {}) {
     rating: p.rating || { average: 0, count: 0 },
     verified: p.verificationStatus === "approved",
     hasBadge: Boolean(p.hasBadge),
+    badges: p.badges || {},
     joinedAt: p.createdAt || null,
   };
 }
@@ -524,15 +526,33 @@ export default function InstructorProfilePage() {
                 {profile.name}
               </h1>
               {profile.verified && <VerifiedBadge />}
-              {profile.hasBadge && (
-                <span
-                  title="Badged instructor"
-                  className="text-2xl leading-none text-[#D4AF37]"
-                >
-                  🏅
-                </span>
-              )}
             </div>
+
+            {(profile.badges?.founding ||
+              profile.badges?.popular ||
+              profile.badges?.bronze ||
+              profile.badges?.admin) && (
+              <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                {profile.badges.founding && (
+                  <BadgeMedal type="founding" size={34} />
+                )}
+                {profile.badges.popular && (
+                  <BadgeMedal type="popular" size={34} />
+                )}
+                {profile.badges.bronze && (
+                  <BadgeMedal type="bronze" size={34} />
+                )}
+                {profile.badges.admin && (
+                  <BadgeMedal type="admin" size={34} />
+                )}
+                <Link
+                  to="/badges"
+                  className="text-xs font-semibold text-brand-orange underline"
+                >
+                  What do these mean?
+                </Link>
+              </div>
+            )}
 
             {profile.headline && (
               <div className="mb-2 text-sm font-semibold text-brand-orange">

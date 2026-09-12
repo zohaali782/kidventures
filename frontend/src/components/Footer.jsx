@@ -135,6 +135,7 @@ function Footer() {
             { label: "About", to: "/about" },
             { label: "How It Works", to: "/how-it-works" },
             { label: "Become an Instructor", to: "/become-instructor" },
+            { label: "Instructor Badges", to: "/badges" },
             { label: "Contact", to: "/contact" },
           ]}
         />

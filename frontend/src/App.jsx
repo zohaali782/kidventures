@@ -27,6 +27,7 @@ import RefundPolicyPage from "./pages/RefundPolicyPage";
 import HowItWorksPage from "./pages/HowItWorksPage";
 import BecomeInstructorPage from "./pages/BecomeInstructorPage";
 import InstructorsPage from "./pages/InstructorsPage";
+import BadgesInfoPage from "./pages/BadgesInfoPage";
 import MessagesPage from "./pages/MessagesPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import CampsPage from "./pages/CampsPage";
@@ -55,6 +56,7 @@ function App() {
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/become-instructor" element={<BecomeInstructorPage />} />
         <Route path="/instructors" element={<InstructorsPage />} />
+        <Route path="/badges" element={<BadgesInfoPage />} />
         <Route path="/camps" element={<CampsPage />} />
 
         {/* Instructor-only pages */}

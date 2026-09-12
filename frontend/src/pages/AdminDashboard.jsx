@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import api from "../api/axios";
 import { toList } from "../api/normalize";
 import { logout } from "../api/auth";
+import BadgeMedal from "../components/BadgeMedal";
 
 /* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
    ka na ho, waisi hi wapas kar deta hai. */
@@ -952,13 +953,17 @@ export default function AdminDashboard() {
                     <div className="min-w-[160px] flex-1">
                       <div className="flex items-center gap-1.5 text-sm font-bold">
                         {ins.user?.name}
+                        {ins.badges?.founding && (
+                          <BadgeMedal type="founding" size={18} showRibbon={false} />
+                        )}
+                        {ins.badges?.popular && (
+                          <BadgeMedal type="popular" size={18} showRibbon={false} />
+                        )}
+                        {ins.badges?.bronze && (
+                          <BadgeMedal type="bronze" size={18} showRibbon={false} />
+                        )}
                         {ins.hasBadge && (
-                          <span
-                            title="Has badge"
-                            className="text-sm leading-none text-[#D4AF37]"
-                          >
-                            🏅
-                          </span>
+                          <BadgeMedal type="admin" size={18} showRibbon={false} />
                         )}
                       </div>
                       <div className="text-xs opacity-60">

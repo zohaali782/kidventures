@@ -6,6 +6,11 @@ const ClassRequest = require("../models/ClassRequest");
 const User = require("../models/User");
 const { sendEmail } = require("../utils/sendEmail");
 const tpl = require("../utils/emailTemplates");
+const {
+  getFoundingInstructorIds,
+  getPopularInstructorUserIds,
+  computeBadges,
+} = require("../utils/badges");
 
 /**
  * Ye saara file sirf admin ke liye hai.
@@ -26,12 +31,25 @@ const getInstructorApplications = async (req, res, next) => {
       filter.verificationStatus = String(req.query.status);
     }
 
-    const profiles = await InstructorProfile.find(filter)
-      .populate("user", "name email phone avatar createdAt")
-      .populate("categories", "name slug")
-      .sort({ submittedAt: -1, createdAt: -1 });
+    const [profiles, foundingIds, popularUserIds] = await Promise.all([
+      InstructorProfile.find(filter)
+        .populate("user", "name email phone avatar createdAt")
+        .populate("categories", "name slug")
+        .sort({ submittedAt: -1, createdAt: -1 }),
+      getFoundingInstructorIds(),
+      getPopularInstructorUserIds(),
+    ]);
 
-    res.json({ success: true, count: profiles.length, instructors: profiles });
+    // Admin ke liye bhi automatic badges (founding/popular/bronze) dikha dete
+    // hain - taake wo dekh sake instructor ne khud kya "kama" liya hai,
+    // "admin" flag ke alawa jo manually diya jata hai (toggleBadgeInstructor).
+    const instructors = profiles.map((p) => {
+      const obj = p.toObject();
+      obj.badges = computeBadges(p, foundingIds, popularUserIds);
+      return obj;
+    });
+
+    res.json({ success: true, count: instructors.length, instructors });
   } catch (error) {
     next(error);
   }

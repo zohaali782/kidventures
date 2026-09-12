@@ -8,6 +8,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import FavoriteButton from "../components/FavoriteButton";
 import RecentlyViewed from "../components/RecentlyViewed";
+import BadgeMedal from "../components/BadgeMedal";
 import api from "../api/axios";
 import heroImg from "../assets/hero.jpg"; // hero image: src/assets/hero.jpg
 import moment1 from "../assets/moment-1.jpg";
@@ -336,6 +337,7 @@ const normInstructor = (i) => ({
     pickLocation(i.location) || pickLocation(i.area) || pickLocation(i.city),
   photo: pickImg(i.photo, i.avatar, i.profilePhoto, i.user?.avatar),
   hasBadge: Boolean(i.hasBadge),
+  badges: i.badges || {},
 });
 
 /* ============================================================
@@ -936,15 +938,18 @@ function Homepage() {
                 )}
                 <div className="flex items-center justify-center gap-1 font-bold text-brand-brown">
                   {ins.name}
-                  {ins.hasBadge && (
-                    <span
-                      title="Badged instructor"
-                      className="text-sm leading-none text-[#D4AF37]"
-                    >
-                      🏅
-                    </span>
-                  )}
                 </div>
+                {(ins.badges?.founding ||
+                  ins.badges?.popular ||
+                  ins.badges?.bronze ||
+                  ins.badges?.admin) && (
+                  <div className="mt-1 flex items-center justify-center gap-1">
+                    {ins.badges.founding && <BadgeMedal type="founding" size={20} showRibbon={false} />}
+                    {ins.badges.popular && <BadgeMedal type="popular" size={20} showRibbon={false} />}
+                    {ins.badges.bronze && <BadgeMedal type="bronze" size={20} showRibbon={false} />}
+                    {ins.badges.admin && <BadgeMedal type="admin" size={20} showRibbon={false} />}
+                  </div>
+                )}
                 {ins.subject && (
                   <div className="text-xs text-brand-brown/70">
                     {ins.subject}
