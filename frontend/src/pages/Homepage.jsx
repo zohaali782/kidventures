@@ -599,8 +599,8 @@ const galleryImages = [
  *
  * Number baRhayen to dheema, ghatayen to tez.
  */
-const SECONDS_PER_PHOTO_MOBILE = 2.2;
-const SECONDS_PER_PHOTO_DESKTOP = 2.4;
+const SECONDS_PER_PHOTO_MOBILE = 1.5;
+const SECONDS_PER_PHOTO_DESKTOP = 1.65;
 
 /** 640px se chhoti screen? (Tailwind ka sm breakpoint) */
 function useIsPhone() {
