@@ -17,9 +17,22 @@ import heroSm from "../assets/hero-sm.jpg";
 import heroMd from "../assets/hero-md.jpg";
 import heroLg from "../assets/hero-lg.jpg";
 import heroXl from "../assets/hero-xl.jpg";
-import moment1 from "../assets/moment-1.jpg";
-import moment2 from "../assets/moment-2.jpg";
-import moment3 from "../assets/moment-3.jpg";
+/* Moments band ki tasveerein. File ka number hi marquee me unki tarteeb
+   hai, aur wo tarteeb jaan boojh kar shuffle ki hui hai (neeche dekhein).
+   Sab pehle se 520x325 par crop aur compress hain, yani card ke asli
+   size ka 2x, is liye browser ko kuch resize nahi karna paRta. */
+import moment01 from "../assets/moment-01.jpg";
+import moment02 from "../assets/moment-02.jpg";
+import moment03 from "../assets/moment-03.jpg";
+import moment04 from "../assets/moment-04.jpg";
+import moment05 from "../assets/moment-05.jpg";
+import moment06 from "../assets/moment-06.jpg";
+import moment07 from "../assets/moment-07.jpg";
+import moment08 from "../assets/moment-08.jpg";
+import moment09 from "../assets/moment-09.jpg";
+import moment10 from "../assets/moment-10.jpg";
+import moment11 from "../assets/moment-11.jpg";
+import moment12 from "../assets/moment-12.jpg";
 import { cldOptimize } from "../utils/img";
 
 
@@ -526,23 +539,54 @@ function SectionHeader({ title, link }) {
 
 /* ============================================================
    MOMENTS MARQUEE (auto-scrolling image band)
-   Real class photos hosted on Cloudinary, resized+auto-optimized
-   via w_500,q_auto,f_auto transformation for fast load.
+   Asli class photos: kuch project ke andar (moment-01 se moment-12),
+   kuch Cloudinary par. Dono taraf card ke size par resize ho kar aati
+   hain, poori original kabhi download nahi hoti.
    ============================================================ */
+/* Cloudinary wali purani photos. ar_8:5,c_fill se Cloudinary khud hi card
+   ke ratio par crop kar ke bhejta hai, to browser ko bekar pixels
+   download nahi karne paRte (pehle poori chaurhi image aati thi aur
+   object-cover use kaat deta tha). */
+const cld = (v, file) =>
+  `https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,ar_8:5,c_fill,q_auto,f_auto/${v}/${file}`;
+
+/**
+ * Marquee ki tarteeb.
+ *
+ * Do usool is list me bandhe hue hain:
+ *  1. Ek hi class/session ki milti julti tasveerein kabhi aas paas nahi
+ *     aaeen (crochet, pastel room, teens wali laptop session, sab bikhri
+ *     hui hain). Marquee loop karta hai, is liye aakhri aur pehli ka
+ *     jorha bhi isi tarah dekha gaya hai.
+ *  2. Har purani Cloudinary photo ke dono taraf ek nai wali hai, to agar
+ *     un purani me koi do ek jaisi hain to bhi wo kabhi sath nahi
+ *     lagengi.
+ *
+ * Tarteeb badalni ho to bas is array ka order badal dein.
+ */
 const galleryImages = [
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786558300/kid1.jpg",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620602/kid2.jpg",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620616/kid3.jpg",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620667/kid4.jpg",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620672/kid8.png",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620673/kid6.png",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620674/kid7.png",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620674/kid5.png",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620716/kid10.png",
-  "https://res.cloudinary.com/rwnkpzbs/image/upload/w_500,q_auto,f_auto/v1786620716/kid9.png",
-  moment1,
-  moment2,
-  moment3,
+  moment01, // group photo, gift bags
+  cld("v1786558300", "kid1.jpg"),
+  moment02, // crochet, wooden table
+  cld("v1786620673", "kid6.png"),
+  moment03, // teens, laptop session
+  cld("v1786620616", "kid3.jpg"),
+  moment04, // outdoor paint craft
+  cld("v1786620716", "kid9.png"),
+  moment05, // pastel room, drawing close up
+  cld("v1786620602", "kid2.jpg"),
+  moment06, // crochet, yarn table
+  cld("v1786620674", "kid7.png"),
+  moment07, // meeting room, projector
+  cld("v1786620667", "kid4.jpg"),
+  moment08, // weaving with instructor
+  cld("v1786620716", "kid10.png"),
+  moment09, // crochet, one to one help
+  cld("v1786620674", "kid5.png"),
+  moment10, // pastel room, wide
+  cld("v1786620672", "kid8.png"),
+  moment11, // teens, group work
+  moment12, // mandala colouring
 ];
 
 function MomentsMarquee() {
@@ -559,7 +603,10 @@ function MomentsMarquee() {
               key={i}
               src={src}
               alt="A moment from a Kidventures class"
+              width={256}
+              height={160}
               loading="lazy"
+              decoding="async"
               className="h-36 w-56 shrink-0 rounded-2xl object-cover shadow-[0_2px_14px_rgba(61,43,31,0.10)] sm:h-40 sm:w-64"
             />
           ))}
