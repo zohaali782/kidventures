@@ -4,14 +4,8 @@ import { Helmet } from "react-helmet-async";
 import api from "../api/axios";
 import { toList } from "../api/normalize";
 import { logout } from "../api/auth";
+import { cldOptimize } from "../utils/img";
 
-/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
-   ka na ho, waisi hi wapas kar deta hai. */
-const cldOptimize = (url, width = 200) => {
-  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com"))
-    return url;
-  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
-};
 
 /* ------------------------------ icons ------------------------------ */
 const I = ({ children, size = 18, sw = 2 }) => (

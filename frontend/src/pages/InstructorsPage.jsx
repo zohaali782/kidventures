@@ -5,6 +5,7 @@ import axios from "../api/axios";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { BadgeRow } from "../components/BadgeMedal";
+import { cldOptimize } from "../utils/img";
 
 export default function InstructorsPage() {
   const [searchParams] = useSearchParams();
@@ -171,9 +172,11 @@ function InstructorAvatar({ name, avatar, initial }) {
   if (avatar && !failed) {
     return (
       <img
-        src={avatar}
+        src={cldOptimize(avatar, 200)}
         alt={name}
         onError={() => setFailed(true)}
+        loading="lazy"
+        decoding="async"
         className="w-20 h-20 rounded-full object-cover mb-4"
       />
     );

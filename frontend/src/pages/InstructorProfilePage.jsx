@@ -7,14 +7,8 @@ import { BadgeRow } from "../components/BadgeMedal";
 import api from "../api/axios";
 import { normActivity, toList } from "../api/normalize";
 import { isLoggedIn } from "../api/auth";
+import { cldOptimize } from "../utils/img";
 
-/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
-   ka na ho, waisi hi wapas kar deta hai. */
-const cldOptimize = (url, width = 400) => {
-  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com"))
-    return url;
-  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
-};
 
 /* ------------------------------------------------------------------ *
  * SINGLE ADJUSTMENT POINT

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getRecentlyViewed } from "../api/favorites";
+import { cldOptimize } from "../utils/img";
 
 export default function RecentlyViewed() {
   const [items, setItems] = useState([]);
@@ -29,9 +30,10 @@ export default function RecentlyViewed() {
             <div className="h-[110px] w-full bg-brand-cream">
               {a.image && (
                 <img
-                  src={a.image}
+                  src={cldOptimize(a.image, 400)}
                   alt={a.title}
                   loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               )}

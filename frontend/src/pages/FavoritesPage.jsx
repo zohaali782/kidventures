@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import FavoriteButton from "../components/FavoriteButton";
 import { getFavorites } from "../api/favorites";
+import { cldOptimize } from "../utils/img";
 
 function FavoritesPage() {
   const [items, setItems] = useState([]);
@@ -62,9 +63,10 @@ function FavoritesPage() {
                   <div className="relative h-[140px] w-full bg-brand-cream">
                     {a.image && (
                       <img
-                        src={a.image}
+                        src={cldOptimize(a.image, 500)}
                         alt={a.title}
                         loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                       />
                     )}

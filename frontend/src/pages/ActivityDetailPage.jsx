@@ -12,6 +12,7 @@ import api from "../api/axios";
 import { addRecentlyViewed } from "../api/favorites";
 import { getStoredUser } from "../api/auth";
 import FavoriteButton from "../components/FavoriteButton";
+import { cldOptimize } from "../utils/img";
 import {
   toList,
   normActivity,
@@ -63,12 +64,6 @@ const DUBAI_CENTER = { lat: 25.2048, lng: 55.2708 };
 const areaCoords = (area) => {
   if (!area) return null;
   return AREA_COORDS[String(area).trim().toLowerCase()] || DUBAI_CENTER;
-};
-/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
-   ka na ho, waisi hi wapas kar deta hai. */
-const cldOptimize = (url, width = 500) => {
-  if (!url || !url.includes("res.cloudinary.com")) return url;
-  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
 };
 const sameDay = (a, b) =>
   a &&

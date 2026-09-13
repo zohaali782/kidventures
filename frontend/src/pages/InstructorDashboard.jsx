@@ -15,6 +15,7 @@ import api from "../api/axios";
 import { toList } from "../api/normalize";
 import { logout } from "../api/auth";
 import InstructorVerification from "./InstructorVerification";
+import { cldOptimize } from "../utils/img";
 
 /* -------------------------------- icons -------------------------------- */
 const I = ({ children, size = 18, sw = 2 }) => (
@@ -383,8 +384,9 @@ export default function InstructorDashboard() {
       <div className="mb-3 flex items-center gap-3 border-b border-white/10 px-5 pb-4">
         {profile?.user?.avatar?.url ? (
           <img
-            src={profile.user.avatar.url}
+            src={cldOptimize(profile.user.avatar.url, 96)}
             alt=""
+            decoding="async"
             className="h-10 w-10 rounded-full object-cover"
           />
         ) : (

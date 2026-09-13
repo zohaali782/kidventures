@@ -10,17 +10,18 @@ import FavoriteButton from "../components/FavoriteButton";
 import RecentlyViewed from "../components/RecentlyViewed";
 import { BadgeRow } from "../components/BadgeMedal";
 import api from "../api/axios";
-import heroImg from "../assets/hero.jpg"; // hero image: src/assets/hero.jpg
+/* Hero ki chaar sizes. Browser `sizes` dekh kar apni screen ke hisab se
+   sirf EK file download karta hai - phone par ~19 KB (hero-sm) na ke
+   poori 500 KB wali original. Baqi teen kabhi download hi nahi hotin. */
+import heroSm from "../assets/hero-sm.jpg";
+import heroMd from "../assets/hero-md.jpg";
+import heroLg from "../assets/hero-lg.jpg";
+import heroXl from "../assets/hero-xl.jpg";
 import moment1 from "../assets/moment-1.jpg";
 import moment2 from "../assets/moment-2.jpg";
 import moment3 from "../assets/moment-3.jpg";
+import { cldOptimize } from "../utils/img";
 
-/* Cloudinary URL ko resize+auto-optimize karta hai. Agar URL Cloudinary
-   ka na ho (jaise koi purani/manual image), waisi hi wapas kar deta hai. */
-const cldOptimize = (url, width = 400) => {
-  if (!url || !url.includes("res.cloudinary.com")) return url;
-  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
-};
 
 /* ============================================================
    ICONS (sab SVG, koi emoji nahi) — ye frontend cheez hai, backend se nahi aati
@@ -667,10 +668,14 @@ function Homepage() {
       <section className="relative flex min-h-[440px] items-center px-4 py-8 sm:px-6 md:px-10">
         <div className="absolute inset-0 overflow-hidden">
           <img
-            src={heroImg}
+            src={heroMd}
+            srcSet={`${heroSm} 760w, ${heroMd} 1280w, ${heroLg} 1920w, ${heroXl} 2560w`}
+            sizes="100vw"
             alt="Children happily taking part in creative and educational activities"
             className="h-full w-full object-cover object-right-top [filter:saturate(1.15)_contrast(1.06)]"
             loading="eager"
+            fetchPriority="high"
+            decoding="async"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-cream/70 via-brand-cream/25 to-transparent md:bg-gradient-to-r md:from-brand-cream/90 md:via-brand-cream/35 md:via-55% md:to-transparent md:to-88%" />
         </div>

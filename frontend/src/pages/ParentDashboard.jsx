@@ -7,6 +7,7 @@ import api from "../api/axios";
 import { toList } from "../api/normalize";
 import { isLoggedIn, getStoredUser } from "../api/auth";
 import { getFavorites } from "../api/favorites";
+import { cldOptimize } from "../utils/img";
 
 /* ------------------------------ icons ------------------------------ */
 const I = ({ children, size = 18, sw = 2 }) => (
@@ -572,8 +573,10 @@ export default function ParentDashboard() {
                       <div className="h-28 bg-brand-cream">
                         {img ? (
                           <img
-                            src={img}
+                            src={cldOptimize(img, 400)}
                             alt=""
+                            loading="lazy"
+                            decoding="async"
                             className="h-full w-full object-cover"
                           />
                         ) : null}
@@ -893,8 +896,10 @@ function BookingList({
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-brand-cream">
                   {img ? (
                     <img
-                      src={img}
+                      src={cldOptimize(img, 160)}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   ) : null}

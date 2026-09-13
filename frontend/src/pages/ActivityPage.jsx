@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import FavoriteButton from "../components/FavoriteButton";
 import api from "../api/axios";
 import { toList, normActivity } from "../api/normalize";
+import { cldOptimize } from "../utils/img";
 
 /* ----------------------------- filter config ----------------------------- */
 const AGE_OPTIONS = ["", 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
@@ -69,10 +70,6 @@ const SearchIcon = () => (
   </svg>
 );
 
-const cldOptimize = (url, width = 400) => {
-  if (!url || !url.includes("res.cloudinary.com")) return url;
-  return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
-};
 const PinIcon = () => (
   <svg
     width="13"
@@ -114,9 +111,10 @@ function ActivityCard({ a }) {
         <div className="relative h-[140px] w-full bg-brand-cream">
           {a.image && (
             <img
-              src={a.image}
+              src={cldOptimize(a.image, 500)}
               alt={a.title}
               loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
           )}
