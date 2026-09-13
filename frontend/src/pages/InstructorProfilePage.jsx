@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import BadgeMedal from "../components/BadgeMedal";
+import { BadgeRow } from "../components/BadgeMedal";
 import api from "../api/axios";
 import { normActivity, toList } from "../api/normalize";
 import { isLoggedIn } from "../api/auth";
@@ -532,19 +532,14 @@ export default function InstructorProfilePage() {
               profile.badges?.popular ||
               profile.badges?.bronze ||
               profile.badges?.admin) && (
-              <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                {profile.badges.founding && (
-                  <BadgeMedal type="founding" size={34} />
-                )}
-                {profile.badges.popular && (
-                  <BadgeMedal type="popular" size={34} />
-                )}
-                {profile.badges.bronze && (
-                  <BadgeMedal type="bronze" size={34} />
-                )}
-                {profile.badges.admin && (
-                  <BadgeMedal type="admin" size={34} />
-                )}
+              <div className="mb-2.5 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                {/* profile par poore naam wale chips, taake parent ko saaf
+                    dikhe ke ye instructor kis wajah se numaya hai */}
+                <BadgeRow
+                  badges={profile.badges}
+                  size="md"
+                  className="justify-center sm:justify-start"
+                />
                 <Link
                   to="/badges"
                   className="text-xs font-semibold text-brand-orange underline"

@@ -58,26 +58,34 @@ export default function BadgesInfoPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-16">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-28 sm:grid-cols-2">
           {BADGE_ORDER.map((type) => {
             const meta = BADGE_META[type];
             const details = BADGE_DETAILS[type];
             return (
               <div
                 key={type}
-                className="relative overflow-visible rounded-2xl bg-white pt-20 pb-6 px-6 shadow-md flex flex-col items-center text-center"
+                className="relative flex flex-col items-center overflow-visible rounded-2xl bg-white px-6 pb-6 pt-24 text-center shadow-md"
               >
                 {/* Medal hangs off the top edge of the card, like a real
-                    award ribbon pinned to it. */}
-                <div className="absolute -top-[50px] left-1/2 -translate-x-1/2">
-                  <BadgeMedal type={type} size={88} showLabel />
+                    award ribbon pinned to it. Yahan asli photoreal medal
+                    hi chalta hai kyunke jagah kaafi hai, aur 1x/2x/3x
+                    srcset ki wajah se har screen par sharp aata hai. */}
+                <div className="absolute -top-[86px] left-1/2 -translate-x-1/2">
+                  <BadgeMedal type={type} variant="medal" width={96} />
                 </div>
 
-                <h2 className="font-bold text-brand-brown text-lg">
+                <h2 className="text-lg font-bold text-brand-brown">
                   {meta.label}
                 </h2>
-                <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                <div className="mt-2 flex justify-center">
+                  <BadgeMedal type={type} size="md" />
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-gray-600">
                   {meta.blurb}
+                </p>
+                <p className="mt-1.5 text-xs text-gray-400">
+                  This is how the badge appears on an instructor's profile.
                 </p>
                 <div className="mt-4 w-full rounded-xl bg-brand-cream/60 p-4 text-left">
                   <div className="text-xs font-bold uppercase tracking-wide text-brand-orange mb-1">
