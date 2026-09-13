@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Review = require("../models/Review");
 const Activity = require("../models/Activity");
 const Booking = require("../models/Booking");
+const InstructorProfile = require("../models/InstructorProfile");
 
 /** String ko ObjectId banata hai — ghalat ho to null */
 const toObjectId = (value) => {
@@ -44,6 +45,60 @@ const recomputeActivityRating = async (activityIdInput) => {
 
   await Activity.updateOne(
     { _id: activityId },
+    { $set: { "rating.average": average, "rating.count": count } },
+  );
+};
+
+/**
+ * InstructorProfile ki rating.average aur rating.count recompute karta hai,
+ * us instructor ki SAARI classes ke saare reviews mila kar.
+ *
+ * BUGFIX: ye function pehle tha hi nahi. Reviews sirf Activity.rating
+ * update karti thin, aur InstructorProfile.rating hamesha {0, 0} par
+ * baitha rehta tha. Do cheezein toot rahi thin:
+ *   1. instructor cards/profile par hamesha "★ 0 (0)" dikhta tha
+ *   2. "Highly Rated" badge (utils/badges.js me rating >= 4.5 aur
+ *      reviews >= 5 maangta hai) kabhi trigger hi nahi ho sakta tha
+ *
+ * Note: Activity.instructor User ka reference hai (InstructorProfile ka
+ * nahi), aur InstructorProfile us User se `user` field par judta hai.
+ */
+const recomputeInstructorRating = async (instructorUserIdInput) => {
+  const instructorUserId = toObjectId(instructorUserIdInput);
+  if (!instructorUserId) return;
+
+  // Pehle is instructor ki saari classes ki ids, phir un par reviews.
+  // ($lookup ke bajaye do chhoti queries - dono indexed hain aur padhne
+  // me saaf hai.)
+  const activities = await Activity.find({ instructor: instructorUserId })
+    .select("_id")
+    .lean();
+
+  const activityIds = activities.map((a) => a._id);
+
+  let average = 0;
+  let count = 0;
+
+  if (activityIds.length > 0) {
+    const stats = await Review.aggregate([
+      { $match: { activity: { $in: activityIds } } },
+      {
+        $group: {
+          _id: null,
+          average: { $avg: "$rating" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    if (stats[0]) {
+      average = Math.round(stats[0].average * 10) / 10;
+      count = stats[0].count;
+    }
+  }
+
+  await InstructorProfile.updateOne(
+    { user: instructorUserId },
     { $set: { "rating.average": average, "rating.count": count } },
   );
 };
@@ -190,6 +245,9 @@ const createReview = async (req, res, next) => {
     }
 
     await recomputeActivityRating(activityId);
+    // class ki rating ke sath instructor ki overall rating bhi refresh,
+    // warna "Highly Rated" badge ka data kabhi update nahi hota
+    await recomputeInstructorRating(activityDoc.instructor);
 
     const populated = await review.populate("user", "name avatar");
 
@@ -199,4 +257,10 @@ const createReview = async (req, res, next) => {
   }
 };
 
-module.exports = { getReviews, createReview };
+module.exports = {
+  getReviews,
+  createReview,
+  // backfill script (backfill-ratings.js) isay dobara use karti hai
+  recomputeActivityRating,
+  recomputeInstructorRating,
+};
