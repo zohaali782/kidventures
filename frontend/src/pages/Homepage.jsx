@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import DatePicker from "react-datepicker";
@@ -19,7 +19,7 @@ import heroLg from "../assets/hero-lg.jpg";
 import heroXl from "../assets/hero-xl.jpg";
 /* Moments band ki tasveerein. File ka number hi marquee me unki tarteeb
    hai, aur wo tarteeb jaan boojh kar shuffle ki hui hai (neeche dekhein).
-   Sab pehle se 520x325 par crop aur compress hain, yani card ke asli
+   Sab pehle se 480x300 par crop aur compress hain, yani card ke asli
    size ka 2x, is liye browser ko kuch resize nahi karna paRta. */
 import moment01 from "../assets/moment-01.jpg";
 import moment02 from "../assets/moment-02.jpg";
@@ -589,7 +589,61 @@ const galleryImages = [
   moment12, // mandala colouring
 ];
 
+/**
+ * Marquee ki raftaar. Ye seconds PER PHOTO hain, poori strip ke nahi.
+ *
+ * Pehle poori strip ka waqt fix tha, jis ka matlab ye tha ke jitni
+ * photos baRhao utna loop tez ho jata tha (13 se 22 hone par wo khud hi
+ * tez ho gaya tha). Ab duration photos ki ginti se calculate hoti hai,
+ * to raftaar hamesha wahi rehti hai chahe photos kitni bhi ho jayen.
+ *
+ * Number baRhayen to dheema, ghatayen to tez.
+ */
+const SECONDS_PER_PHOTO_MOBILE = 2.2;
+const SECONDS_PER_PHOTO_DESKTOP = 2.4;
+
+/** 640px se chhoti screen? (Tailwind ka sm breakpoint) */
+function useIsPhone() {
+  const query = "(max-width: 639px)";
+  const [isPhone, setIsPhone] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = (e) => setIsPhone(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  return isPhone;
+}
+
 function MomentsMarquee() {
+  const isPhone = useIsPhone();
+
+  /**
+   * Phone par aadhi photos: sirf project ke andar wali (moment-01 se
+   * moment-11), Cloudinary wali chhoR deta hai.
+   *
+   * Wajah: mobile data par 22 tasveerein utaarna bhari paRta hai. Ye
+   * gyara site ke apne bundle se aati hain (na koi alag server, na DNS,
+   * na TLS handshake) aur pehle se card ke size par compressed hain, to
+   * band bohat jaldi bhar jata hai. Inka order bhi wahi shuffled order
+   * hai, yani phone par bhi ek jaisi do photos sath nahi aayengi.
+   *
+   * Array me tarteeb ek nai, ek purani hai, is liye har doosri (even
+   * index wali) hamesha nai wali hi nikalti hai.
+   */
+  const images = useMemo(
+    () => (isPhone ? galleryImages.filter((_, i) => i % 2 === 0) : galleryImages),
+    [isPhone],
+  );
+
+  const secondsPerPhoto = isPhone
+    ? SECONDS_PER_PHOTO_MOBILE
+    : SECONDS_PER_PHOTO_DESKTOP;
+
   return (
     <section className="overflow-hidden bg-brand-cream/40 py-8">
       <p className="mb-4 text-center text-xs font-semibold tracking-[0.15em] text-brand-brown/60">
@@ -597,8 +651,13 @@ function MomentsMarquee() {
       </p>
       <div className="group relative flex overflow-hidden">
         {/* strip do baar (duplicate) taake loop seamless rahe */}
-        <div className="flex w-max animate-[kvmarquee_16s_linear_infinite] gap-4 pr-4 group-hover:[animation-play-state:paused] motion-reduce:animate-none sm:animate-[kvmarquee_28s_linear_infinite]">
-          {[...galleryImages, ...galleryImages].map((src, i) => (
+        <div
+          className="kv-marquee flex w-max gap-4 pr-4 group-hover:[animation-play-state:paused]"
+          style={{
+            animationDuration: `${(images.length * secondsPerPhoto).toFixed(1)}s`,
+          }}
+        >
+          {[...images, ...images].map((src, i) => (
             <img
               key={i}
               src={src}
@@ -607,12 +666,28 @@ function MomentsMarquee() {
               height={160}
               loading="lazy"
               decoding="async"
+              fetchPriority="low"
               className="h-36 w-56 shrink-0 rounded-2xl object-cover shadow-[0_2px_14px_rgba(61,43,31,0.10)] sm:h-40 sm:w-64"
             />
           ))}
         </div>
       </div>
-      <style>{`@keyframes kvmarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+      <style>{`
+        @keyframes kvmarquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .kv-marquee {
+          animation-name: kvmarquee;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        /* jin logon ne phone/laptop me "reduce motion" on kiya hua hai,
+           unke liye band rukka rehta hai */
+        @media (prefers-reduced-motion: reduce) {
+          .kv-marquee { animation: none; }
+        }
+      `}</style>
     </section>
   );
 }
