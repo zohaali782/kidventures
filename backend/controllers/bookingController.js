@@ -24,12 +24,16 @@ const RESERVATION_MINUTES = 15;
  *
  * Body: { activityId, sessionId, childIds: [], parentNotes }
  *
- * NOTE: qeemat body se NAHI aati. Frontend chahe kuch bhi bheje,
- * server hamesha database se asli price uthata hai.
+ * NOTE: qeemat body se NAHI aati - sirf ek istisna hai: agar class par
+ * flexiblePricing.enabled hai to instructor ne khud parent ko amount
+ * choose karne diya hai, us soorat me body ka "customAmount" liya jata
+ * hai (neeche validate hone ke baad). Warna hamesha database se, activity
+ * ki asli price uthai jati hai - frontend chahe kuch bhi bheje.
  */
 const createBooking = async (req, res, next) => {
   try {
-    const { activityId, sessionId, childIds, parentNotes } = req.body;
+    const { activityId, sessionId, childIds, parentNotes, customAmount } =
+      req.body;
 
     if (
       !activityId ||
@@ -78,6 +82,42 @@ const createBooking = async (req, res, next) => {
       return res
         .status(400)
         .json({ success: false, message: "This session has already passed" });
+    }
+
+    /**
+     * FLEXIBLE PRICING: agar instructor ne apni class par ye on kar rakha
+     * hai, to fixed activity.price ke bajaye parent jo amount bheje wahi
+     * per-child price banti hai - lekin seat reserve hone se PEHLE hi
+     * validate karna zaroori hai (warna invalid amount par bhi seat
+     * atomically reserve ho chuki hogi aur wapas release karni parti).
+     */
+    let pricePerChild = activity.price;
+    if (activity.flexiblePricing?.enabled) {
+      const amount = Number(customAmount);
+      const minAmount = Number(activity.flexiblePricing.minAmount) || 0;
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid amount",
+        });
+      }
+      if (amount < minAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Please enter an amount of at least AED ${minAmount} per child`,
+        });
+      }
+      // Sanity cap - typo/abuse se bachao, suggested price se bahut zyada
+      // upar ki koi wajah nahi honi chahiye.
+      const sanityCap = Math.max(activity.price, minAmount, 1) * 20 + 5000;
+      if (amount > sanityCap) {
+        return res.status(400).json({
+          success: false,
+          message: "That amount looks too high, please double-check it",
+        });
+      }
+      pricePerChild = amount;
     }
 
     /* ------------------------- 2. Children check ------------------------- */
@@ -203,7 +243,6 @@ const createBooking = async (req, res, next) => {
      * NOTE: yahan jaan boojh kar decimal round nahi kiya - jo bhi asli
      * number bane wohi rakha jata hai (koi Math.round nahi).
      */
-    const pricePerChild = activity.price;
     const subtotalBeforeDiscount = pricePerChild * numberOfChildren;
     const commissionPercent = getCommissionPercent();
     const commissionAmount = subtotalBeforeDiscount * (commissionPercent / 100);

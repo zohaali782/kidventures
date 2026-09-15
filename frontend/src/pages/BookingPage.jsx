@@ -285,6 +285,9 @@ export default function BookingPage() {
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [selectedChildIds, setSelectedChildIds] = useState([]);
   const [stepError, setStepError] = useState("");
+  // Flexible pricing - jab instructor ne "let parents choose their own
+  // amount" on kar rakha ho, ye per-child amount parent khud type karta hai.
+  const [customAmount, setCustomAmount] = useState("");
 
   const [booking, setBooking] = useState(null);
   const [clientSecret, setClientSecret] = useState("");
@@ -315,6 +318,15 @@ export default function BookingPage() {
       alive = false;
     };
   }, [id]);
+
+  // Flexible pricing wali class ho to suggested amount ko starting point
+  // ke tor par pre-fill kar dete hain, parent chahe to badal sakta hai.
+  useEffect(() => {
+    if (activity?.flexiblePricing?.enabled && activity.price) {
+      setCustomAmount((v) => v || String(activity.price));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activity]);
 
   useEffect(() => {
     if (!user || user.role !== "parent") {
@@ -438,8 +450,14 @@ export default function BookingPage() {
     selectedChildIds.includes(c._id || c.id),
   );
 
+  const isFlexiblePricing = !!a.flexiblePricing?.enabled;
+  const flexibleMinAmount = Number(a.flexiblePricing?.minAmount) || 0;
+  const effectivePricePerChild = isFlexiblePricing
+    ? Number(customAmount) || 0
+    : a.price;
+
   const pricing = estimatePricing(
-    a.price,
+    effectivePricePerChild,
     selectedChildIds.length,
     a.siblingDiscount,
   );
@@ -474,12 +492,26 @@ export default function BookingPage() {
 
   const handleReserve = async () => {
     setStepError("");
+
+    if (isFlexiblePricing) {
+      const amt = Number(customAmount);
+      if (!Number.isFinite(amt) || amt <= 0) {
+        setStepError("Please enter an amount.");
+        return;
+      }
+      if (amt < flexibleMinAmount) {
+        setStepError(`Please enter an amount of at least AED ${flexibleMinAmount} per child.`);
+        return;
+      }
+    }
+
     setReserving(true);
     try {
       const { data } = await api.post("/bookings", {
         activityId,
         sessionId: selectedSessionId,
         childIds: selectedChildIds,
+        ...(isFlexiblePricing ? { customAmount: Number(customAmount) } : {}),
       });
       setBooking(data.booking);
 
@@ -589,7 +621,9 @@ export default function BookingPage() {
                 {a.ageMax}
               </div>
             </div>
-            <div className="font-bold text-brand-orange">AED {a.price}</div>
+            <div className="font-bold text-brand-orange">
+              {isFlexiblePricing ? "Pay what you like" : `AED ${a.price}`}
+            </div>
           </div>
         )}
 
@@ -759,10 +793,33 @@ export default function BookingPage() {
                     .join(", ")}
                 />
               </div>
+
+              {isFlexiblePricing && (
+                <div className="mb-4 rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
+                  <label className="mb-1.5 block text-[13px] font-semibold">
+                    Choose your amount per child (AED)
+                  </label>
+                  <input
+                    type="number"
+                    min={flexibleMinAmount || 0}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-brand-orange"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    placeholder={a.price ? String(a.price) : "0"}
+                  />
+                  <p className="mt-1.5 text-[11px] opacity-60">
+                    {flexibleMinAmount > 0
+                      ? `Minimum AED ${flexibleMinAmount} per child. `
+                      : ""}
+                    Suggested amount: AED {a.price}.
+                  </p>
+                </div>
+              )}
+
               {selectedChildren.length > 1 && (
                 <div className="mb-1.5 flex justify-between text-xs opacity-70">
                   <span>
-                    AED {a.price} × {selectedChildren.length} children
+                    AED {effectivePricePerChild} × {selectedChildren.length} children
                   </span>
                   <span>AED {estimatedSubtotal}</span>
                 </div>

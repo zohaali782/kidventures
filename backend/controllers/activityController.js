@@ -279,6 +279,7 @@ const EDITABLE_FIELDS = [
   "whatToBring",
   "cancellationPolicy",
   "siblingDiscount",
+  "flexiblePricing",
 ];
 
 /**
@@ -308,6 +309,18 @@ function sanitizeSiblingDiscount(input) {
   if (!Number.isFinite(percent) || percent < 0) percent = 0;
   if (percent > 50) percent = 50;
   return { enabled, percent: enabled ? Math.round(percent) : 0 };
+}
+
+/**
+ * Flexible/pay-what-you-can pricing bhi instructor apni marzi se on/off
+ * karta hai - is liye body se aane wali value ko trust nahi karte, hamesha
+ * yahan clean/clamp karte hain (minAmount kabhi negative nahi, off hone par 0).
+ */
+function sanitizeFlexiblePricing(input) {
+  const enabled = !!input?.enabled;
+  let minAmount = Number(input?.minAmount);
+  if (!Number.isFinite(minAmount) || minAmount < 0) minAmount = 0;
+  return { enabled, minAmount: enabled ? minAmount : 0 };
 }
 
 /**
@@ -341,6 +354,10 @@ const createActivity = async (req, res, next) => {
 
     if (data.siblingDiscount !== undefined) {
       data.siblingDiscount = sanitizeSiblingDiscount(data.siblingDiscount);
+    }
+
+    if (data.flexiblePricing !== undefined) {
+      data.flexiblePricing = sanitizeFlexiblePricing(data.flexiblePricing);
     }
 
     // "Other" case: koi official category nahi, sirf free-text suggestion.
@@ -469,6 +486,12 @@ const updateActivity = async (req, res, next) => {
       );
     }
 
+    if (req.body.flexiblePricing !== undefined) {
+      req.body.flexiblePricing = sanitizeFlexiblePricing(
+        req.body.flexiblePricing,
+      );
+    }
+
     const REVIEW_TRIGGERING_FIELDS = [
       "title",
       "description",
@@ -483,6 +506,7 @@ const updateActivity = async (req, res, next) => {
       "format",
       "location",
       "capacity",
+      "flexiblePricing",
     ];
 
     const changedFields = [];

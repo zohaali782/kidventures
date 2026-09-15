@@ -934,9 +934,17 @@ function ActivityDetailPage() {
         <div className="min-w-0 flex-1 lg:max-w-[340px]">
           <div className="mb-4 rounded-2xl bg-white p-5 shadow-[0_2px_20px_rgba(61,43,31,0.12)]">
             <div className="text-2xl font-bold text-brand-brown">
-              {price !== "" ? `AED ${price}` : "—"}
+              {a.flexiblePricing?.enabled
+                ? `From AED ${price}`
+                : price !== ""
+                  ? `AED ${price}`
+                  : "—"}
             </div>
-            <div className="text-xs text-brand-brown/60">per child</div>
+            <div className="text-xs text-brand-brown/60">
+              {a.flexiblePricing?.enabled
+                ? "per child · pay what you like"
+                : "per child"}
+            </div>
             {siblingDiscountPercent && (
               <div className="mt-2 inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
                 {siblingDiscountPercent}% off when you book 2+ children together

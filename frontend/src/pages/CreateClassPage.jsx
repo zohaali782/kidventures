@@ -111,6 +111,8 @@ export default function CreateClassPage() {
     whatToBring: "",
     siblingDiscountEnabled: false,
     siblingDiscountPercent: "10",
+    flexiblePricingEnabled: false,
+    flexiblePricingMin: "",
   });
   const [learnList, setLearnList] = useState([""]);
   const [faqList, setFaqList] = useState([{ question: "", answer: "" }]);
@@ -242,6 +244,12 @@ export default function CreateClassPage() {
         e.siblingDiscount = "Enter a discount between 1% and 50%";
       }
     }
+    if (form.flexiblePricingEnabled && form.flexiblePricingMin) {
+      const min = Number(form.flexiblePricingMin);
+      if (!Number.isFinite(min) || min < 0) {
+        e.flexiblePricing = "Enter a valid minimum amount";
+      }
+    }
     const validSessions = sessions.filter((s) => s.date && s.startTime);
     if (validSessions.length === 0)
       e.sessions = "Add at least one date and time";
@@ -309,6 +317,12 @@ export default function CreateClassPage() {
         enabled: form.siblingDiscountEnabled,
         percent: form.siblingDiscountEnabled
           ? Number(form.siblingDiscountPercent) || 0
+          : 0,
+      },
+      flexiblePricing: {
+        enabled: form.flexiblePricingEnabled,
+        minAmount: form.flexiblePricingEnabled
+          ? Number(form.flexiblePricingMin) || 0
           : 0,
       },
       status, // "pending" = submit for approval, "draft" = save for later
@@ -557,7 +571,11 @@ export default function CreateClassPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="mb-1.5 flex items-center gap-1.5">
-                <label className={labelCls}>Price per child (AED)</label>
+                <label className={labelCls}>
+                  {form.flexiblePricingEnabled
+                    ? "Suggested amount per child (AED)"
+                    : "Price per child (AED)"}
+                </label>
                 <button
                   type="button"
                   onClick={() => setShowFeeInfo(true)}
@@ -633,6 +651,42 @@ export default function CreateClassPage() {
             {errors.siblingDiscount && (
               <div className="mt-1 text-xs text-red-600">
                 {errors.siblingDiscount}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={form.flexiblePricingEnabled}
+                onChange={(e) => set("flexiblePricingEnabled", e.target.checked)}
+                className="h-4 w-4 accent-brand-orange"
+              />
+              Let parents choose their own amount
+            </label>
+            <p className="mt-1 text-xs opacity-60">
+              Instead of a fixed price, parents can type in whatever amount
+              they want to pay per child at checkout. The amount above becomes
+              just a suggestion shown to them. Useful for donation-based or
+              pay-what-you-can classes.
+            </p>
+            {form.flexiblePricingEnabled && (
+              <div className="mt-3 max-w-[220px]">
+                <label className={labelCls}>Minimum amount (AED, optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  value={form.flexiblePricingMin}
+                  onChange={(e) => set("flexiblePricingMin", e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            )}
+            {errors.flexiblePricing && (
+              <div className="mt-1 text-xs text-red-600">
+                {errors.flexiblePricing}
               </div>
             )}
           </div>

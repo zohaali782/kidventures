@@ -112,6 +112,17 @@ const activitySchema = new mongoose.Schema(
       enabled: { type: Boolean, default: false },
       percent: { type: Number, min: 0, max: 50, default: 0 },
     },
+    /**
+     * Flexible/pay-what-you-can pricing - instructor apni class par ye on
+     * kar sake to `price` field sirf ek "suggested" amount reh jata hai,
+     * aur booking ke waqt parent khud apni marzi ka amount likh sakta hai
+     * (kam se kam `minAmount`, agar set ho). bookingController.js me
+     * asal validation hoti hai.
+     */
+    flexiblePricing: {
+      enabled: { type: Boolean, default: false },
+      minAmount: { type: Number, min: 0, default: 0 },
+    },
     durationMinutes: { type: Number, required: true, min: 15 },
     format: {
       type: String,
@@ -240,6 +251,11 @@ activitySchema.pre("save", function () {
   // Sibling discount off hai to percent bhi clean rakho (0).
   if (this.siblingDiscount && !this.siblingDiscount.enabled) {
     this.siblingDiscount.percent = 0;
+  }
+
+  // Flexible pricing off hai to minAmount bhi clean rakho (0).
+  if (this.flexiblePricing && !this.flexiblePricing.enabled) {
+    this.flexiblePricing.minAmount = 0;
   }
 });
 
