@@ -396,6 +396,24 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [pickCategoryFor, setPickCategoryFor] = useState(null); // activity
   const [pickedCategory, setPickedCategory] = useState("");
+  // Charity fundraiser mode - admin-only, set per class from the class
+  // view modal below (view+edit form, synced whenever viewClass changes).
+  const [fundraiserForm, setFundraiserForm] = useState({
+    enabled: false,
+    link: "",
+    whatsapp: "",
+  });
+  const [savingFundraiser, setSavingFundraiser] = useState(false);
+
+  useEffect(() => {
+    if (viewClass) {
+      setFundraiserForm({
+        enabled: !!viewClass.fundraiser?.enabled,
+        link: viewClass.fundraiser?.link || "",
+        whatsapp: viewClass.fundraiser?.whatsapp || "",
+      });
+    }
+  }, [viewClass]);
 
   const loadClasses = useCallback(async () => {
     setClassesLoading(true);
@@ -462,6 +480,33 @@ export default function AdminDashboard() {
       flash(data.message);
     } catch (err) {
       flash(err?.response?.data?.message || "Couldn't assign category.");
+    }
+  };
+
+  const saveFundraiser = async () => {
+    if (!viewClass) return;
+    if (
+      fundraiserForm.enabled &&
+      (!fundraiserForm.link.trim() || !fundraiserForm.whatsapp.trim())
+    ) {
+      flash("Fundraiser link and WhatsApp number are both required.");
+      return;
+    }
+    setSavingFundraiser(true);
+    try {
+      const { data } = await api.put(
+        `/admin/activities/${viewClass._id}/fundraiser`,
+        fundraiserForm,
+      );
+      setClasses((cs) =>
+        cs.map((c) => (c._id === viewClass._id ? data.activity : c)),
+      );
+      setViewClass(data.activity);
+      flash(data.message);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't update fundraiser mode.");
+    } finally {
+      setSavingFundraiser(false);
     }
   };
 
@@ -1669,6 +1714,76 @@ export default function AdminDashboard() {
                 <b>{viewClass.status}</b>
               </div>
             </div>
+
+            <div className="mb-5 rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={fundraiserForm.enabled}
+                  onChange={(e) =>
+                    setFundraiserForm((f) => ({
+                      ...f,
+                      enabled: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 accent-brand-orange"
+                />
+                Charity fundraiser mode
+              </label>
+              <p className="mt-1 text-xs opacity-60">
+                Only for this class. When on, parents see a "donate via
+                link" button instead of the normal checkout, plus a
+                WhatsApp button to send their payment screenshot for
+                manual verification. No seat auto-reservation, no
+                commission.
+              </p>
+              {fundraiserForm.enabled && (
+                <div className="mt-3 flex flex-col gap-2.5">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold opacity-70">
+                      Fundraiser link
+                    </label>
+                    <input
+                      type="text"
+                      value={fundraiserForm.link}
+                      onChange={(e) =>
+                        setFundraiserForm((f) => ({
+                          ...f,
+                          link: e.target.value,
+                        }))
+                      }
+                      placeholder="https://..."
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-orange"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold opacity-70">
+                      WhatsApp number (with country code)
+                    </label>
+                    <input
+                      type="text"
+                      value={fundraiserForm.whatsapp}
+                      onChange={(e) =>
+                        setFundraiserForm((f) => ({
+                          ...f,
+                          whatsapp: e.target.value,
+                        }))
+                      }
+                      placeholder="+9715xxxxxxxx"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-orange"
+                    />
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={saveFundraiser}
+                disabled={savingFundraiser}
+                className="mt-3 rounded-lg bg-brand-orange px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {savingFundraiser ? "Saving…" : "Save fundraiser setting"}
+              </button>
+            </div>
+
             <div className="flex justify-end gap-2.5">
               {viewClass.status === "pending" ? (
                 <button

@@ -461,6 +461,66 @@ const resolveCategorySuggestion = async (req, res, next) => {
 };
 
 /**
+ * @desc    Class ko "charity fundraiser" mode me daalna / nikalna
+ * @route   PUT /api/admin/activities/:id/fundraiser
+ * @access  Admin
+ * Body: { enabled, link, whatsapp }
+ *
+ * NAYA — sirf EK khaas instructor ki class ke liye. Jab ye on ho, to
+ * frontend par normal Stripe checkout ki jagah "donate via link +
+ * WhatsApp verify" flow dikhta hai - seat auto-reserve nahi hoti, na
+ * commission lagta hai (parent externally donate karta hai, phir
+ * WhatsApp par screenshot bhej ke seat manually confirm hoti hai).
+ * Instructor apne Create/Edit Class form se ye khud set nahi kar
+ * sakta - sirf admin yahan se, is route se.
+ */
+const setFundraiser = async (req, res, next) => {
+  try {
+    const { enabled, link, whatsapp } = req.body;
+
+    const activity = await Activity.findById(req.params.id);
+
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    if (enabled) {
+      const cleanLink = (link || "").trim();
+      const cleanWhatsapp = (whatsapp || "").trim();
+
+      if (!cleanLink || !cleanWhatsapp) {
+        return res.status(400).json({
+          success: false,
+          message: "Fundraiser link and WhatsApp number are both required",
+        });
+      }
+
+      activity.fundraiser = {
+        enabled: true,
+        link: cleanLink,
+        whatsapp: cleanWhatsapp,
+      };
+    } else {
+      activity.fundraiser = { enabled: false, link: "", whatsapp: "" };
+    }
+
+    await activity.save();
+
+    res.json({
+      success: true,
+      message: activity.fundraiser.enabled
+        ? "Fundraiser mode turned on for this class"
+        : "Fundraiser mode turned off",
+      activity,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    User block / unblock karna
  * @route   PUT /api/admin/users/:id/block
  * @access  Admin
@@ -777,6 +837,7 @@ module.exports = {
   toggleSuspendActivity,
   removeActivity,
   resolveCategorySuggestion,
+  setFundraiser,
   toggleBlockUser,
   getAdminStats,
   getAllUsers,

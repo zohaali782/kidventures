@@ -435,6 +435,34 @@ export default function BookingPage() {
     );
   }
 
+  // Charity fundraiser classes don't go through normal checkout - parents
+  // donate via the instructor's fundraiser link and verify on WhatsApp
+  // instead (see ActivityDetailPage.jsx). Send anyone who lands here
+  // directly (e.g. an old bookmarked link) back to the class page.
+  if (activity.fundraiser?.enabled) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] font-sans text-brand-brown">
+        <Navbar />
+        <div className="px-4 py-20 text-center">
+          <h2 className="mb-2 text-lg font-bold">
+            This class isn't booked here
+          </h2>
+          <p className="mx-auto mb-4 max-w-[420px] text-sm opacity-70">
+            This is a charity fundraiser class. Please use the donate link
+            and WhatsApp verification on the class page instead.
+          </p>
+          <Link
+            to={`/activities/${activity._id || activity.id}`}
+            className="font-bold text-brand-orange no-underline"
+          >
+            Go to class page
+          </Link>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   const a = activity;
   const activityId = a._id || a.id;
   const cover = pickImg(a.images?.[0]);

@@ -69,6 +69,18 @@ const createBooking = async (req, res, next) => {
       });
     }
 
+    // Charity fundraiser classes don't go through normal checkout - parent
+    // donates via the instructor's fundraiser link and verifies on
+    // WhatsApp instead, so this endpoint must never reserve a seat for
+    // one (defense in depth - frontend already hides/blocks this too).
+    if (activity.fundraiser?.enabled) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This class is booked through its fundraiser link, not here",
+      });
+    }
+
     const session = activity.sessions.id(sessionId);
 
     if (!session || session.status !== "scheduled") {

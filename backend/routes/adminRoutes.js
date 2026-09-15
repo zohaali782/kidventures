@@ -13,6 +13,7 @@ const {
   toggleSuspendActivity,
   removeActivity,
   resolveCategorySuggestion,
+  setFundraiser,
   toggleBlockUser,
   getAdminStats,
   getAllUsers,
@@ -49,6 +50,7 @@ router.get("/activities", getAllActivities);
 router.put("/activities/:id/approve", approveActivity);
 router.put("/activities/:id/suspend", toggleSuspendActivity);
 router.put("/activities/:id/resolve-category", resolveCategorySuggestion);
+router.put("/activities/:id/fundraiser", setFundraiser);
 router.delete("/activities/:id", removeActivity);
 
 /* --------------------------------- Users --------------------------------- */

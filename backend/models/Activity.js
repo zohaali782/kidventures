@@ -123,6 +123,19 @@ const activitySchema = new mongoose.Schema(
       enabled: { type: Boolean, default: false },
       minAmount: { type: Number, min: 0, default: 0 },
     },
+    /**
+     * Charity fundraiser mode - ADMIN-ONLY (instructor apne Create/Edit
+     * Class form se ye khud set nahi kar sakta). Jab ek khaas instructor
+     * ki class ke liye admin ye on kar de, to normal Stripe checkout ki
+     * jagah frontend par ek "donate via link + WhatsApp verify" flow
+     * dikhta hai - koi seat auto-reserve nahi hoti, na hi commission
+     * lagta hai, sab manual coordination WhatsApp par hoti hai.
+     */
+    fundraiser: {
+      enabled: { type: Boolean, default: false },
+      link: { type: String, trim: true, default: "" },
+      whatsapp: { type: String, trim: true, default: "" },
+    },
     durationMinutes: { type: Number, required: true, min: 15 },
     format: {
       type: String,
@@ -256,6 +269,12 @@ activitySchema.pre("save", function () {
   // Flexible pricing off hai to minAmount bhi clean rakho (0).
   if (this.flexiblePricing && !this.flexiblePricing.enabled) {
     this.flexiblePricing.minAmount = 0;
+  }
+
+  // Fundraiser off hai to link/whatsapp bhi clean rakho.
+  if (this.fundraiser && !this.fundraiser.enabled) {
+    this.fundraiser.link = "";
+    this.fundraiser.whatsapp = "";
   }
 });
 

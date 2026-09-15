@@ -150,6 +150,21 @@ const LockIcon = () => (
     <path d="M8 11V7a4 4 0 0 1 8 0v4" />
   </svg>
 );
+const WhatsappIcon = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-4.6A8.5 8.5 0 1 1 20.5 11.5Z" />
+    <path d="M8.5 10c.3 1.8 2.2 3.7 4 4 .6.1 1 0 1.3-.4l.5-.7c.2-.3.2-.7 0-1L13 10.6" />
+  </svg>
+);
 const ShareIcon = () => (
   <svg
     width="16"
@@ -933,19 +948,33 @@ function ActivityDetailPage() {
         {/* RIGHT — booking card */}
         <div className="min-w-0 flex-1 lg:max-w-[340px]">
           <div className="mb-4 rounded-2xl bg-white p-5 shadow-[0_2px_20px_rgba(61,43,31,0.12)]">
-            <div className="text-2xl font-bold text-brand-brown">
-              {a.flexiblePricing?.enabled
-                ? `From AED ${price}`
-                : price !== ""
-                  ? `AED ${price}`
-                  : "—"}
-            </div>
-            <div className="text-xs text-brand-brown/60">
-              {a.flexiblePricing?.enabled
-                ? "per child · pay what you like"
-                : "per child"}
-            </div>
-            {siblingDiscountPercent && (
+            {a.fundraiser?.enabled ? (
+              <>
+                <div className="mb-1 inline-block rounded-full bg-brand-orange/10 px-3 py-1 text-xs font-bold text-brand-orange">
+                  Charity fundraiser class
+                </div>
+                <div className="text-sm text-brand-brown/70">
+                  All proceeds support this instructor's fundraiser — pay
+                  directly through their link, then verify on WhatsApp.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-brand-brown">
+                  {a.flexiblePricing?.enabled
+                    ? `From AED ${price}`
+                    : price !== ""
+                      ? `AED ${price}`
+                      : "—"}
+                </div>
+                <div className="text-xs text-brand-brown/60">
+                  {a.flexiblePricing?.enabled
+                    ? "per child · pay what you like"
+                    : "per child"}
+                </div>
+              </>
+            )}
+            {!a.fundraiser?.enabled && siblingDiscountPercent && (
               <div className="mt-2 inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
                 {siblingDiscountPercent}% off when you book 2+ children together
               </div>
@@ -1031,24 +1060,60 @@ function ActivityDetailPage() {
               </>
             )}
 
-            <Link
-              to={`/book/${a._id || a.id}`}
-              state={{
-                sessionDate: selectedDate,
-                sessionTime: selectedTime,
-                count,
-              }}
-              className={`block rounded-[10px] py-3 text-center text-sm font-bold text-white no-underline ${
-                dates.length === 0
-                  ? "pointer-events-none bg-gray-300"
-                  : "bg-brand-sky"
-              }`}
-            >
-              Book Now
-            </Link>
-            <div className="mt-2.5 flex items-center justify-center gap-1 text-[11px] text-brand-brown/55">
-              <LockIcon /> Secure payment
-            </div>
+            {a.fundraiser?.enabled ? (
+              <>
+                <a
+                  href={a.fundraiser.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-[10px] bg-brand-orange py-3 text-center text-sm font-bold text-white no-underline"
+                >
+                  Donate & Reserve Your Spot
+                </a>
+                <a
+                  href={`https://wa.me/${(a.fundraiser.whatsapp || "").replace(
+                    /[^\d]/g,
+                    "",
+                  )}?text=${encodeURIComponent(
+                    `Hi! I'd like to book ${count} spot(s) for "${a.title}"${
+                      selectedDate ? ` on ${fmtDate(selectedDate)}` : ""
+                    }${
+                      selectedTime ? ` at ${selectedTime}` : ""
+                    }. I've made my fundraiser payment and I'm attaching the screenshot.`,
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2.5 flex items-center justify-center gap-1.5 rounded-[10px] border border-[#25D366] py-3 text-center text-sm font-bold text-[#25D366] no-underline"
+                >
+                  <WhatsappIcon /> Verify payment on WhatsApp
+                </a>
+                <div className="mt-2.5 text-center text-[11px] text-brand-brown/55">
+                  Seats for this class are coordinated manually with the
+                  instructor.
+                </div>
+              </>
+            ) : (
+              <>
+                <Link
+                  to={`/book/${a._id || a.id}`}
+                  state={{
+                    sessionDate: selectedDate,
+                    sessionTime: selectedTime,
+                    count,
+                  }}
+                  className={`block rounded-[10px] py-3 text-center text-sm font-bold text-white no-underline ${
+                    dates.length === 0
+                      ? "pointer-events-none bg-gray-300"
+                      : "bg-brand-sky"
+                  }`}
+                >
+                  Book Now
+                </Link>
+                <div className="mt-2.5 flex items-center justify-center gap-1 text-[11px] text-brand-brown/55">
+                  <LockIcon /> Secure payment
+                </div>
+              </>
+            )}
           </div>
 
           {/* Instructor card */}
