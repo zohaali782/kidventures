@@ -45,6 +45,13 @@ const IcBell = (p) => (
     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </I>
 );
+const IcBulb = (p) => (
+  <I {...p}>
+    <path d="M15 14c.2-1 .7-1.7 1.5-2.5C17.7 10.2 18 9.2 18 8A6 6 0 0 0 6 8c0 1 .3 2.2 1.5 3.5.7.8 1.3 1.5 1.5 2.5" />
+    <path d="M9 18h6" />
+    <path d="M10 22h4" />
+  </I>
+);
 
 const inputCls =
   "w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-brand-orange";
@@ -347,8 +354,8 @@ export default function RequestClassPage() {
           </button>
         </div>
 
-        <div className="mt-4.5 flex items-start gap-2 text-xs leading-relaxed opacity-65">
-          <IcAlert size={15} className="mt-0.5 shrink-0 text-brand-orange" />
+        <div className="mt-4.5 flex items-start justify-center gap-2 text-xs leading-relaxed opacity-65">
+          <IcBulb size={15} className="mt-0.5 shrink-0 text-brand-orange" />
           <span>
             Requests help us grow based on what families actually want, rather
             than guessing. The more requests for a class, the sooner we bring an
