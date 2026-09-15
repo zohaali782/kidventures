@@ -305,7 +305,7 @@ export default function RequestClassPage() {
           <div className="mb-4.5">
             <label className={labelCls}>Anything specific? (optional)</label>
             <textarea
-              className={`${inputCls} min-h-[85px] resize-y`}
+              className={`${inputCls} min-h-[85px] resize-none`}
               value={form.note}
               onChange={(e) => set("note", e.target.value)}
               placeholder="e.g. weekend mornings would suit us best, or my daughter is a complete beginner"
