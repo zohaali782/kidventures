@@ -18,8 +18,8 @@ const I = ({ children, size = 20, sw = 2 }) => (
 );
 const IcMail = (p) => (
   <I {...p}>
-    <path d="M4 4h16v16H4z" />
-    <path d="m22 6-10 7L2 6" />
+    <rect x="3" y="5" width="18" height="14" rx="4" />
+    <path d="m4 7.5 7.11 5.55a1.6 1.6 0 0 0 1.78 0L20 7.5" />
   </I>
 );
 const IcPhone = (p) => (
