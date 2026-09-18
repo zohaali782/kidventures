@@ -116,7 +116,12 @@ export default function CreateClassPage() {
   });
   const [learnList, setLearnList] = useState([""]);
   const [faqList, setFaqList] = useState([{ question: "", answer: "" }]);
-  const [sessions, setSessions] = useState([{ date: "", startTime: "" }]);
+  // Start time defaults to a real value (not empty) - native <input
+  // type="time"> browsers leave the AM/PM segment as an unset placeholder
+  // when the field starts empty and only the hour/minute get typed, which
+  // makes the browser report the WHOLE value as "" even though it visually
+  // shows a time. Starting from a complete value avoids that trap.
+  const [sessions, setSessions] = useState([{ date: "", startTime: "10:00" }]);
 
   /* images: [{ file, previewUrl, status: "pending"|"uploading"|"done"|"error" }] */
   const [images, setImages] = useState([]);
@@ -176,7 +181,7 @@ export default function CreateClassPage() {
       s.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)),
     );
   const addSession = () =>
-    setSessions((s) => [...s, { date: "", startTime: "" }]);
+    setSessions((s) => [...s, { date: "", startTime: "10:00" }]);
   const removeSession = (i) =>
     setSessions((s) => s.filter((_, idx) => idx !== i));
 
@@ -252,7 +257,8 @@ export default function CreateClassPage() {
     }
     const validSessions = sessions.filter((s) => s.date && s.startTime);
     if (validSessions.length === 0)
-      e.sessions = "Add at least one date and time";
+      e.sessions =
+        "Add at least one date and time. If you already filled it in, double check the time field, click into it and make sure AM/PM is also set, not just the hour and minutes.";
     return e;
   };
 
