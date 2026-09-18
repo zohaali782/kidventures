@@ -729,7 +729,7 @@ function Homepage() {
         api.get("/activities", {
           params: { isFeatured: true, status: "active", limit: 4 },
         }),
-        api.get("/instructors", { params: { limit: 4, sort: "-rating" } }),
+        api.get("/instructors", { params: { limit: 8, sort: "-rating" } }),
       ]);
 
       if (catRes.status === "fulfilled")
@@ -738,7 +738,7 @@ function Homepage() {
         setFeatured(toList(actRes.value.data).map(normActivity).slice(0, 4));
       if (insRes.status === "fulfilled")
         setTopInstructors(
-          toList(insRes.value.data).map(normInstructor).slice(0, 4),
+          toList(insRes.value.data).map(normInstructor).slice(0, 8),
         );
 
       if ([catRes, actRes, insRes].every((r) => r.status === "rejected"))
@@ -1035,7 +1035,7 @@ function Homepage() {
         <SectionHeader title="Meet Our Top Instructors" link="/instructors" />
         {loading ? (
           <div className="flex flex-wrap gap-5">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <CardSkeleton
                 key={i}
                 className="h-[220px] w-full bg-white sm:w-[calc(50%-10px)] lg:w-[220px]"
