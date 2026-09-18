@@ -359,7 +359,7 @@ const toggleSuspendActivity = async (req, res, next) => {
     const suspending = activity.status !== "suspended";
     activity.status = suspending ? "suspended" : "active";
     activity.statusNote = suspending
-      ? req.body.reason?.trim() || "Suspended by admin"
+      ? req.body?.reason?.trim() || "Suspended by admin"
       : undefined;
 
     await activity.save();
