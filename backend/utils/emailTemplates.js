@@ -7,8 +7,14 @@ const BRAND = {
 
 // CLIENT_URL ab CORS ke liye comma-separated list ho sakta hai — links ke
 // liye sirf pehla URL lete hain (dekhein authController.js ka APP_URL).
+//
+// ZAROORI: CLIENT_URL ko FRONTEND_URL se PEHLE check karte hain (authController.js
+// aur instructorController.js ki tarah). Agar dono set hon (jaise FRONTEND_URL
+// purana vercel.app URL ho aur CLIENT_URL me custom domain pehle se list ho),
+// to alag order lene se emails me galat domain chala jata tha - CLIENT_URL ko
+// hamesha priority dena is mismatch ko rokta hai.
 const APP = () =>
-  (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:5173")
+  (process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173")
     .split(",")[0]
     .trim();
 
