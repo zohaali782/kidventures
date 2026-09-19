@@ -160,7 +160,15 @@ function ActivityCard({ a }) {
             </div>
           )}
           <div className="mt-2 text-sm font-bold text-brand-brown">
-            {a.price !== "" ? `AED ${a.price}` : ""}
+            {a.flexiblePricing?.enabled && !a.price ? (
+              <span className="inline-block rounded-full bg-brand-orange/10 px-2 py-0.5 text-[10px] font-bold text-brand-orange">
+                Delegate pricing
+              </span>
+            ) : a.price !== "" ? (
+              `AED ${a.price}`
+            ) : (
+              ""
+            )}
           </div>
         </div>
       </Link>

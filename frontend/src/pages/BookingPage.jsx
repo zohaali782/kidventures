@@ -839,7 +839,9 @@ export default function BookingPage() {
                     {flexibleMinAmount > 0
                       ? `Minimum AED ${flexibleMinAmount} per child. `
                       : ""}
-                    Suggested amount: AED {a.price}.
+                    {a.price
+                      ? `Suggested amount: AED ${a.price}.`
+                      : "No suggested amount — it's entirely your choice."}
                   </p>
                 </div>
               )}

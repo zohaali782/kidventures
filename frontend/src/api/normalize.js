@@ -94,6 +94,13 @@ export const normActivity = (a) => {
     // schema me hai hi nahi; agar kabhi add ho jata to dikhne wali aur
     // charge hone wali price alag ho jatin.)
     price: a.price ?? "",
+    // Instructor ne "parents choose their own amount" on kiya ho to yahan
+    // milta hai - agar minAmount 0 hai to koi bhi amount suggest nahi karna,
+    // sirf "Delegate pricing" dikhana hai (listing/cards is flag ko check
+    // karte hain).
+    flexiblePricing: a.flexiblePricing?.enabled
+      ? { enabled: true, minAmount: Number(a.flexiblePricing.minAmount) || 0 }
+      : null,
     rating: asNum(a.rating?.average ?? a.rating),
     reviews: asNum(a.rating?.count ?? a.reviews ?? a.reviewCount),
     image: pickImg(a.images?.[0], a.coverImage, a.image),

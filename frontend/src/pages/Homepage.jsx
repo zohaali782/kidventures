@@ -1009,7 +1009,17 @@ function Homepage() {
                       </div>
                     )}
                     <div className="mt-1.5 flex justify-between text-[13px] font-bold text-brand-brown">
-                      <span>{a.price !== "" ? `AED ${a.price}` : ""}</span>
+                      <span>
+                        {a.flexiblePricing?.enabled && !a.price ? (
+                          <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 text-[10px] font-bold text-brand-orange">
+                            Delegate pricing
+                          </span>
+                        ) : a.price !== "" ? (
+                          `AED ${a.price}`
+                        ) : (
+                          ""
+                        )}
+                      </span>
                       <span className="text-brand-gold">
                         ★ {a.rating} ({a.reviews})
                       </span>

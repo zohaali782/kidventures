@@ -1119,7 +1119,10 @@ export default function AdminDashboard() {
                         <div className="text-sm font-bold">{c.title}</div>
                         <div className="text-xs opacity-60">
                           {c.category?.name || c.suggestedCategory || "—"} · by{" "}
-                          {c.instructor?.name || "—"} · AED {c.price}
+                          {c.instructor?.name || "—"} ·{" "}
+                          {c.flexiblePricing?.enabled && !c.price
+                            ? "Delegate pricing"
+                            : `AED ${c.price}`}
                         </div>
                       </div>
                       <StatusPill status={c.status} />
@@ -1707,7 +1710,11 @@ export default function AdminDashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="opacity-60">Price</span>
-                <b>AED {viewClass.price}</b>
+                <b>
+                  {viewClass.flexiblePricing?.enabled && !viewClass.price
+                    ? "Delegate pricing (parent's choice)"
+                    : `AED ${viewClass.price}`}
+                </b>
               </div>
               <div className="flex justify-between">
                 <span className="opacity-60">Status</span>

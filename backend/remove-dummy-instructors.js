@@ -40,11 +40,11 @@ const DUMMY_EMAILS = [
   "syed.dayan.ali.786@gmail.com",
   "zohaa134@gmail.com",
   "jawadsarkar1725@gmail.com",
-  "yusuf.zyd@gmail.com",
   "ibakersdozenstore@gmail.com",
   "sarwatfatima073@gmail.com",
   "zoha07871@gmail.com",
   "maheenali5959@gmail.com",
+  "zohaali7182@gmail.com",
 ];
 
 const run = async () => {

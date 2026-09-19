@@ -433,10 +433,20 @@ export default function MyClassesPage() {
                       <div className="text-[10px] opacity-60">sessions</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-base font-bold text-brand-orange">
-                        AED {c.price}
-                      </div>
-                      <div className="text-[10px] opacity-60">per child</div>
+                      {c.flexiblePricing?.enabled && !c.price ? (
+                        <span className="inline-block rounded-full bg-brand-orange/10 px-2.5 py-1 text-[10px] font-bold text-brand-orange">
+                          Delegate pricing
+                        </span>
+                      ) : (
+                        <>
+                          <div className="text-base font-bold text-brand-orange">
+                            AED {c.price}
+                          </div>
+                          <div className="text-[10px] opacity-60">
+                            per child
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* actions */}

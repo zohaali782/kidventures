@@ -958,6 +958,16 @@ function ActivityDetailPage() {
                   directly through their link, then verify on WhatsApp.
                 </div>
               </>
+            ) : a.flexiblePricing?.enabled && !price ? (
+              <>
+                <div className="mb-1 inline-block rounded-full bg-brand-orange/10 px-3 py-1 text-xs font-bold text-brand-orange">
+                  Delegate pricing
+                </div>
+                <div className="text-sm text-brand-brown/70">
+                  No fixed price — you choose the amount per child at
+                  checkout.
+                </div>
+              </>
             ) : (
               <>
                 <div className="text-2xl font-bold text-brand-brown">

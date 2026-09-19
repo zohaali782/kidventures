@@ -791,8 +791,14 @@ export default function InstructorProfilePage() {
                                   ? `Ages ${a.ageGroup}`
                                   : ""}
                             </span>
-                            {price != null && (
-                              <span className="font-bold">AED {price}</span>
+                            {a.flexiblePricing?.enabled && !price ? (
+                              <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 text-[10px] font-bold text-brand-orange">
+                                Delegate pricing
+                              </span>
+                            ) : (
+                              price != null && (
+                                <span className="font-bold">AED {price}</span>
+                              )
                             )}
                           </div>
                         </div>
