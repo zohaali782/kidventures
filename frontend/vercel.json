@@ -1,5 +1,16 @@
 {
   "rewrites": [
+    {
+      "source": "/activity/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|WhatsApp|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|Pinterest|redditbot|Googlebot|bingbot|SkypeUriPreview|Applebot|vkShare|AppleWebKit.*Preview).*"
+        }
+      ],
+      "destination": "/api/share-preview?id=:id"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
