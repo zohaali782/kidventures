@@ -14,6 +14,13 @@ const cldOptimize = (url, width = 150) => {
   return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
 };
 
+/* Phone number ko WhatsApp chat link me badalta hai (sirf digits rakhta
+   hai - "+", spaces, dashes waghera nikal deta hai, jo wa.me chahta hai). */
+const waLink = (phone) => {
+  const digits = String(phone || "").replace(/\D/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
+};
+
 /* -------------------------------- icons -------------------------------- */
 const I = ({ children, size = 18, sw = 2 }) => (
   <svg
@@ -131,6 +138,17 @@ const IcMenu = (p) => (
     <line x1="3" y1="6" x2="21" y2="6" />
     <line x1="3" y1="12" x2="21" y2="12" />
     <line x1="3" y1="18" x2="21" y2="18" />
+  </I>
+);
+const IcMail = (p) => (
+  <I {...p}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="m22 6-10 7L2 6" />
+  </I>
+);
+const IcWhatsapp = (p) => (
+  <I {...p}>
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
   </I>
 );
 
@@ -926,8 +944,27 @@ export default function AdminDashboard() {
                               p.headline ||
                               ""}
                           </div>
-                          <div className="mt-0.5 text-xs opacity-60">
-                            {p.user?.email} · {p.user?.phone}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                            {p.user?.email && (
+                              <a
+                                href={`mailto:${p.user.email}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 font-semibold text-brand-sky hover:underline"
+                              >
+                                <IcMail size={12} /> {p.user.email}
+                              </a>
+                            )}
+                            {p.user?.phone && (
+                              <a
+                                href={waLink(p.user.phone)}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 font-semibold text-green-600 hover:underline"
+                              >
+                                <IcWhatsapp size={12} /> {p.user.phone}
+                              </a>
+                            )}
                           </div>
                           {p.bio && (
                             <p className="mt-2 line-clamp-2 text-xs leading-relaxed opacity-80">
@@ -1579,11 +1616,31 @@ export default function AdminDashboard() {
                 <div className="mb-4 space-y-1.5 text-[13px]">
                   <div className="flex justify-between border-b border-gray-100 py-2">
                     <span className="opacity-60">Email</span>
-                    <b>{viewingDetail.user?.email}</b>
+                    {viewingDetail.user?.email ? (
+                      <a
+                        href={`mailto:${viewingDetail.user.email}`}
+                        className="flex items-center gap-1 font-bold text-brand-sky hover:underline"
+                      >
+                        <IcMail size={13} /> {viewingDetail.user.email}
+                      </a>
+                    ) : (
+                      <b>—</b>
+                    )}
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
                     <span className="opacity-60">Phone</span>
-                    <b>{viewingDetail.user?.phone}</b>
+                    {viewingDetail.user?.phone ? (
+                      <a
+                        href={waLink(viewingDetail.user.phone)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 font-bold text-green-600 hover:underline"
+                      >
+                        <IcWhatsapp size={13} /> {viewingDetail.user.phone}
+                      </a>
+                    ) : (
+                      <b>—</b>
+                    )}
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
                     <span className="opacity-60">Categories</span>
@@ -1831,11 +1888,31 @@ export default function AdminDashboard() {
             <div className="mb-5 space-y-2 text-[13px]">
               <div className="flex justify-between">
                 <span className="opacity-60">Email</span>
-                <b>{viewUser.email}</b>
+                {viewUser.email ? (
+                  <a
+                    href={`mailto:${viewUser.email}`}
+                    className="flex items-center gap-1 font-bold text-brand-sky hover:underline"
+                  >
+                    <IcMail size={13} /> {viewUser.email}
+                  </a>
+                ) : (
+                  <b>—</b>
+                )}
               </div>
               <div className="flex justify-between">
                 <span className="opacity-60">Phone</span>
-                <b>{viewUser.phone || "—"}</b>
+                {viewUser.phone ? (
+                  <a
+                    href={waLink(viewUser.phone)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 font-bold text-green-600 hover:underline"
+                  >
+                    <IcWhatsapp size={13} /> {viewUser.phone}
+                  </a>
+                ) : (
+                  <b>—</b>
+                )}
               </div>
               <div className="flex justify-between">
                 <span className="opacity-60">Role</span>
