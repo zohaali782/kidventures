@@ -37,7 +37,12 @@ const esc = (s = "") =>
 const truncate = (s = "", n) =>
   s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
 
-module.exports = async (req, res) => {
+// ESM export - frontend/package.json has "type": "module", so Vercel loads
+// this file as an ES Module. `module.exports = ...` throws
+// "module is not defined" in that mode and crashes the function outright
+// (500 FUNCTION_INVOCATION_FAILED) before any of the try/catch below ever
+// runs - `export default` is the correct form here.
+export default async function handler(req, res) {
   const id = typeof req.query.id === "string" ? req.query.id : "";
   const pageUrl = `https://kidventures.ae/activity/${id}`;
 
@@ -96,4 +101,4 @@ module.exports = async (req, res) => {
     <p>Redirecting to <a href="${esc(pageUrl)}">${esc(title)}</a>…</p>
   </body>
 </html>`);
-};
+}
