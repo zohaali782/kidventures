@@ -11,6 +11,23 @@ const inputCls = (bad) =>
     bad ? "border-[#c0392b]" : "border-gray-200"
   }`;
 
+// Phone ke sath hamesha poora country code save karne ke liye - taake baad
+// mein (admin dashboard ke WhatsApp links waghera mein) number kabhi
+// ambiguous na ho. UAE default hai, baaqi common mulk list mein hain.
+const COUNTRY_CODES = [
+  { code: "+971", flag: "🇦🇪", label: "UAE" },
+  { code: "+92", flag: "🇵🇰", label: "Pakistan" },
+  { code: "+91", flag: "🇮🇳", label: "India" },
+  { code: "+966", flag: "🇸🇦", label: "Saudi Arabia" },
+  { code: "+973", flag: "🇧🇭", label: "Bahrain" },
+  { code: "+965", flag: "🇰🇼", label: "Kuwait" },
+  { code: "+974", flag: "🇶🇦", label: "Qatar" },
+  { code: "+968", flag: "🇴🇲", label: "Oman" },
+  { code: "+20", flag: "🇪🇬", label: "Egypt" },
+  { code: "+44", flag: "🇬🇧", label: "UK" },
+  { code: "+1", flag: "🇺🇸", label: "USA/Canada" },
+];
+
 function Field({ label, children, error }) {
   return (
     <div className="mb-4">
@@ -26,6 +43,7 @@ function Field({ label, children, error }) {
 function SignupPage() {
   const navigate = useNavigate();
   const [role, setRole] = useState("parent"); // parent | instructor
+  const [countryCode, setCountryCode] = useState("+971");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -66,11 +84,15 @@ function SignupPage() {
 
     setLoading(true);
     try {
+      // Local number ke shuru ka "0" (agar user ne likha ho, jese
+      // "0501234567") hata kar country code ke sath jorte hain - taake
+      // phone hamesha ek hi, poora format (+971501234567) mein save ho.
+      const localDigits = form.phone.replace(/\D/g, "").replace(/^0+/, "");
       const res = await api.post("/auth/signup", {
         role,
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: `${countryCode}${localDigits}`,
         password: form.password,
       });
       // Agar verification email gayi hai to abhi login nahi hua —
@@ -179,12 +201,26 @@ function SignupPage() {
           </Field>
 
           <Field label="Phone number" error={errors.phone}>
-            <input
-              className={inputCls(errors.phone)}
-              value={form.phone}
-              onChange={(e) => set("phone", e.target.value)}
-              placeholder="+971 ..."
-            />
+            <div className="flex gap-2">
+              <select
+                value={countryCode}
+                onChange={(e) => setCountryCode(e.target.value)}
+                className="w-[104px] shrink-0 rounded-[10px] border border-gray-200 bg-white px-2 py-3 text-sm text-brand-brown outline-none focus:border-brand-orange"
+              >
+                {COUNTRY_CODES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.flag} {c.code}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                className={inputCls(errors.phone)}
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                placeholder="50 123 4567"
+              />
+            </div>
           </Field>
 
           <Field label="Password" error={errors.password}>
