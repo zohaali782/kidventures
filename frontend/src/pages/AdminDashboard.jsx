@@ -1834,6 +1834,10 @@ export default function AdminDashboard() {
                 <b>{viewUser.email}</b>
               </div>
               <div className="flex justify-between">
+                <span className="opacity-60">Phone</span>
+                <b>{viewUser.phone || "—"}</b>
+              </div>
+              <div className="flex justify-between">
                 <span className="opacity-60">Role</span>
                 <b>{viewUser.role}</b>
               </div>
