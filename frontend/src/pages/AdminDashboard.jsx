@@ -14,11 +14,20 @@ const cldOptimize = (url, width = 150) => {
   return url.replace("/upload/", `/upload/w_${width},q_auto,f_auto/`);
 };
 
-/* Phone number ko WhatsApp chat link me badalta hai (sirf digits rakhta
-   hai - "+", spaces, dashes waghera nikal deta hai, jo wa.me chahta hai). */
+/* Phone number ko WhatsApp chat link me badalta hai.
+   wa.me ko poora country code chahiye, koi leading 0 nahi. Humare
+   instructors/parents UAE local format me save hote hain (0501234567),
+   is liye us "0" ko 971 se replace karte hain. Agar number pehle se
+   country code ke sath hai (+971... ya 00971...) to usay chhera nahi. */
 const waLink = (phone) => {
-  const digits = String(phone || "").replace(/\D/g, "");
-  return digits ? `https://wa.me/${digits}` : "";
+  let digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2); // 00971... -> 971...
+  } else if (digits.startsWith("0")) {
+    digits = "971" + digits.slice(1); // 0501234567 -> 971501234567
+  }
+  return `https://wa.me/${digits}`;
 };
 
 /* -------------------------------- icons -------------------------------- */
