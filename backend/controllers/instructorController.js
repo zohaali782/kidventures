@@ -385,12 +385,74 @@ const startConnectOnboarding = async (req, res, next) => {
     // A fresh onboarding link is generated on every call — Stripe's links
     // expire quickly, and the same link type also handles re-onboarding.
     const base = process.env.CLIENT_URL || "http://localhost:5173";
-    const accountLink = await stripe.accountLinks.create({
-      account: profile.stripeConnect.accountId,
-      refresh_url: `${base}/instructor/dashboard?connect=refresh`,
-      return_url: `${base}/instructor/dashboard?connect=return`,
-      type: "account_onboarding",
-    });
+    let accountLink;
+    try {
+      accountLink = await stripe.accountLinks.create({
+        account: profile.stripeConnect.accountId,
+        refresh_url: `${base}/instructor/dashboard?connect=refresh`,
+        return_url: `${base}/instructor/dashboard?connect=return`,
+        type: "account_onboarding",
+      });
+    } catch (linkError) {
+      /**
+       * SELF-HEALING: TEST -> LIVE key migration ke waqt jin instructors
+       * ne pehle (test mode me) onboarding shuru ki thi, unka accountId
+       * database me abhi bhi save hai - lekin woh test-mode account ab
+       * LIVE Stripe account me exist hi nahi karta. Stripe isay
+       * "resource_missing" / "account_invalid" bol kar reject karta hai
+       * ("account link for an account that is not connected to your
+       * platform or does not exist").
+       *
+       * Aise stale accountId ko chupa kar fail hone dene ke bajaye, hum
+       * usay hata kar ek naya (asal LIVE) Express account bana dete hain
+       * - taake instructor ko sirf dobara "Set Up Payouts" dabana pare,
+       * koi manual database fix na karna pare.
+       */
+      const isStaleAccount =
+        linkError?.code === "resource_missing" ||
+        linkError?.code === "account_invalid" ||
+        linkError?.param === "account" ||
+        /not connected to your platform|does not exist/i.test(
+          linkError?.message || "",
+        );
+
+      if (!isStaleAccount) throw linkError;
+
+      console.warn(
+        `! Stale Stripe Connect accountId for instructor ${req.user._id} (${profile.stripeConnect.accountId}) - recreating.`,
+      );
+
+      const freshAccount = await stripe.accounts.create({
+        type: "express",
+        country: "AE",
+        email: req.user.email,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        settings: {
+          payouts: {
+            schedule: { interval: "weekly", weekly_anchor: "monday" },
+          },
+        },
+        metadata: { instructorUserId: req.user._id.toString() },
+      });
+
+      profile.stripeConnect = {
+        accountId: freshAccount.id,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false,
+        onboardingStartedAt: new Date(),
+      };
+      await profile.save();
+
+      accountLink = await stripe.accountLinks.create({
+        account: freshAccount.id,
+        refresh_url: `${base}/instructor/dashboard?connect=refresh`,
+        return_url: `${base}/instructor/dashboard?connect=return`,
+        type: "account_onboarding",
+      });
+    }
 
     res.json({ success: true, url: accountLink.url });
   } catch (error) {
