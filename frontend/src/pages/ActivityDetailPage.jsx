@@ -245,6 +245,9 @@ function ActivityDetailPage() {
   const [selectedTime, setSelectedTime] = useState("");
   const [count, setCount] = useState(1);
   const [copied, setCopied] = useState(false);
+  // Gallery lightbox - kaunsi image (images array ka index) bari dikha rahe
+  // hain. null matlab lightbox band hai.
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const [reviewList, setReviewList] = useState([]);
   const [myRating, setMyRating] = useState(0);
   const [myComment, setMyComment] = useState("");
@@ -571,7 +574,12 @@ function ActivityDetailPage() {
         <div className="min-w-0 flex-[2]">
           {/* Gallery */}
           <div className="mb-6 flex gap-3">
-            <div className="relative flex h-[240px] flex-[2] items-center justify-center overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px]">
+            <div
+              className={`relative flex h-[240px] flex-[2] items-center justify-center overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px] ${
+                cover ? "cursor-pointer" : ""
+              }`}
+              onClick={() => cover && setLightboxIndex(0)}
+            >
               {cover ? (
                 <img
                   src={cldOptimize(cover, 700)}
@@ -609,7 +617,8 @@ function ActivityDetailPage() {
                     key={i}
                     src={cldOptimize(src, 200)}
                     alt={`${a.title} ${i + 2}`}
-                    className="h-full w-full flex-1 rounded-xl object-cover"
+                    className="h-full w-full flex-1 cursor-pointer rounded-xl object-cover"
+                    onClick={() => setLightboxIndex(i + 1)}
                   />
                 ))}
               </div>
@@ -1219,6 +1228,61 @@ function ActivityDetailPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Gallery lightbox - cover/thumbnail par click karne se poori
+          image bari hoke yahan khulti hai */}
+      {lightboxIndex !== null && images[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-2xl leading-none text-white"
+          >
+            ×
+          </button>
+
+          {images.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIndex(
+                  (lightboxIndex - 1 + images.length) % images.length,
+                );
+              }}
+              aria-label="Previous image"
+              className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-2xl text-white sm:left-5"
+            >
+              ‹
+            </button>
+          )}
+
+          <img
+            src={cldOptimize(images[lightboxIndex], 1400)}
+            alt={`${a.title} ${lightboxIndex + 1}`}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+          />
+
+          {images.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIndex((lightboxIndex + 1) % images.length);
+              }}
+              aria-label="Next image"
+              className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-2xl text-white sm:right-5"
+            >
+              ›
+            </button>
+          )}
+        </div>
       )}
 
       <Footer />
