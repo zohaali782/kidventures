@@ -445,18 +445,37 @@ const onChargeRefunded = async (charge) => {
     booking.status = "refunded";
 
     // Seat wapas chhor do — sirf tab jab booking pehle cancel na hui ho
-    // (cancel ke waqt seat pehle hi chhori ja chuki hoti hai)
+    // (cancel ke waqt seat pehle hi chhori ja chuki hoti hai). Bundle
+    // booking ho to uski HAR session ki seat release honi chahiye.
+    const sessionIdsToRelease =
+      booking.bundleSessions && booking.bundleSessions.length > 0
+        ? booking.bundleSessions.map((s) => s.sessionId)
+        : [booking.sessionId];
+
+    const refundArrayFilters = sessionIdsToRelease.map((id, i) => ({
+      [`s${i}._id`]: id,
+    }));
+    const refundIncFields = Object.fromEntries(
+      sessionIdsToRelease.map((id, i) => [
+        `sessions.$[s${i}].seatsBooked`,
+        -booking.numberOfChildren,
+      ]),
+    );
+
     const seatResult = await Activity.updateOne(
       {
         _id: booking.activity,
-        sessions: {
-          $elemMatch: {
-            _id: booking.sessionId,
-            seatsBooked: { $gte: booking.numberOfChildren },
+        $and: sessionIdsToRelease.map((id) => ({
+          sessions: {
+            $elemMatch: {
+              _id: id,
+              seatsBooked: { $gte: booking.numberOfChildren },
+            },
           },
-        },
+        })),
       },
-      { $inc: { "sessions.$.seatsBooked": -booking.numberOfChildren } },
+      { $inc: refundIncFields },
+      { arrayFilters: refundArrayFilters },
     ).catch((err) => {
       console.error(
         `! Seat release error on webhook refund — ${booking.bookingNumber}: ${err.message}`,
@@ -687,18 +706,37 @@ const refundPayment = async (req, res, next) => {
     if (fullRefund && booking.status !== "cancelled") {
       booking.status = "refunded";
 
-      // Seats wapas chhod do
+      // Seats wapas chhod do — bundle booking ho to uski HAR session ki
+      // seat release honi chahiye, na ke sirf primary sessionId ki.
+      const sessionIdsToRelease =
+        booking.bundleSessions && booking.bundleSessions.length > 0
+          ? booking.bundleSessions.map((s) => s.sessionId)
+          : [booking.sessionId];
+
+      const refundArrayFilters = sessionIdsToRelease.map((id, i) => ({
+        [`s${i}._id`]: id,
+      }));
+      const refundIncFields = Object.fromEntries(
+        sessionIdsToRelease.map((id, i) => [
+          `sessions.$[s${i}].seatsBooked`,
+          -booking.numberOfChildren,
+        ]),
+      );
+
       const seatResult = await Activity.updateOne(
         {
           _id: booking.activity,
-          sessions: {
-            $elemMatch: {
-              _id: booking.sessionId,
-              seatsBooked: { $gte: booking.numberOfChildren },
+          $and: sessionIdsToRelease.map((id) => ({
+            sessions: {
+              $elemMatch: {
+                _id: id,
+                seatsBooked: { $gte: booking.numberOfChildren },
+              },
             },
-          },
+          })),
         },
-        { $inc: { "sessions.$.seatsBooked": -booking.numberOfChildren } },
+        { $inc: refundIncFields },
+        { arrayFilters: refundArrayFilters },
       ).catch((err) => {
         console.error(
           `! Seat release error on refund — booking ${booking.bookingNumber}: ${err.message}`,
@@ -711,7 +749,7 @@ const refundPayment = async (req, res, next) => {
       if (seatResult && seatResult.modifiedCount === 0) {
         console.error(
           `! Seat release failed on refund — booking ${booking.bookingNumber}, ` +
-            `activity ${booking.activity}, session ${booking.sessionId}`,
+            `activity ${booking.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
         );
       }
     }

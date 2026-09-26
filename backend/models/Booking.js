@@ -32,10 +32,33 @@ const bookingSchema = new mongoose.Schema(
     },
 
     /* ------------------------------ Session ------------------------------- */
+    // Normal (single-session) booking ke liye ye teeno hamesha bharay
+    // jate hain. Bundle booking ke liye bhi bharay jate hain - sessionId/
+    // sessionDate/startTime/endTime us bundle ki PEHLI (earliest) session
+    // ki hoti hai, taake purana code (sorting, reminders, receipts) jo
+    // in fields ko directly padhta hai, bundle bookings ke sath bhi chale.
     sessionId: { type: mongoose.Schema.Types.ObjectId, required: true },
     sessionDate: { type: Date, required: true, index: true },
     startTime: String,
     endTime: String,
+
+    /**
+     * Multi-day bundle booking (dekho Activity.bundles). Jab set ho, to
+     * `bundleSessions` me un SAB sessions ka snapshot hota hai jo is
+     * bundle me shamil hain (sessionId wali bhi dobara, taake seat
+     * reserve/release aur attendee list dono me poora bundle handle ho
+     * sake). Normal single-session booking ke liye ye khali rehta hai.
+     */
+    bundleId: { type: mongoose.Schema.Types.ObjectId },
+    bundleTitle: String,
+    bundleSessions: [
+      {
+        sessionId: mongoose.Schema.Types.ObjectId,
+        date: Date,
+        startTime: String,
+        endTime: String,
+      },
+    ],
 
     // Class ka naam bhi snapshot - listing me har baar populate na karna pare
     activityTitle: String,

@@ -283,6 +283,10 @@ export default function BookingPage() {
 
   const [step, setStep] = useState(1); // 1 session, 2 child, 3 review, 4 pay, 5 done
   const [selectedSessionId, setSelectedSessionId] = useState("");
+  // Multi-day bundle chuna ho to selectedSessionId khali rehta hai (aur
+  // vice versa) - dono mutually exclusive hain, ek waqt me sirf ek hi
+  // cheez book ho sakti hai.
+  const [selectedBundleId, setSelectedBundleId] = useState("");
   const [selectedChildIds, setSelectedChildIds] = useState([]);
   const [stepError, setStepError] = useState("");
   // Flexible pricing - jab instructor ne "let parents choose their own
@@ -363,6 +367,7 @@ export default function BookingPage() {
     setBooking(draft.booking);
     setClientSecret(draft.clientSecret);
     setSelectedSessionId(draft.selectedSessionId || "");
+    setSelectedBundleId(draft.selectedBundleId || "");
     setSelectedChildIds(draft.selectedChildIds || []);
     setStep(4);
     setRestoredNotice(true);
@@ -467,22 +472,70 @@ export default function BookingPage() {
   const activityId = a._id || a.id;
   const cover = pickImg(a.images?.[0]);
   const now = new Date();
-  const sessions = (a.sessions || [])
-    .filter((s) => s.status === "scheduled" && new Date(s.date) >= now)
+  const allSessions = a.sessions || [];
+
+  // Jo sessions kisi ACTIVE bundle ka hissa hain, unhe ALAG se book nahi
+  // karne dete - sirf bundle ke through hi (dekho Activity.js schema).
+  const bundledSessionIds = new Set(
+    (a.bundles || [])
+      .filter((b) => b.status === "active")
+      .flatMap((b) => (b.sessionIds || []).map(String)),
+  );
+
+  const sessions = allSessions
+    .filter(
+      (s) =>
+        s.status === "scheduled" &&
+        new Date(s.date) >= now &&
+        !bundledSessionIds.has(String(s._id || s.id)),
+    )
     .sort((x, y) => new Date(x.date) - new Date(y.date));
+
+  // Bundles jo abhi book kiye ja saktay hain - active, kam se kam 2
+  // sessions resolve hui hon, aur SAB abhi bhi scheduled/future hon (ek
+  // bhi din guzar chuka ho to poora bundle hide, warna parent sirf aadha
+  // bundle book kar payega jo theek nahi).
+  const bundles = (a.bundles || [])
+    .filter((b) => b.status === "active")
+    .map((b) => {
+      const bSessions = (b.sessionIds || [])
+        .map((sid) =>
+          allSessions.find((s) => String(s._id || s.id) === String(sid)),
+        )
+        .filter(Boolean)
+        .sort((x, y) => new Date(x.date) - new Date(y.date));
+      return { ...b, sessions: bSessions };
+    })
+    .filter(
+      (b) =>
+        b.sessions.length >= 2 &&
+        b.sessions.length === (b.sessionIds || []).length &&
+        b.sessions.every(
+          (s) => s.status === "scheduled" && new Date(s.date) >= now,
+        ),
+    );
 
   const selectedSession = sessions.find(
     (s) => (s._id || s.id) === selectedSessionId,
+  );
+  const selectedBundle = bundles.find(
+    (b) => (b._id || b.id) === selectedBundleId,
   );
   const selectedChildren = children.filter((c) =>
     selectedChildIds.includes(c._id || c.id),
   );
 
-  const isFlexiblePricing = !!a.flexiblePricing?.enabled;
+  const isBundleSelected = !!selectedBundleId;
+  // Flexible pricing sirf normal single-session booking par lagu hoti hai -
+  // bundle ki apni fixed price hoti hai (backend bhi yehi karta hai, dekho
+  // bookingController.js createBooking).
+  const isFlexiblePricing = !isBundleSelected && !!a.flexiblePricing?.enabled;
   const flexibleMinAmount = Number(a.flexiblePricing?.minAmount) || 0;
-  const effectivePricePerChild = isFlexiblePricing
-    ? Number(customAmount) || 0
-    : a.price;
+  const effectivePricePerChild = isBundleSelected
+    ? Number(selectedBundle?.price) || 0
+    : isFlexiblePricing
+      ? Number(customAmount) || 0
+      : a.price;
 
   const pricing = estimatePricing(
     effectivePricePerChild,
@@ -504,7 +557,7 @@ export default function BookingPage() {
   const goNext = () => {
     setStepError("");
     if (step === 1) {
-      if (!selectedSessionId) {
+      if (!selectedSessionId && !selectedBundleId) {
         setStepError("Please choose a date and time.");
         return;
       }
@@ -537,7 +590,9 @@ export default function BookingPage() {
     try {
       const { data } = await api.post("/bookings", {
         activityId,
-        sessionId: selectedSessionId,
+        ...(isBundleSelected
+          ? { bundleId: selectedBundleId }
+          : { sessionId: selectedSessionId }),
         childIds: selectedChildIds,
         ...(isFlexiblePricing ? { customAmount: Number(customAmount) } : {}),
       });
@@ -553,6 +608,7 @@ export default function BookingPage() {
         booking: data.booking,
         clientSecret: pi.data.clientSecret,
         selectedSessionId,
+        selectedBundleId,
         selectedChildIds,
       });
     } catch (err) {
@@ -650,7 +706,11 @@ export default function BookingPage() {
               </div>
             </div>
             <div className="font-bold text-brand-orange">
-              {isFlexiblePricing ? "Pay what you like" : `AED ${a.price}`}
+              {isBundleSelected
+                ? `AED ${selectedBundle.price}`
+                : isFlexiblePricing
+                  ? "Pay what you like"
+                  : `AED ${a.price}`}
             </div>
           </div>
         )}
@@ -666,26 +726,29 @@ export default function BookingPage() {
           {step === 1 && (
             <>
               <h2 className="mb-4 text-base font-bold">Choose date & time</h2>
-              {sessions.length === 0 ? (
-                <div className="rounded-lg bg-brand-cream/60 px-4 py-6 text-center text-sm opacity-70">
-                  No upcoming sessions scheduled for this class.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2.5">
-                  {sessions.map((s) => {
-                    const sid = s._id || s.id;
-                    const seatsLeft =
-                      s.seatsAvailable ??
-                      Math.max((s.capacity || 0) - (s.seatsBooked || 0), 0);
+
+              {bundles.length > 0 && (
+                <div className="mb-4 flex flex-col gap-2.5">
+                  {bundles.map((b) => {
+                    const bid = b._id || b.id;
+                    const seatsLeft = Math.min(
+                      ...b.sessions.map((s) =>
+                        s.seatsAvailable ??
+                        Math.max((s.capacity || 0) - (s.seatsBooked || 0), 0),
+                      ),
+                    );
                     const full = seatsLeft <= 0;
-                    const chosen = selectedSessionId === sid;
+                    const chosen = selectedBundleId === bid;
                     return (
                       <button
-                        key={sid}
+                        key={bid}
                         type="button"
                         disabled={full}
-                        onClick={() => setSelectedSessionId(sid)}
-                        className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm ${
+                        onClick={() => {
+                          setSelectedBundleId(bid);
+                          setSelectedSessionId("");
+                        }}
+                        className={`rounded-xl border px-4 py-3 text-left text-sm ${
                           full
                             ? "cursor-not-allowed border-gray-100 bg-gray-50 opacity-50"
                             : chosen
@@ -693,27 +756,101 @@ export default function BookingPage() {
                               : "border-gray-200 bg-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <IcClock size={16} />
-                          <span className="font-semibold">
-                            {fmtSessionDate(s.date)} · {s.startTime}
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-bold">
+                            <IcTag size={14} />
+                            {b.title || "Multi-day bundle"}
+                          </span>
+                          <span
+                            className={`text-xs font-bold ${
+                              full
+                                ? "text-red-600"
+                                : seatsLeft <= 3
+                                  ? "text-brand-orange"
+                                  : "opacity-60"
+                            }`}
+                          >
+                            {full ? "Full" : `${seatsLeft} seats left`}
                           </span>
                         </div>
-                        <span
-                          className={`text-xs font-bold ${
-                            full
-                              ? "text-red-600"
-                              : seatsLeft <= 3
-                                ? "text-brand-orange"
-                                : "opacity-60"
-                          }`}
-                        >
-                          {full ? "Full" : `${seatsLeft} seats left`}
-                        </span>
+                        <div className="mb-1.5 flex flex-col gap-1 text-xs opacity-70">
+                          {b.sessions.map((s) => (
+                            <span
+                              key={s._id || s.id}
+                              className="flex items-center gap-1.5"
+                            >
+                              <IcClock size={13} />
+                              {fmtSessionDate(s.date)} · {s.startTime}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="font-bold text-brand-orange">
+                          AED {b.price} <span className="font-normal opacity-60">per child, all {b.sessions.length} dates</span>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
+              )}
+
+              {sessions.length === 0 && bundles.length === 0 ? (
+                <div className="rounded-lg bg-brand-cream/60 px-4 py-6 text-center text-sm opacity-70">
+                  No upcoming sessions scheduled for this class.
+                </div>
+              ) : (
+                sessions.length > 0 && (
+                  <div className="flex flex-col gap-2.5">
+                    {bundles.length > 0 && (
+                      <div className="mb-0.5 text-xs font-semibold opacity-60">
+                        Or book a single date
+                      </div>
+                    )}
+                    {sessions.map((s) => {
+                      const sid = s._id || s.id;
+                      const seatsLeft =
+                        s.seatsAvailable ??
+                        Math.max((s.capacity || 0) - (s.seatsBooked || 0), 0);
+                      const full = seatsLeft <= 0;
+                      const chosen = selectedSessionId === sid;
+                      return (
+                        <button
+                          key={sid}
+                          type="button"
+                          disabled={full}
+                          onClick={() => {
+                            setSelectedSessionId(sid);
+                            setSelectedBundleId("");
+                          }}
+                          className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm ${
+                            full
+                              ? "cursor-not-allowed border-gray-100 bg-gray-50 opacity-50"
+                              : chosen
+                                ? "border-brand-orange bg-brand-cream"
+                                : "border-gray-200 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <IcClock size={16} />
+                            <span className="font-semibold">
+                              {fmtSessionDate(s.date)} · {s.startTime}
+                            </span>
+                          </div>
+                          <span
+                            className={`text-xs font-bold ${
+                              full
+                                ? "text-red-600"
+                                : seatsLeft <= 3
+                                  ? "text-brand-orange"
+                                  : "opacity-60"
+                            }`}
+                          >
+                            {full ? "Full" : `${seatsLeft} seats left`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </>
           )}
@@ -803,17 +940,35 @@ export default function BookingPage() {
           )}
 
           {/* STEP 3 — review */}
-          {step === 3 && selectedSession && (
+          {step === 3 && (selectedSession || selectedBundle) && (
             <>
               <h2 className="mb-4 text-base font-bold">Review</h2>
               <div className="mb-5 flex flex-col gap-2.5">
                 <Row label="Class" value={a.title} />
                 <Row label="Instructor" value={a.instructor?.name} />
-                <Row
-                  label="Date"
-                  value={fmtSessionDate(selectedSession.date)}
-                />
-                <Row label="Time" value={selectedSession.startTime} />
+                {selectedBundle ? (
+                  <>
+                    <Row
+                      label="Bundle"
+                      value={selectedBundle.title || "Multi-day bundle"}
+                    />
+                    {selectedBundle.sessions.map((s, i) => (
+                      <Row
+                        key={s._id || s.id}
+                        label={`Date ${i + 1}`}
+                        value={`${fmtSessionDate(s.date)} · ${s.startTime}`}
+                      />
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <Row
+                      label="Date"
+                      value={fmtSessionDate(selectedSession.date)}
+                    />
+                    <Row label="Time" value={selectedSession.startTime} />
+                  </>
+                )}
                 <Row
                   label={selectedChildren.length > 1 ? "Children" : "Child"}
                   value={selectedChildren
@@ -930,12 +1085,23 @@ export default function BookingPage() {
                 {selectedChildren.map((c) => c.name).join(" & ")}{" "}
                 {selectedChildren.length > 1 ? "are" : "is"} booked for{" "}
                 <b>{a.title}</b>
-                {selectedSession && (
+                {selectedBundle ? (
                   <>
                     {" "}
-                    on {fmtSessionDate(selectedSession.date)} at{" "}
-                    {selectedSession.startTime}
+                    (
+                    {selectedBundle.sessions
+                      .map((s) => `${fmtSessionDate(s.date)} at ${s.startTime}`)
+                      .join(", ")}
+                    )
                   </>
+                ) : (
+                  selectedSession && (
+                    <>
+                      {" "}
+                      on {fmtSessionDate(selectedSession.date)} at{" "}
+                      {selectedSession.startTime}
+                    </>
+                  )
                 )}
                 .
               </p>

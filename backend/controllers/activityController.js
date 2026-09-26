@@ -1,5 +1,6 @@
 const Activity = require("../models/Activity");
 const Category = require("../models/Category");
+const Booking = require("../models/Booking");
 const { cleanVideoUrl } = require("../utils/safeUrl");
 
 /**
@@ -720,6 +721,22 @@ const deleteSession = async (req, res, next) => {
         .json({ success: false, message: "Session not found" });
     }
 
+    // Ye session kisi ACTIVE bundle ka hissa hai? To pehle bundle theek
+    // karo (dosri session laga do ya bundle archive karo) - warna bundle
+    // ki apni sessionIds list toot jayegi (aur is booking flow me
+    // bookingController.js ka "misconfigured" error dega).
+    const usedInBundle = (activity.bundles || []).find(
+      (b) =>
+        b.status === "active" &&
+        b.sessionIds.some((id) => id.toString() === session._id.toString()),
+    );
+    if (usedInBundle) {
+      return res.status(400).json({
+        success: false,
+        message: `This session is part of the bundle "${usedInBundle.title || "Untitled bundle"}". Please edit or archive that bundle first.`,
+      });
+    }
+
     if (session.seatsBooked > 0) {
       session.status = "cancelled";
       await activity.save();
@@ -740,6 +757,217 @@ const deleteSession = async (req, res, next) => {
   }
 };
 
+/**
+ * Bundle body ({title, sessionIds, price}) ko validate karta hai. Yahan
+ * "friendly" 400 errors dete hain - Activity model ke pre-save hook me bhi
+ * yehi checks hain (defense in depth), magar wahan se aane wala error
+ * generic 500 ban jata hai (dekho errorHandler.js), is liye asal user-facing
+ * validation yahan hoti hai.
+ *
+ * Return: { error: "..." } YA { sessionIds: [ObjectId...], price: Number }
+ */
+function validateBundleInput(activity, { title, sessionIds, price }) {
+  const ids = Array.isArray(sessionIds) ? [...new Set(sessionIds.map(String))] : [];
+
+  if (ids.length < 2) {
+    return { error: "A bundle needs at least 2 sessions" };
+  }
+
+  const sessions = ids.map((id) => activity.sessions.id(id)).filter(Boolean);
+  if (sessions.length !== ids.length) {
+    return { error: "One or more selected sessions were not found on this class" };
+  }
+
+  const notScheduled = sessions.find((s) => s.status !== "scheduled");
+  if (notScheduled) {
+    return {
+      error: "Only upcoming (scheduled) sessions can be added to a bundle",
+    };
+  }
+
+  const priceNum = Number(price);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    return { error: "Please enter a valid bundle price" };
+  }
+
+  if (title !== undefined && String(title).trim().length > 120) {
+    return { error: "Bundle title is too long" };
+  }
+
+  return { sessionIds: ids, price: priceNum, title: String(title || "").trim() };
+}
+
+/**
+ * @desc    Class ki 2+ sessions ko ek bundle (combined price, ek payment)
+ *          me jorna - jaise "2-Day Financial Literacy Bundle".
+ * @route   POST /api/activities/:id/bundles
+ * @access  Instructor (apni class)
+ */
+const addBundle = async (req, res, next) => {
+  try {
+    const activity = await Activity.findById(req.params.id);
+
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const isOwner = activity.instructor.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your class" });
+    }
+
+    const validated = validateBundleInput(activity, req.body);
+    if (validated.error) {
+      return res.status(400).json({ success: false, message: validated.error });
+    }
+
+    activity.bundles.push({
+      title: validated.title,
+      sessionIds: validated.sessionIds,
+      price: validated.price,
+      status: "active",
+    });
+
+    await activity.save();
+
+    res
+      .status(201)
+      .json({ success: true, message: "Bundle added", activity });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Bundle edit karna (title/sessions/price/status)
+ * @route   PUT /api/activities/:id/bundles/:bundleId
+ * @access  Instructor (apni class)
+ */
+const updateBundle = async (req, res, next) => {
+  try {
+    const activity = await Activity.findById(req.params.id);
+
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const isOwner = activity.instructor.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your class" });
+    }
+
+    const bundle = activity.bundles.id(req.params.bundleId);
+    if (!bundle) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Bundle not found" });
+    }
+
+    // Sessions/price/title sirf tab revalidate karte hain jab body me diye
+    // gaye hon - warna sirf status (active/archived) badalna ho to purani
+    // sessionIds/price ko bewajah dobara validate na karein.
+    const wantsContentChange =
+      req.body.sessionIds !== undefined ||
+      req.body.price !== undefined ||
+      req.body.title !== undefined;
+
+    if (wantsContentChange) {
+      const validated = validateBundleInput(activity, {
+        title: req.body.title !== undefined ? req.body.title : bundle.title,
+        sessionIds:
+          req.body.sessionIds !== undefined
+            ? req.body.sessionIds
+            : bundle.sessionIds,
+        price: req.body.price !== undefined ? req.body.price : bundle.price,
+      });
+      if (validated.error) {
+        return res
+          .status(400)
+          .json({ success: false, message: validated.error });
+      }
+      bundle.title = validated.title;
+      bundle.sessionIds = validated.sessionIds;
+      bundle.price = validated.price;
+    }
+
+    if (req.body.status && ["active", "archived"].includes(req.body.status)) {
+      bundle.status = req.body.status;
+    }
+
+    await activity.save();
+
+    res.json({ success: true, message: "Bundle updated", activity });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Bundle hatana
+ * @route   DELETE /api/activities/:id/bundles/:bundleId
+ * @access  Instructor (apni class)
+ *
+ * Session ki tarah: agar is bundle par koi (pending/confirmed) booking ho
+ * chuki hai to poora hatane ke bajaye "archived" kar dete hain - warna
+ * receipts/attendee list me reference toot jata.
+ */
+const deleteBundle = async (req, res, next) => {
+  try {
+    const activity = await Activity.findById(req.params.id);
+
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const isOwner = activity.instructor.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your class" });
+    }
+
+    const bundle = activity.bundles.id(req.params.bundleId);
+    if (!bundle) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Bundle not found" });
+    }
+
+    const hasBookings = await Booking.exists({
+      bundleId: bundle._id,
+      status: { $in: ["pending", "confirmed"] },
+    });
+
+    if (hasBookings) {
+      bundle.status = "archived";
+      await activity.save();
+
+      return res.json({
+        success: true,
+        message: "Bundle has bookings, so it was archived instead of removed",
+        activity,
+      });
+    }
+
+    bundle.deleteOne();
+    await activity.save();
+
+    res.json({ success: true, message: "Bundle removed", activity });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getActivities,
   getFeaturedActivities,
@@ -750,4 +978,7 @@ module.exports = {
   deleteActivity,
   addSession,
   deleteSession,
+  addBundle,
+  updateBundle,
+  deleteBundle,
 };

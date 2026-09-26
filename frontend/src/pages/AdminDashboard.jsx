@@ -15,16 +15,21 @@ const cldOptimize = (url, width = 150) => {
 };
 
 /* Phone number ko WhatsApp chat link me badalta hai.
-   wa.me ko poora country code chahiye, koi leading 0 nahi. Humare
-   instructors/parents UAE local format me save hote hain (0501234567),
-   is liye us "0" ko 971 se replace karte hain. Agar number pehle se
-   country code ke sath hai (+971... ya 00971...) to usay chhera nahi. */
+   wa.me ko poora country code chahiye, koi leading 0 nahi.
+   Yahan sab instructors/parents UAE ke nahi hote, kuch doosre mulk ke
+   bhi hote hain - is liye hum sirf UAE ka mobile pattern hi confidently
+   pehchan kar 971 lagate hain (05XXXXXXXX - poore 10 digit, "05" se
+   shuru). Kisi aur mulk ka local number (jo bhi "0" se shuru ho sakta
+   hai) waisa hi chhor dete hain - uska country guess karna ghalat
+   insaan ko WhatsApp bhej sakta hai. Agar number pehle se poora
+   country code ke sath hai (+971... ya 00971...) to usay bhi chhera
+   nahi jata, sirf 00 ki jagah country code seedha. */
 const waLink = (phone) => {
   let digits = String(phone || "").replace(/\D/g, "");
   if (!digits) return "";
   if (digits.startsWith("00")) {
     digits = digits.slice(2); // 00971... -> 971...
-  } else if (digits.startsWith("0")) {
+  } else if (digits.length === 10 && digits.startsWith("05")) {
     digits = "971" + digits.slice(1); // 0501234567 -> 971501234567
   }
   return `https://wa.me/${digits}`;

@@ -110,6 +110,7 @@ export default function EditClassPage() {
   const [faqList, setFaqList] = useState([{ question: "", answer: "" }]);
   const [images, setImages] = useState([]); // [{_id, url}]
   const [sessions, setSessions] = useState([]); // existing sessions from server
+  const [bundles, setBundles] = useState([]); // existing multi-day bundles from server
 
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -190,6 +191,7 @@ export default function EditClassPage() {
           })),
         );
         setSessions(toList(a.sessions));
+        setBundles(toList(a.bundles));
       } catch {
         if (alive) setNotFound(true);
       } finally {
@@ -376,6 +378,83 @@ export default function EditClassPage() {
       flash(err?.response?.data?.message || "Couldn't remove session.");
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  /* ---------------- bundles (live save) ----------------
+   *
+   * Bundle = 2+ (already existing) sessions ko jorna, ek combined price
+   * par, ek payment mein - jaise "2-Day Financial Literacy Bundle".
+   * Isliye pehle sessions honi zaroori hain (dekho Sessions section upar).
+   */
+  const [newBundle, setNewBundle] = useState({
+    title: "",
+    price: "",
+    sessionIds: [],
+  });
+  const [savingBundle, setSavingBundle] = useState(false);
+  const [bundleActionId, setBundleActionId] = useState(null);
+
+  const toggleBundleSession = (sid) =>
+    setNewBundle((b) => ({
+      ...b,
+      sessionIds: b.sessionIds.includes(sid)
+        ? b.sessionIds.filter((x) => x !== sid)
+        : [...b.sessionIds, sid],
+    }));
+
+  const createBundle = async () => {
+    if (newBundle.sessionIds.length < 2) {
+      flash("Select at least 2 sessions for the bundle.");
+      return;
+    }
+    if (!newBundle.price) {
+      flash("Enter a combined price for the bundle.");
+      return;
+    }
+    setSavingBundle(true);
+    try {
+      const { data } = await api.post(`/activities/${id}/bundles`, {
+        title: newBundle.title.trim(),
+        price: Number(newBundle.price),
+        sessionIds: newBundle.sessionIds,
+      });
+      setBundles(toList(data.activity?.bundles));
+      setNewBundle({ title: "", price: "", sessionIds: [] });
+      flash("Bundle added.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't add bundle.");
+    } finally {
+      setSavingBundle(false);
+    }
+  };
+
+  const toggleBundleStatus = async (bundleId, currentStatus) => {
+    setBundleActionId(bundleId);
+    try {
+      const { data } = await api.put(`/activities/${id}/bundles/${bundleId}`, {
+        status: currentStatus === "active" ? "archived" : "active",
+      });
+      setBundles(toList(data.activity?.bundles));
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't update bundle.");
+    } finally {
+      setBundleActionId(null);
+    }
+  };
+
+  const removeBundle = async (bundleId) => {
+    setBundleActionId(bundleId);
+    try {
+      const { data } = await api.delete(
+        `/activities/${id}/bundles/${bundleId}`,
+      );
+      setBundles(toList(data.activity?.bundles));
+      flash(data.message);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't remove bundle.");
+    } finally {
+      setBundleActionId(null);
     }
   };
 
@@ -809,6 +888,160 @@ export default function EditClassPage() {
             </button>
           </div>
         </Section>
+
+        {/* 4b. multi-day bundles — live save */}
+        {(() => {
+          const bundledIds = new Set(
+            bundles
+              .filter((b) => b.status === "active")
+              .flatMap((b) => (b.sessionIds || []).map(String)),
+          );
+          const bundleableSessions = sessions.filter(
+            (s) =>
+              s.status === "scheduled" &&
+              new Date(s.date) >= new Date() &&
+              !bundledIds.has(String(s._id || s.id)),
+          );
+
+          return (
+            <Section
+              title="Multi-Day Bundles"
+              subtitle="Package 2+ of your sessions together as one combined price — parents pay once for all the dates"
+            >
+              {bundles.length === 0 ? (
+                <p className="mb-3 text-sm opacity-60">No bundles yet.</p>
+              ) : (
+                <div className="mb-4 space-y-2">
+                  {bundles.map((b) => {
+                    const bid = b._id || b.id;
+                    const archived = b.status === "archived";
+                    const bundleSessions = (b.sessionIds || [])
+                      .map((sid) =>
+                        sessions.find(
+                          (s) => String(s._id || s.id) === String(sid),
+                        ),
+                      )
+                      .filter(Boolean)
+                      .sort((x, y) => new Date(x.date) - new Date(y.date));
+                    return (
+                      <div
+                        key={bid}
+                        className={`rounded-lg border px-3.5 py-2.5 text-sm ${
+                          archived
+                            ? "border-gray-100 bg-gray-50 opacity-60"
+                            : "border-gray-200"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <b>{b.title || "Untitled bundle"}</b>
+                            <span className="ml-2 text-xs opacity-60">
+                              AED {b.price} · {bundleSessions.length} dates
+                              {archived ? " · archived" : ""}
+                            </span>
+                            <div className="mt-1 text-xs opacity-60">
+                              {bundleSessions
+                                .map((s) => `${fmtDate(s.date)} ${s.startTime}`)
+                                .join("  +  ")}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-1.5">
+                            <button
+                              onClick={() => toggleBundleStatus(bid, b.status)}
+                              disabled={bundleActionId === bid}
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                            >
+                              {bundleActionId === bid
+                                ? "…"
+                                : archived
+                                  ? "Reactivate"
+                                  : "Archive"}
+                            </button>
+                            <button
+                              onClick={() => removeBundle(bid)}
+                              disabled={bundleActionId === bid}
+                              className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 disabled:opacity-60"
+                            >
+                              {bundleActionId === bid ? "…" : "Remove"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {bundleableSessions.length < 2 ? (
+                <p className="text-xs opacity-60">
+                  Add at least 2 upcoming sessions above before you can create
+                  a bundle.
+                </p>
+              ) : (
+                <div className="rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
+                  <Field label="Bundle title">
+                    <input
+                      className={inputCls}
+                      value={newBundle.title}
+                      onChange={(e) =>
+                        setNewBundle((b) => ({ ...b, title: e.target.value }))
+                      }
+                      placeholder="e.g. 2-Day Financial Literacy Bundle"
+                    />
+                  </Field>
+                  <div className="mt-3">
+                    <label className={labelCls}>
+                      Select sessions (at least 2)
+                    </label>
+                    <div className="space-y-1.5">
+                      {bundleableSessions.map((s) => {
+                        const sid = s._id || s.id;
+                        const checked = newBundle.sessionIds.includes(sid);
+                        return (
+                          <label
+                            key={sid}
+                            className="flex cursor-pointer items-center gap-2 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleBundleSession(sid)}
+                              className="h-4 w-4 accent-brand-orange"
+                            />
+                            {fmtDate(s.date)} · {s.startTime}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="mt-3 max-w-[220px]">
+                    <Field label="Combined price per child (AED)">
+                      <input
+                        type="number"
+                        className={inputCls}
+                        value={newBundle.price}
+                        onChange={(e) =>
+                          setNewBundle((b) => ({
+                            ...b,
+                            price: e.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <button
+                    onClick={createBundle}
+                    disabled={savingBundle}
+                    className="mt-3 flex items-center gap-1.5 rounded-lg bg-brand-orange px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+                  >
+                    <IcPlus size={15} />{" "}
+                    {savingBundle ? "Adding…" : "Add bundle"}
+                  </button>
+                </div>
+              )}
+            </Section>
+          );
+        })()}
 
         {/* 5. learning points */}
         <Section

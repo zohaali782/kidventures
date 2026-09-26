@@ -40,7 +40,7 @@ const releaseExpiredReservations = async () => {
       paymentStatus: { $in: ["unpaid", "failed"] },
       reservationExpiresAt: { $lt: now },
     })
-      .select("_id activity sessionId numberOfChildren")
+      .select("_id activity sessionId bundleSessions numberOfChildren")
       .limit(100);
 
     if (expired.length === 0) return;
@@ -77,26 +77,47 @@ const releaseExpiredReservations = async () => {
       }
 
       // 2. Ab seat wapas chhodo. Pehle cancel, phir seat — is tarteeb se
-      //    seat kabhi do dafa release nahi hoti.
+      //    seat kabhi do dafa release nahi hoti. Bundle booking ho to
+      //    uski HAR session ki seat release honi chahiye (na ke sirf
+      //    primary sessionId ki), warna bundle ki baqi dates hamesha
+      //    ke liye block reh jatin.
       try {
+        const sessionIdsToRelease =
+          booking.bundleSessions && booking.bundleSessions.length > 0
+            ? booking.bundleSessions.map((s) => s.sessionId)
+            : [booking.sessionId];
+
+        const arrayFilters = sessionIdsToRelease.map((id, i) => ({
+          [`s${i}._id`]: id,
+        }));
+        const incFields = Object.fromEntries(
+          sessionIdsToRelease.map((id, i) => [
+            `sessions.$[s${i}].seatsBooked`,
+            -booking.numberOfChildren,
+          ]),
+        );
+
         const result = await Activity.updateOne(
           {
             _id: booking.activity,
-            sessions: {
-              $elemMatch: {
-                _id: booking.sessionId,
-                seatsBooked: { $gte: booking.numberOfChildren },
+            $and: sessionIdsToRelease.map((id) => ({
+              sessions: {
+                $elemMatch: {
+                  _id: id,
+                  seatsBooked: { $gte: booking.numberOfChildren },
+                },
               },
-            },
+            })),
           },
-          { $inc: { "sessions.$.seatsBooked": -booking.numberOfChildren } },
+          { $inc: incFields },
+          { arrayFilters },
         );
 
         if (result.modifiedCount === 0) {
           // Purana code yahan error chupa deta tha (.catch(() => {})), jis se
           // seat hamesha ke liye block ho jati aur kisi ko pata na chalta.
           console.error(
-            `! Seat release failed — booking ${booking._id}, activity ${booking.activity}, session ${booking.sessionId}`,
+            `! Seat release failed — booking ${booking._id}, activity ${booking.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
           );
         }
       } catch (err) {

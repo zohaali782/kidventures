@@ -11,6 +11,9 @@ const {
   deleteActivity,
   addSession,
   deleteSession,
+  addBundle,
+  updateBundle,
+  deleteBundle,
 } = require("../controllers/activityController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -85,6 +88,29 @@ router.delete(
   protect,
   authorize("instructor", "admin"),
   deleteSession,
+);
+
+router.post(
+  "/:id/bundles",
+  protect,
+  authorize("instructor", "admin"),
+  requireApprovedInstructor,
+  addBundle,
+);
+
+router.put(
+  "/:id/bundles/:bundleId",
+  protect,
+  authorize("instructor", "admin"),
+  requireApprovedInstructor,
+  updateBundle,
+);
+
+router.delete(
+  "/:id/bundles/:bundleId",
+  protect,
+  authorize("instructor", "admin"),
+  deleteBundle,
 );
 
 module.exports = router;

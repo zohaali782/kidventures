@@ -23,21 +23,28 @@ const RESERVATION_MINUTES = 15;
  * @access  Parent
  *
  * Body: { activityId, sessionId, childIds: [], parentNotes }
+ * YA multi-day bundle ke liye: { activityId, bundleId, childIds: [], parentNotes }
  *
- * NOTE: qeemat body se NAHI aati - sirf ek istisna hai: agar class par
- * flexiblePricing.enabled hai to instructor ne khud parent ko amount
- * choose karne diya hai, us soorat me body ka "customAmount" liya jata
- * hai (neeche validate hone ke baad). Warna hamesha database se, activity
- * ki asli price uthai jati hai - frontend chahe kuch bhi bheje.
+ * NOTE: qeemat body se NAHI aati - do istisna hain: (1) flexiblePricing
+ * wali class par body ka "customAmount" (neeche validate hone ke baad),
+ * (2) bundle wali booking par bundle ki apni fixed `price`. Warna hamesha
+ * database se, activity ki asli price uthai jati hai - frontend chahe
+ * kuch bhi bheje.
  */
 const createBooking = async (req, res, next) => {
   try {
-    const { activityId, sessionId, childIds, parentNotes, customAmount } =
-      req.body;
+    const {
+      activityId,
+      sessionId,
+      bundleId,
+      childIds,
+      parentNotes,
+      customAmount,
+    } = req.body;
 
     if (
       !activityId ||
-      !sessionId ||
+      (!sessionId && !bundleId) ||
       !Array.isArray(childIds) ||
       childIds.length === 0
     ) {
@@ -81,19 +88,66 @@ const createBooking = async (req, res, next) => {
       });
     }
 
-    const session = activity.sessions.id(sessionId);
+    /**
+     * BUNDLE vs SINGLE SESSION.
+     *
+     * `sessionsToReserve` normalizes both paths into the same shape (an
+     * array of the actual session subdocuments), so seat reservation
+     * below can be written once and work for either a single session
+     * (array of 1) or a multi-day bundle (array of 2+).
+     */
+    let bundle = null;
+    let sessionsToReserve = [];
 
-    if (!session || session.status !== "scheduled") {
-      return res
-        .status(400)
-        .json({ success: false, message: "This session is not available" });
-    }
+    if (bundleId) {
+      bundle = activity.bundles?.id(bundleId);
+      if (!bundle || bundle.status !== "active") {
+        return res.status(400).json({
+          success: false,
+          message: "This bundle is not available",
+        });
+      }
 
-    // Guzri hui date par booking nahi
-    if (new Date(session.date) < new Date()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "This session has already passed" });
+      sessionsToReserve = bundle.sessionIds
+        .map((id) => activity.sessions.id(id))
+        .filter(Boolean);
+
+      if (sessionsToReserve.length !== bundle.sessionIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "This bundle is misconfigured, please contact support",
+        });
+      }
+
+      const now = new Date();
+      const bad = sessionsToReserve.find(
+        (s) => s.status !== "scheduled" || new Date(s.date) < now,
+      );
+      if (bad) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "One of the dates in this bundle is no longer available",
+        });
+      }
+    } else {
+      const session = activity.sessions.id(sessionId);
+
+      if (!session || session.status !== "scheduled") {
+        return res
+          .status(400)
+          .json({ success: false, message: "This session is not available" });
+      }
+
+      // Guzri hui date par booking nahi
+      if (new Date(session.date) < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "This session has already passed",
+        });
+      }
+
+      sessionsToReserve = [session];
     }
 
     /**
@@ -102,9 +156,11 @@ const createBooking = async (req, res, next) => {
      * per-child price banti hai - lekin seat reserve hone se PEHLE hi
      * validate karna zaroori hai (warna invalid amount par bhi seat
      * atomically reserve ho chuki hogi aur wapas release karni parti).
+     * Bundles apni khud ki fixed price rakhte hain - flexible pricing
+     * sirf normal single-session booking par lagu hoti hai.
      */
-    let pricePerChild = activity.price;
-    if (activity.flexiblePricing?.enabled) {
+    let pricePerChild = bundle ? bundle.price : activity.price;
+    if (!bundle && activity.flexiblePricing?.enabled) {
       const amount = Number(customAmount);
       const minAmount = Number(activity.flexiblePricing.minAmount) || 0;
 
@@ -161,11 +217,18 @@ const createBooking = async (req, res, next) => {
       });
     }
 
-    // Wohi bacha isi session me pehle se booked to nahi?
+    // Wohi bacha in sessions (single ya bundle ki koi bhi date) me pehle
+    // se booked to nahi? - dusri bundle bookings bhi check hoti hain
+    // kyunke unka bhi sessionId in hi dates par hota hai.
+    const sessionIdsInvolved = sessionsToReserve.map((s) => s._id);
     const alreadyBooked = await Booking.findOne({
-      sessionId,
+      activity: activityId,
       "children.child": { $in: uniqueChildIds },
       status: { $in: ["pending", "confirmed"] },
+      $or: [
+        { sessionId: { $in: sessionIdsInvolved } },
+        { "bundleSessions.sessionId": { $in: sessionIdsInvolved } },
+      ],
     });
 
     if (alreadyBooked) {
@@ -189,33 +252,58 @@ const createBooking = async (req, res, next) => {
      * Is liye check aur update EK HI database operation me hain.
      * MongoDB guarantee karta hai ke ye operation beech me nahi tootega.
      * Do requests aayen to sirf ek kaamyab hogi, doosri ko null milega.
+     *
+     * Bundle ke case me EK HI update call me SAB sessions increment hoti
+     * hain (arrayFilters se, har session ka apna alag identifier) - aur
+     * filter me har session ka apna $elemMatch hota hai, is liye document
+     * sirf tab match karta hai jab BUNDLE KI HAR EK session me seat bachi
+     * ho. Ek bhi session full ho to poori booking fail ho jati hai - koi
+     * partial reservation nahi hoti.
      */
+    const arrayFilters = sessionsToReserve.map((s, i) => ({
+      [`s${i}._id`]: s._id,
+    }));
+    const incFields = Object.fromEntries(
+      sessionsToReserve.map((s, i) => [
+        `sessions.$[s${i}].seatsBooked`,
+        numberOfChildren,
+      ]),
+    );
+
     const reserved = await Activity.findOneAndUpdate(
       {
         _id: activityId,
         status: "active",
-        sessions: {
-          $elemMatch: {
-            _id: sessionId,
-            status: "scheduled",
-            capacity: session.capacity, // capacity beech me badli to fail
-            seatsBooked: { $lte: session.capacity - numberOfChildren },
+        $and: sessionsToReserve.map((s) => ({
+          sessions: {
+            $elemMatch: {
+              _id: s._id,
+              status: "scheduled",
+              capacity: s.capacity, // capacity beech me badli to fail
+              seatsBooked: { $lte: s.capacity - numberOfChildren },
+            },
           },
-        },
+        })),
       },
-      { $inc: { "sessions.$.seatsBooked": numberOfChildren } },
-      { new: true },
+      { $inc: incFields },
+      { new: true, arrayFilters },
     );
 
     if (!reserved) {
-      const seatsLeft = Math.max(session.capacity - session.seatsBooked, 0);
+      const seatsLeft = Math.min(
+        ...sessionsToReserve.map((s) =>
+          Math.max(s.capacity - s.seatsBooked, 0),
+        ),
+      );
 
       return res.status(409).json({
         success: false,
         message:
           seatsLeft === 0
-            ? "Sorry, this session is now full"
-            : `Only ${seatsLeft} seat(s) left in this session`,
+            ? bundle
+              ? "Sorry, one of the dates in this bundle is now full"
+              : "Sorry, this session is now full"
+            : `Only ${seatsLeft} seat(s) left`,
         seatsAvailable: seatsLeft,
       });
     }
@@ -290,6 +378,15 @@ const createBooking = async (req, res, next) => {
     const totalAmount = subtotal; // parent isse zyada kuch nahi deta
 
     /* -------------------------- 5. Booking -------------------------- */
+    // Bundle ho to sab dates dikhane ke liye chronological order me
+    // sort kar dete hain - pehli (earliest) date hi canonical
+    // sessionId/sessionDate/startTime/endTime bantay hain (purana code
+    // - listing sort, reminders, receipts - inhi fields ko padhta hai).
+    const sortedSessions = [...sessionsToReserve].sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+    const primarySession = sortedSessions[0];
+
     try {
       const booking = await Booking.create({
         parent: req.user._id,
@@ -297,10 +394,21 @@ const createBooking = async (req, res, next) => {
         activityTitle: activity.title,
         instructor: activity.instructor,
 
-        sessionId: session._id,
-        sessionDate: session.date,
-        startTime: session.startTime,
-        endTime: session.endTime,
+        sessionId: primarySession._id,
+        sessionDate: primarySession.date,
+        startTime: primarySession.startTime,
+        endTime: primarySession.endTime,
+
+        ...(bundle && {
+          bundleId: bundle._id,
+          bundleTitle: bundle.title,
+          bundleSessions: sortedSessions.map((s) => ({
+            sessionId: s._id,
+            date: s.date,
+            startTime: s.startTime,
+            endTime: s.endTime,
+          })),
+        }),
 
         children: children.map((child) => ({
           child: child._id,
@@ -336,17 +444,22 @@ const createBooking = async (req, res, next) => {
         booking,
       });
     } catch (bookingError) {
-      // Booking banane me masla ho gaya to reserve ki hui seats wapas chhor do,
-      // warna woh hamesha ke liye block ho jatin.
+      // Booking banane me masla ho gaya to reserve ki hui seats wapas chhor do
+      // (bundle ki HAR session ki, agar bundle thi) - warna woh hamesha ke
+      // liye block ho jatin.
+      const decFields = Object.fromEntries(
+        Object.entries(incFields).map(([key, val]) => [key, -val]),
+      );
       await Activity.updateOne(
-        { _id: activityId, "sessions._id": sessionId },
-        { $inc: { "sessions.$.seatsBooked": -numberOfChildren } },
+        { _id: activityId },
+        { $inc: decFields },
+        { arrayFilters },
       ).catch((err) =>
         // Error chupana nahi — yeh woh soorat hai jahan seat kisi ke kaam
         // aaye baghair block ho jati hai, aur kisi ko pata nahi chalta.
         console.error(
-          `! Seat rollback failed — activity ${activityId}, session ${sessionId}, ` +
-            `${numberOfChildren} seat(s): ${err.message}`,
+          `! Seat rollback failed — activity ${activityId}, session(s) ` +
+            `${sessionIdsInvolved.join(",")}, ${numberOfChildren} seat(s): ${err.message}`,
         ),
       );
 
@@ -574,18 +687,39 @@ const cancelBooking = async (req, res, next) => {
       });
     }
 
-    // Seats wapas chhor do taake koi aur book kar sake
+    // Seats wapas chhor do taake koi aur book kar sake. Bundle booking ho to
+    // uski HAR session ki seat release honi chahiye, na ke sirf primary
+    // (canonical) sessionId ki — warna baqi dates hamesha ke liye block
+    // rehtin.
+    const sessionIdsToRelease =
+      cancelled.bundleSessions && cancelled.bundleSessions.length > 0
+        ? cancelled.bundleSessions.map((s) => s.sessionId)
+        : [cancelled.sessionId];
+
+    const releaseArrayFilters = sessionIdsToRelease.map((id, i) => ({
+      [`s${i}._id`]: id,
+    }));
+    const releaseIncFields = Object.fromEntries(
+      sessionIdsToRelease.map((id, i) => [
+        `sessions.$[s${i}].seatsBooked`,
+        -cancelled.numberOfChildren,
+      ]),
+    );
+
     const seatResult = await Activity.updateOne(
       {
         _id: cancelled.activity,
-        sessions: {
-          $elemMatch: {
-            _id: cancelled.sessionId,
-            seatsBooked: { $gte: cancelled.numberOfChildren },
+        $and: sessionIdsToRelease.map((id) => ({
+          sessions: {
+            $elemMatch: {
+              _id: id,
+              seatsBooked: { $gte: cancelled.numberOfChildren },
+            },
           },
-        },
+        })),
       },
-      { $inc: { "sessions.$.seatsBooked": -cancelled.numberOfChildren } },
+      { $inc: releaseIncFields },
+      { arrayFilters: releaseArrayFilters },
     ).catch((err) => {
       console.error(
         `! Seat release error — booking ${cancelled.bookingNumber}: ${err.message}`,
@@ -598,7 +732,7 @@ const cancelBooking = async (req, res, next) => {
     if (seatResult && seatResult.modifiedCount === 0) {
       console.error(
         `! Seat release failed — booking ${cancelled.bookingNumber}, ` +
-          `activity ${cancelled.activity}, session ${cancelled.sessionId}`,
+          `activity ${cancelled.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
       );
     }
 
@@ -638,10 +772,17 @@ const getSessionAttendees = async (req, res, next) => {
         .json({ success: false, message: "Not your class" });
     }
 
+    // Bundle booking me is date ka sessionId primary na ho (i.e. bundle ki
+    // pehli date na ho) to bhi wo bookingSessions me maujood hogi - dono
+    // jagah check karo, warna bundle ke doosre din ki attendee list khali
+    // dikhegi.
     const bookings = await Booking.find({
       activity: req.params.activityId,
-      sessionId: req.params.sessionId,
       status: "confirmed",
+      $or: [
+        { sessionId: req.params.sessionId },
+        { "bundleSessions.sessionId": req.params.sessionId },
+      ],
     }).populate("parent", "name phone");
 
     // Sirf wohi cheezein bhejni hain jo instructor ko chahiyen
@@ -779,11 +920,27 @@ const getBookingReceipt = async (req, res, next) => {
 
     heading("Class Details");
     row("Instructor", booking.instructor?.name || "—");
-    row("Date", fmtDate(booking.sessionDate));
-    row(
-      "Time",
-      `${booking.startTime}${booking.endTime ? " – " + booking.endTime : ""}`,
-    );
+    if (booking.bundleTitle) {
+      row("Bundle", booking.bundleTitle);
+    }
+    if (booking.bundleSessions && booking.bundleSessions.length > 0) {
+      // Bundle booking - har din ki apni date/time dikhao, sirf primary
+      // (canonical) session nahi - warna parent ko lagega sirf ek din
+      // book hua hai.
+      booking.bundleSessions.forEach((s, i) => {
+        row(`Date ${i + 1}`, fmtDate(s.date));
+        row(
+          `Time ${i + 1}`,
+          `${s.startTime}${s.endTime ? " – " + s.endTime : ""}`,
+        );
+      });
+    } else {
+      row("Date", fmtDate(booking.sessionDate));
+      row(
+        "Time",
+        `${booking.startTime}${booking.endTime ? " – " + booking.endTime : ""}`,
+      );
+    }
     if (booking.activity?.location?.area) {
       row(
         "Location",

@@ -84,6 +84,21 @@ const fmtDate = (date, startTime) => {
   return startTime ? `${d}, ${startTime}` : d;
 };
 
+/**
+ * Booking ke "When" ki value banata hai - normal single-session booking ke
+ * liye sirf ek date/time, magar multi-day BUNDLE booking ke liye har ek
+ * din alag line par (warna sirf pehli/primary date dikhti, parent/instructor
+ * ko lagta bas ek hi din book hua hai).
+ */
+const fmtWhen = (booking) => {
+  if (booking.bundleSessions && booking.bundleSessions.length > 0) {
+    return booking.bundleSessions
+      .map((s) => fmtDate(s.date, s.startTime))
+      .join("<br>");
+  }
+  return fmtDate(booking.sessionDate, booking.startTime);
+};
+
 function layout({ heading, body, ctaText, ctaUrl }) {
   return `
 <!DOCTYPE html>
@@ -137,6 +152,18 @@ function row(label, value) {
   </tr>`;
 }
 
+/**
+ * row() jaisa hi, magar value ko esc() NAHI karta - sirf un jagah istemal
+ * karo jahan value hamari apni banai hui HTML ho (jaise fmtWhen ka "<br>"
+ * wala multi-line date), kabhi bhi seedha user input ke sath nahi.
+ */
+function rowRaw(label, valueHtml) {
+  return `<tr>
+    <td style="padding:6px 0;color:#777;font-size:14px;">${esc(label)}</td>
+    <td style="padding:6px 0;color:${BRAND.brown};font-size:14px;font-weight:bold;text-align:right;">${valueHtml}</td>
+  </tr>`;
+}
+
 /* ---------- 1. Parent: booking confirmed ---------- */
 function bookingConfirmedParent({ parentName, booking }) {
   const kids = (booking.children || []).map((c) => c.name).join(", ");
@@ -158,7 +185,8 @@ function bookingConfirmedParent({ parentName, booking }) {
         <strong>${esc(booking.activityTitle)}</strong> is confirmed.</p>
         <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;margin-bottom:16px;">
           ${row("Class", booking.activityTitle)}
-          ${row("When", fmtDate(booking.sessionDate, booking.startTime))}
+          ${booking.bundleTitle ? row("Bundle", booking.bundleTitle) : ""}
+          ${rowRaw("When", fmtWhen(booking))}
           ${row("Children", kids)}
           ${discountLine}
           ${row("Total paid", aed(booking.totalAmount))}
@@ -187,7 +215,8 @@ function newBookingInstructor({ instructorName, booking }) {
         into your class.</p>
         <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;margin-bottom:16px;">
           ${row("Class", booking.activityTitle)}
-          ${row("Session", fmtDate(booking.sessionDate, booking.startTime))}
+          ${booking.bundleTitle ? row("Bundle", booking.bundleTitle) : ""}
+          ${rowRaw("Session", fmtWhen(booking))}
           ${row("Children", String(booking.numberOfChildren))}
           ${row("Your earning", aed(booking.instructorEarning))}
         </table>

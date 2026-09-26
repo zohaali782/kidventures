@@ -175,6 +175,30 @@ const activitySchema = new mongoose.Schema(
 
     sessions: [sessionSchema],
 
+    /**
+     * Multi-day bundle - 2 (ya zyada) sessions ko jor kar EK combined
+     * price par, EK payment mein bechna hai (jese "2-Day Financial
+     * Literacy Bundle"). sessionIds un sessions ke _id hain jo isi
+     * activity ke `sessions` array mein already maujood hain.
+     *
+     * Jo session kisi bundle mein shamil ho jaye, wo booking page par
+     * ALAG se (individually) book karne ke liye nahi dikhaya jata -
+     * sirf bundle ke through hi book hoga (frontend filter, dekho
+     * BookingPage.jsx aur normActivity).
+     */
+    bundles: [
+      {
+        title: { type: String, trim: true, maxlength: 120 },
+        sessionIds: [mongoose.Schema.Types.ObjectId],
+        price: { type: Number, required: true, min: 0 }, // total, per child
+        status: {
+          type: String,
+          enum: ["active", "archived"],
+          default: "active",
+        },
+      },
+    ],
+
     /* ------------------------------- Status ------------------------------- */
     // draft     -> instructor abhi bana raha hai
     // pending   -> admin ki approval ka intezar
@@ -275,6 +299,24 @@ activitySchema.pre("save", function () {
   if (this.fundraiser && !this.fundraiser.enabled) {
     this.fundraiser.link = "";
     this.fundraiser.whatsapp = "";
+  }
+
+  // Bundles: kam se kam 2 sessions honi chahiye, aur har sessionId isi
+  // activity ki apni sessions me se hi hona chahiye (koi doosri class ka
+  // session id yahan na aa jaye).
+  if (this.bundles && this.bundles.length > 0) {
+    const validSessionIds = new Set(
+      (this.sessions || []).map((s) => s._id.toString()),
+    );
+    for (const bundle of this.bundles) {
+      const ids = (bundle.sessionIds || []).map((id) => id.toString());
+      if (ids.length < 2) {
+        throw new Error("A bundle needs at least 2 sessions");
+      }
+      if (ids.some((id) => !validSessionIds.has(id))) {
+        throw new Error("A bundle can only include this class's own sessions");
+      }
+    }
   }
 });
 
