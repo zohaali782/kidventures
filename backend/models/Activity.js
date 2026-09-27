@@ -181,10 +181,12 @@ const activitySchema = new mongoose.Schema(
      * Literacy Bundle"). sessionIds un sessions ke _id hain jo isi
      * activity ke `sessions` array mein already maujood hain.
      *
-     * Jo session kisi bundle mein shamil ho jaye, wo booking page par
-     * ALAG se (individually) book karne ke liye nahi dikhaya jata -
-     * sirf bundle ke through hi book hoga (frontend filter, dekho
-     * BookingPage.jsx aur normActivity).
+     * Bundle EXTRA option hai, replacement nahi: jo sessions bundle mein
+     * shamil hain wo booking page par ALAG se (single day, normal price)
+     * bhi book ho sakti hain. Parent khud faisla karta hai ke poora
+     * bundle le ya sirf ek din. Dono soorton me seat isi session se
+     * katti hai, aur ek hi bacha dono tareeqon se book na ho jaye iska
+     * check bookingController.js ke createBooking mein hai.
      */
     bundles: [
       {

@@ -474,21 +474,13 @@ export default function BookingPage() {
   const now = new Date();
   const allSessions = a.sessions || [];
 
-  // Jo sessions kisi ACTIVE bundle ka hissa hain, unhe ALAG se book nahi
-  // karne dete - sirf bundle ke through hi (dekho Activity.js schema).
-  const bundledSessionIds = new Set(
-    (a.bundles || [])
-      .filter((b) => b.status === "active")
-      .flatMap((b) => (b.sessionIds || []).map(String)),
-  );
-
+  // Bundle ki dates yahan se hatai NAHI jatin: parent ki apni marzi hai
+  // ke poora bundle le (combined price par) ya sirf ek din alag se book
+  // kare. Dono soorton me seat isi session se katti hai, aur ek hi bacha
+  // dono tareeqon se book na ho jaye iska check backend me hai (dekho
+  // createBooking ka duplicate-booking wala hissa).
   const sessions = allSessions
-    .filter(
-      (s) =>
-        s.status === "scheduled" &&
-        new Date(s.date) >= now &&
-        !bundledSessionIds.has(String(s._id || s.id)),
-    )
+    .filter((s) => s.status === "scheduled" && new Date(s.date) >= now)
     .sort((x, y) => new Date(x.date) - new Date(y.date));
 
   // Bundles jo abhi book kiye ja saktay hain - active, kam se kam 2
@@ -802,7 +794,7 @@ export default function BookingPage() {
                   <div className="flex flex-col gap-2.5">
                     {bundles.length > 0 && (
                       <div className="mb-0.5 text-xs font-semibold opacity-60">
-                        Or book a single date
+                        Or book a single day at the normal price
                       </div>
                     )}
                     {sessions.map((s) => {
