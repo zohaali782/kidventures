@@ -151,16 +151,21 @@ const createBooking = async (req, res, next) => {
     }
 
     /**
-     * FLEXIBLE PRICING: agar instructor ne apni class par ye on kar rakha
-     * hai, to fixed activity.price ke bajaye parent jo amount bheje wahi
+     * FLEXIBLE ("delegate") PRICING: agar instructor ne apni class par ye on
+     * kar rakha hai, to fixed price ke bajaye parent jo amount bheje wahi
      * per-child price banti hai - lekin seat reserve hone se PEHLE hi
      * validate karna zaroori hai (warna invalid amount par bhi seat
      * atomically reserve ho chuki hogi aur wapas release karni parti).
-     * Bundles apni khud ki fixed price rakhte hain - flexible pricing
-     * sirf normal single-session booking par lagu hoti hai.
+     *
+     * Ye bundle par bhi lagu hoti hai: us soorat me bundle ki apni price
+     * sirf "suggested" (combined) amount ban jati hai, aur minAmount wahi
+     * class wala floor rehta hai. Frontend bhi yehi dikhata hai (dekho
+     * BookingPage.jsx ka suggestedPricePerChild).
      */
-    let pricePerChild = bundle ? bundle.price : activity.price;
-    if (!bundle && activity.flexiblePricing?.enabled) {
+    const suggestedPrice = bundle ? bundle.price : activity.price;
+    let pricePerChild = suggestedPrice;
+
+    if (activity.flexiblePricing?.enabled) {
       const amount = Number(customAmount);
       const minAmount = Number(activity.flexiblePricing.minAmount) || 0;
 
@@ -178,7 +183,7 @@ const createBooking = async (req, res, next) => {
       }
       // Sanity cap - typo/abuse se bachao, suggested price se bahut zyada
       // upar ki koi wajah nahi honi chahiye.
-      const sanityCap = Math.max(activity.price, minAmount, 1) * 20 + 5000;
+      const sanityCap = Math.max(suggestedPrice, minAmount, 1) * 20 + 5000;
       if (amount > sanityCap) {
         return res.status(400).json({
           success: false,

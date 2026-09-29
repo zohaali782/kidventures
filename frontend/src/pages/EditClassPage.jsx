@@ -1015,7 +1015,13 @@ export default function EditClassPage() {
                     </div>
                   </div>
                   <div className="mt-3 max-w-[220px]">
-                    <Field label="Combined price per child (AED)">
+                    <Field
+                      label={
+                        form.flexiblePricingEnabled
+                          ? "Suggested combined price per child (AED)"
+                          : "Combined price per child (AED)"
+                      }
+                    >
                       <input
                         type="number"
                         className={inputCls}
@@ -1029,6 +1035,13 @@ export default function EditClassPage() {
                       />
                     </Field>
                   </div>
+                  {form.flexiblePricingEnabled && (
+                    <p className="mt-1.5 text-[11px] opacity-60">
+                      You've turned on "let parents choose their own amount",
+                      so this is shown as the suggested amount for the whole
+                      bundle. Parents can pay a different amount.
+                    </p>
+                  )}
                   <button
                     onClick={createBundle}
                     disabled={savingBundle}

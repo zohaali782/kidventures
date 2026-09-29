@@ -323,14 +323,24 @@ export default function BookingPage() {
     };
   }, [id]);
 
-  // Flexible pricing wali class ho to suggested amount ko starting point
-  // ke tor par pre-fill kar dete hain, parent chahe to badal sakta hai.
+  // Flexible ("delegate") pricing wali class ho to suggested amount ko
+  // starting point ke tor par pre-fill kar dete hain, parent chahe to badal
+  // sakta hai. Bundle chunne par suggestion us bundle ki combined price ban
+  // jati hai, aur single date par wapas class ki apni price - is liye ye
+  // effect selection badalne par dobara chalta hai.
   useEffect(() => {
-    if (activity?.flexiblePricing?.enabled && activity.price) {
-      setCustomAmount((v) => v || String(activity.price));
-    }
+    if (!activity?.flexiblePricing?.enabled) return;
+
+    const chosenBundle = selectedBundleId
+      ? (activity.bundles || []).find(
+          (b) => String(b._id || b.id) === String(selectedBundleId),
+        )
+      : null;
+
+    const suggested = chosenBundle ? chosenBundle.price : activity.price;
+    if (suggested) setCustomAmount(String(suggested));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity]);
+  }, [activity, selectedBundleId]);
 
   useEffect(() => {
     if (!user || user.role !== "parent") {
@@ -518,16 +528,18 @@ export default function BookingPage() {
   );
 
   const isBundleSelected = !!selectedBundleId;
-  // Flexible pricing sirf normal single-session booking par lagu hoti hai -
-  // bundle ki apni fixed price hoti hai (backend bhi yehi karta hai, dekho
-  // bookingController.js createBooking).
-  const isFlexiblePricing = !isBundleSelected && !!a.flexiblePricing?.enabled;
+  // Flexible ("delegate") pricing class-level setting hai, is liye ye bundle
+  // par bhi lagu hoti hai. Bundle chuna ho to uski combined price sirf
+  // "suggested" amount ban jati hai, parent apni marzi ka amount likh sakta
+  // hai (backend bhi yehi karta hai, dekho bookingController.js createBooking).
+  const isFlexiblePricing = !!a.flexiblePricing?.enabled;
   const flexibleMinAmount = Number(a.flexiblePricing?.minAmount) || 0;
-  const effectivePricePerChild = isBundleSelected
+  const suggestedPricePerChild = isBundleSelected
     ? Number(selectedBundle?.price) || 0
-    : isFlexiblePricing
-      ? Number(customAmount) || 0
-      : a.price;
+    : a.price;
+  const effectivePricePerChild = isFlexiblePricing
+    ? Number(customAmount) || 0
+    : suggestedPricePerChild;
 
   const pricing = estimatePricing(
     effectivePricePerChild,
@@ -698,11 +710,9 @@ export default function BookingPage() {
               </div>
             </div>
             <div className="font-bold text-brand-orange">
-              {isBundleSelected
-                ? `AED ${selectedBundle.price}`
-                : isFlexiblePricing
-                  ? "Pay what you like"
-                  : `AED ${a.price}`}
+              {isFlexiblePricing
+                ? "Pay what you like"
+                : `AED ${suggestedPricePerChild}`}
             </div>
           </div>
         )}
@@ -777,7 +787,10 @@ export default function BookingPage() {
                           ))}
                         </div>
                         <div className="font-bold text-brand-orange">
-                          AED {b.price} <span className="font-normal opacity-60">per child, all {b.sessions.length} dates</span>
+                          {isFlexiblePricing ? "Suggested " : ""}AED {b.price}{" "}
+                          <span className="font-normal opacity-60">
+                            per child, all {b.sessions.length} dates
+                          </span>
                         </div>
                       </button>
                     );
@@ -972,7 +985,9 @@ export default function BookingPage() {
               {isFlexiblePricing && (
                 <div className="mb-4 rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
                   <label className="mb-1.5 block text-[13px] font-semibold">
-                    Choose your amount per child (AED)
+                    {selectedBundle
+                      ? `Choose your amount per child (AED), for all ${selectedBundle.sessions.length} dates`
+                      : "Choose your amount per child (AED)"}
                   </label>
                   <input
                     type="number"
@@ -980,15 +995,21 @@ export default function BookingPage() {
                     className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-brand-orange"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder={a.price ? String(a.price) : "0"}
+                    placeholder={
+                      suggestedPricePerChild
+                        ? String(suggestedPricePerChild)
+                        : "0"
+                    }
                   />
                   <p className="mt-1.5 text-[11px] opacity-60">
                     {flexibleMinAmount > 0
                       ? `Minimum AED ${flexibleMinAmount} per child. `
                       : ""}
-                    {a.price
-                      ? `Suggested amount: AED ${a.price}.`
-                      : "No suggested amount — it's entirely your choice."}
+                    {suggestedPricePerChild
+                      ? `Suggested amount: AED ${suggestedPricePerChild}${
+                          selectedBundle ? " for the whole bundle" : ""
+                        }.`
+                      : "No suggested amount, it's entirely your choice."}
                   </p>
                 </div>
               )}
