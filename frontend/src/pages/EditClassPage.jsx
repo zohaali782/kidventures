@@ -338,9 +338,37 @@ export default function EditClassPage() {
   };
 
   /* ---------------- sessions (live save) ---------------- */
-  const [newSession, setNewSession] = useState({ date: "", startTime: "" });
+  const [newSession, setNewSession] = useState({
+    date: "",
+    startTime: "",
+    label: "",
+  });
   const [addingSession, setAddingSession] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
+  // Har session ke label ka draft (jab tak Save na dabaya jaye)
+  const [labelDrafts, setLabelDrafts] = useState({});
+  const [savingLabelId, setSavingLabelId] = useState(null);
+
+  const saveSessionLabel = async (sessionId) => {
+    setSavingLabelId(sessionId);
+    try {
+      const { data } = await api.put(
+        `/activities/${id}/sessions/${sessionId}`,
+        { label: labelDrafts[sessionId] ?? "" },
+      );
+      setSessions(toList(data.activity?.sessions));
+      setLabelDrafts((d) => {
+        const next = { ...d };
+        delete next[sessionId];
+        return next;
+      });
+      flash("Label saved.");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't save label.");
+    } finally {
+      setSavingLabelId(null);
+    }
+  };
 
   const addSession = async () => {
     if (!newSession.date || !newSession.startTime) {
@@ -354,10 +382,11 @@ export default function EditClassPage() {
         date: newSession.date,
         startTime: newSession.startTime,
         endTime: addMinutes(newSession.startTime, dur),
+        label: newSession.label.trim(),
         capacity: Number(form.capacity) || undefined,
       });
       setSessions(toList(data.activity?.sessions));
-      setNewSession({ date: "", startTime: "" });
+      setNewSession({ date: "", startTime: "", label: "" });
       flash("Session added.");
     } catch (err) {
       flash(err?.response?.data?.message || "Couldn't add session.");
@@ -532,7 +561,7 @@ export default function EditClassPage() {
   return (
     <div className="min-h-screen bg-[#F7F5F2] text-brand-brown">
       <Helmet>
-        <title>Edit Class — Kidventures</title>
+        <title>Edit Class, Kidventures</title>
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -750,7 +779,7 @@ export default function EditClassPage() {
             <p className="mt-1 text-xs opacity-60">
               When 2 or more children are booked together in one booking, this
               % is taken off the total. Kidventures' 15% commission is always
-              calculated on the full price — the discount comes entirely out
+              calculated on the full price, the discount comes entirely out
               of your own earning.
             </p>
             {form.siblingDiscountEnabled && (
@@ -811,7 +840,7 @@ export default function EditClassPage() {
           </div>
         </Section>
 
-        {/* 4. sessions — live save */}
+        {/* 4. sessions, live save */}
         <Section
           title="Sessions"
           subtitle="Changes here save immediately, separate from the button above"
@@ -838,6 +867,35 @@ export default function EditClassPage() {
                         {s.seatsBooked || 0}/{s.capacity} booked
                         {cancelled ? " · cancelled" : ""}
                       </span>
+                      {/* Label sirf is din ka naam hai (jaise "Part 1"),
+                          jo parents ko dates ke saath dikhta hai. */}
+                      {!cancelled && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <input
+                            className="w-[190px] rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-brand-orange"
+                            placeholder='Label (e.g. "Part 1")'
+                            maxLength={60}
+                            value={labelDrafts[sid] ?? s.label ?? ""}
+                            onChange={(e) =>
+                              setLabelDrafts((d) => ({
+                                ...d,
+                                [sid]: e.target.value,
+                              }))
+                            }
+                          />
+                          <button
+                            onClick={() => saveSessionLabel(sid)}
+                            disabled={
+                              savingLabelId === sid ||
+                              (labelDrafts[sid] ?? s.label ?? "") ===
+                                (s.label ?? "")
+                            }
+                            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40"
+                          >
+                            {savingLabelId === sid ? "…" : "Save"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {!cancelled && (
                       <button
@@ -879,6 +937,17 @@ export default function EditClassPage() {
                 }
               />
             </Field>
+            <Field label="Label (optional)" className="flex-1">
+              <input
+                className={inputCls}
+                placeholder='e.g. "Part 1"'
+                maxLength={60}
+                value={newSession.label}
+                onChange={(e) =>
+                  setNewSession((s) => ({ ...s, label: e.target.value }))
+                }
+              />
+            </Field>
             <button
               onClick={addSession}
               disabled={addingSession}
@@ -889,7 +958,7 @@ export default function EditClassPage() {
           </div>
         </Section>
 
-        {/* 4b. multi-day bundles — live save */}
+        {/* 4b. multi-day bundles, live save */}
         {(() => {
           const bundledIds = new Set(
             bundles
@@ -906,7 +975,7 @@ export default function EditClassPage() {
           return (
             <Section
               title="Multi-Day Bundles"
-              subtitle="Package 2+ of your sessions together as one combined price — parents pay once for all the dates"
+              subtitle="Package 2+ of your sessions together as one combined price, parents pay once for all the dates"
             >
               {bundles.length === 0 ? (
                 <p className="mb-3 text-sm opacity-60">No bundles yet.</p>
@@ -941,7 +1010,12 @@ export default function EditClassPage() {
                             </span>
                             <div className="mt-1 text-xs opacity-60">
                               {bundleSessions
-                                .map((s) => `${fmtDate(s.date)} ${s.startTime}`)
+                                .map(
+                                  (s) =>
+                                    `${fmtDate(s.date)} ${s.startTime}${
+                                      s.label ? ` (${s.label})` : ""
+                                    }`,
+                                )
                                 .join("  +  ")}
                             </div>
                           </div>
@@ -1009,6 +1083,7 @@ export default function EditClassPage() {
                               className="h-4 w-4 accent-brand-orange"
                             />
                             {fmtDate(s.date)} · {s.startTime}
+                            {s.label ? ` · ${s.label}` : ""}
                           </label>
                         );
                       })}
@@ -1159,13 +1234,13 @@ export default function EditClassPage() {
           </Field>
         </Section>
 
-        {/* 7. images — live save */}
+        {/* 7. images, live save */}
         <Section
           title="Class Images"
           subtitle={`Up to ${MAX_IMAGES} · changes here save immediately`}
         >
           <p className="mb-3 text-xs text-brand-orange">
-            For best results, use a landscape (wide) photo — around 16:9 or 3:2
+            For best results, use a landscape (wide) photo, around 16:9 or 3:2
             ratio. Portrait photos will be cropped to fit the banner.
           </p>
 
@@ -1251,7 +1326,7 @@ export default function EditClassPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6">
             <h3 className="mb-2 text-base font-bold">How pricing works</h3>
             <p className="mb-4 text-sm leading-relaxed opacity-75">
-              Whatever price you set is exactly what parents pay — no extra fees
+              Whatever price you set is exactly what parents pay, no extra fees
               are added on top. Kidventures keeps a 15% commission out of that
               price, and the rest is yours.
             </p>

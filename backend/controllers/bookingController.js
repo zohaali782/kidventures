@@ -403,6 +403,7 @@ const createBooking = async (req, res, next) => {
         sessionDate: primarySession.date,
         startTime: primarySession.startTime,
         endTime: primarySession.endTime,
+        sessionLabel: primarySession.label,
 
         ...(bundle && {
           bundleId: bundle._id,
@@ -412,6 +413,7 @@ const createBooking = async (req, res, next) => {
             date: s.date,
             startTime: s.startTime,
             endTime: s.endTime,
+            label: s.label,
           })),
         }),
 
@@ -933,7 +935,7 @@ const getBookingReceipt = async (req, res, next) => {
       // (canonical) session nahi - warna parent ko lagega sirf ek din
       // book hua hai.
       booking.bundleSessions.forEach((s, i) => {
-        row(`Date ${i + 1}`, fmtDate(s.date));
+        row(s.label ? `Date ${i + 1} (${s.label})` : `Date ${i + 1}`, fmtDate(s.date));
         row(
           `Time ${i + 1}`,
           `${s.startTime}${s.endTime ? " – " + s.endTime : ""}`,

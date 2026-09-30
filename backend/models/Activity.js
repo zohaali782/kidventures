@@ -10,6 +10,12 @@ const sessionSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     startTime: { type: String, required: true }, // "10:00"
     endTime: { type: String, required: true }, // "11:30"
+    /**
+     * Optional chhota naam is din ke liye, jaise "Part 1" ya "Intro".
+     * Multi-session classes me kaam aata hai jahan har din ka material
+     * alag hota hai, taake parent ko pata ho ke kaunsa din kya hai.
+     */
+    label: { type: String, trim: true, maxlength: 60 },
     capacity: { type: Number, required: true, min: 1 },
     seatsBooked: { type: Number, default: 0, min: 0 },
     status: {

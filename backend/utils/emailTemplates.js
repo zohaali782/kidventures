@@ -99,10 +99,18 @@ const fmtDate = (date, startTime) => {
 const fmtWhen = (booking) => {
   if (booking.bundleSessions && booking.bundleSessions.length > 0) {
     return booking.bundleSessions
-      .map((s) => esc(fmtDate(s.date, s.startTime)))
+      .map((s) =>
+        esc(
+          `${fmtDate(s.date, s.startTime)}${s.label ? ` (${s.label})` : ""}`,
+        ),
+      )
       .join("<br>");
   }
-  return esc(fmtDate(booking.sessionDate, booking.startTime));
+  return esc(
+    `${fmtDate(booking.sessionDate, booking.startTime)}${
+      booking.sessionLabel ? ` (${booking.sessionLabel})` : ""
+    }`,
+  );
 };
 
 function layout({ heading, body, ctaText, ctaUrl }) {

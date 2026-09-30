@@ -41,6 +41,8 @@ const bookingSchema = new mongoose.Schema(
     sessionDate: { type: Date, required: true, index: true },
     startTime: String,
     endTime: String,
+    // Us session ka label, jaise "Part 1" (agar instructor ne rakha ho)
+    sessionLabel: String,
 
     /**
      * Multi-day bundle booking (dekho Activity.bundles). Jab set ho, to
@@ -57,6 +59,9 @@ const bookingSchema = new mongoose.Schema(
         date: Date,
         startTime: String,
         endTime: String,
+        // Us din ka label, jaise "Part 1" (snapshot, taake baad me
+        // instructor badal de to bhi purani booking wahi dikhaye)
+        label: String,
       },
     ],
 

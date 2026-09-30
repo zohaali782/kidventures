@@ -572,7 +572,12 @@ function ActivityDetailPage() {
   // hain sab, warna purani single date/time wali soorat.
   const whenText = isFundraiser
     ? pickedSessions
-        .map((s) => `${fmtDate(s.date)}${s.startTime ? ` at ${s.startTime}` : ""}`)
+        .map(
+          (s) =>
+            `${fmtDate(s.date)}${s.startTime ? ` at ${s.startTime}` : ""}${
+              s.label ? ` (${s.label})` : ""
+            }`,
+        )
         .join(" and ")
     : `${selectedDate ? fmtDate(selectedDate) : ""}${
         selectedTime ? ` at ${selectedTime}` : ""
@@ -1098,6 +1103,7 @@ function ActivityDetailPage() {
                             <span className="font-semibold">
                               {fmtDate(s.date)}
                               {s.startTime ? ` · ${s.startTime}` : ""}
+                              {s.label ? ` · ${s.label}` : ""}
                             </span>
                           </label>
                         );

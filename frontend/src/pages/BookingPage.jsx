@@ -787,6 +787,7 @@ export default function BookingPage() {
                             >
                               <IcClock size={13} />
                               {fmtSessionDate(s.date)} · {s.startTime}
+                              {s.label ? ` · ${s.label}` : ""}
                             </span>
                           ))}
                         </div>
@@ -842,6 +843,7 @@ export default function BookingPage() {
                             <IcClock size={16} />
                             <span className="font-semibold">
                               {fmtSessionDate(s.date)} · {s.startTime}
+                              {s.label ? ` · ${s.label}` : ""}
                             </span>
                           </div>
                           <span
@@ -965,7 +967,9 @@ export default function BookingPage() {
                       <Row
                         key={s._id || s.id}
                         label={`Date ${i + 1}`}
-                        value={`${fmtSessionDate(s.date)} · ${s.startTime}`}
+                        value={`${fmtSessionDate(s.date)} · ${s.startTime}${
+                          s.label ? ` · ${s.label}` : ""
+                        }`}
                       />
                     ))}
                   </>
@@ -973,7 +977,11 @@ export default function BookingPage() {
                   <>
                     <Row
                       label="Date"
-                      value={fmtSessionDate(selectedSession.date)}
+                      value={`${fmtSessionDate(selectedSession.date)}${
+                        selectedSession.label
+                          ? ` · ${selectedSession.label}`
+                          : ""
+                      }`}
                     />
                     <Row label="Time" value={selectedSession.startTime} />
                   </>

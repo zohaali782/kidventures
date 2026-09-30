@@ -390,6 +390,7 @@ const createActivity = async (req, res, next) => {
         date: s.date,
         startTime: s.startTime,
         endTime: s.endTime,
+        label: String(s.label || "").trim().slice(0, 60),
         capacity: s.capacity || data.capacity,
         seatsBooked: 0, // hamesha 0 - body se kabhi nahi
       }));
@@ -680,6 +681,8 @@ const addSession = async (req, res, next) => {
       date: sessionDate,
       startTime,
       endTime,
+      // Optional label, jaise "Part 1". 60 characters se zyada nahi.
+      label: String(req.body.label || "").trim().slice(0, 60),
       capacity: Number(capacity) || activity.capacity,
       seatsBooked: 0,
     });
@@ -687,6 +690,47 @@ const addSession = async (req, res, next) => {
     await activity.save();
 
     res.status(201).json({ success: true, message: "Session added", activity });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Session ka label set/badalna (jaise "Part 1")
+ * @route   PUT /api/activities/:id/sessions/:sessionId
+ * @access  Instructor (apni class)
+ *
+ * Sirf label badalta hai. Date/time/capacity yahan se nahi chhedte,
+ * kyunke un par bookings aur seat ka hisaab jura hota hai.
+ */
+const updateSessionLabel = async (req, res, next) => {
+  try {
+    const activity = await Activity.findById(req.params.id);
+
+    if (!activity) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const isOwner = activity.instructor.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your class" });
+    }
+
+    const session = activity.sessions.id(req.params.sessionId);
+    if (!session) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Session not found" });
+    }
+
+    session.label = String(req.body.label || "").trim().slice(0, 60);
+    await activity.save();
+
+    res.json({ success: true, message: "Session updated", activity });
   } catch (error) {
     next(error);
   }
@@ -994,6 +1038,7 @@ module.exports = {
   updateActivity,
   deleteActivity,
   addSession,
+  updateSessionLabel,
   deleteSession,
   addBundle,
   updateBundle,

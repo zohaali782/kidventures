@@ -10,6 +10,7 @@ const {
   updateActivity,
   deleteActivity,
   addSession,
+  updateSessionLabel,
   deleteSession,
   addBundle,
   updateBundle,
@@ -81,6 +82,14 @@ router.post(
   authorize("instructor", "admin"),
   requireApprovedInstructor,
   addSession,
+);
+
+router.put(
+  "/:id/sessions/:sessionId",
+  protect,
+  authorize("instructor", "admin"),
+  requireApprovedInstructor,
+  updateSessionLabel,
 );
 
 router.delete(
