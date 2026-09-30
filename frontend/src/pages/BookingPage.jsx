@@ -527,7 +527,11 @@ export default function BookingPage() {
     selectedChildIds.includes(c._id || c.id),
   );
 
-  const isBundleSelected = !!selectedBundleId;
+  // Jaan boojh kar selectedBundleId ke bajaye khud bundle object dekhte hain:
+  // ho sakta hai chunne ke baad wo bundle bookable na rahe (koi date guzar
+  // gayi, ya instructor ne archive kar diya). Us soorat me use "chuna hua"
+  // maanna ghalat hoga, aur price ka hisaab bhi undefined par ja girta.
+  const isBundleSelected = !!selectedBundle;
   // Flexible ("delegate") pricing class-level setting hai, is liye ye bundle
   // par bhi lagu hoti hai. Bundle chuna ho to uski combined price sirf
   // "suggested" amount ban jati hai, parent apni marzi ka amount likh sakta
@@ -561,7 +565,7 @@ export default function BookingPage() {
   const goNext = () => {
     setStepError("");
     if (step === 1) {
-      if (!selectedSessionId && !selectedBundleId) {
+      if (!selectedSession && !isBundleSelected) {
         setStepError("Please choose a date and time.");
         return;
       }
@@ -636,7 +640,7 @@ export default function BookingPage() {
   return (
     <div className="min-h-screen bg-[#F7F5F2] font-sans text-brand-brown">
       <Helmet>
-        <title>Book {a.title} — Kidventures</title>
+        <title>Book {a.title}, Kidventures</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <Navbar />
@@ -724,7 +728,7 @@ export default function BookingPage() {
         )}
 
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          {/* STEP 1 — session */}
+          {/* STEP 1, session */}
           {step === 1 && (
             <>
               <h2 className="mb-4 text-base font-bold">Choose date & time</h2>
@@ -860,7 +864,7 @@ export default function BookingPage() {
             </>
           )}
 
-          {/* STEP 2 — child */}
+          {/* STEP 2, child */}
           {step === 2 && (
             <>
               <h2 className="mb-1 text-base font-bold">Who is attending?</h2>
@@ -944,7 +948,7 @@ export default function BookingPage() {
             </>
           )}
 
-          {/* STEP 3 — review */}
+          {/* STEP 3, review */}
           {step === 3 && (selectedSession || selectedBundle) && (
             <>
               <h2 className="mb-4 text-base font-bold">Review</h2>
@@ -1050,7 +1054,7 @@ export default function BookingPage() {
             </>
           )}
 
-          {/* STEP 4 — payment */}
+          {/* STEP 4, payment */}
           {step === 4 && booking && clientSecret && (
             <>
               <div className="mb-4 flex items-center justify-between">
@@ -1087,7 +1091,7 @@ export default function BookingPage() {
             </>
           )}
 
-          {/* STEP 5 — confirmation */}
+          {/* STEP 5, confirmation */}
           {step === 5 && (
             <div className="py-5 text-center">
               <div className="mx-auto mb-4 flex h-[70px] w-[70px] items-center justify-center rounded-full bg-green-100">

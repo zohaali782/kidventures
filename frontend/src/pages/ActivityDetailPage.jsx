@@ -34,6 +34,27 @@ const markerIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
+/**
+ * wa.me ko number hamesha international format me chahiye. Admin fundraiser
+ * ka number local UAE format me daal sakta hai (jaise 0566820005), aur aise
+ * number par WhatsApp "invalid number" keh deta hai.
+ *
+ * Is liye sirf us soorat me +971 lagate hain jab number bilkul UAE mobile
+ * jaisa ho: 10 digits aur shuru "05" se. Baqi har format (doosray mulk ke
+ * numbers bhi) jaisa hai waisa hi rehta hai, warna message kisi aur ke paas
+ * chala jata.
+ */
+const waNumber = (phone) => {
+  let digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+  } else if (digits.length === 10 && digits.startsWith("05")) {
+    digits = "971" + digits.slice(1);
+  }
+  return digits;
+};
+
 const getCoords = (loc) => {
   if (!loc || typeof loc !== "object") return null;
   if (typeof loc.lat === "number" && typeof loc.lng === "number")
@@ -244,6 +265,13 @@ function ActivityDetailPage() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState("");
   const [count, setCount] = useState(1);
+  /**
+   * Charity fundraiser class par parent ek se zyada dates chun sakta hai
+   * (jaise 2-day workshop). Normal class par ye istemal nahi hota, wahan
+   * upar wali single date/time hi chalti hai, kyunke wahan booking flow
+   * ek session par chalta hai.
+   */
+  const [pickedSessionIds, setPickedSessionIds] = useState([]);
   const [copied, setCopied] = useState(false);
   // Gallery lightbox - kaunsi image (images array ka index) bari dikha rahe
   // hain. null matlab lightbox band hai.
@@ -339,7 +367,7 @@ function ActivityDetailPage() {
           })
           .catch(() => {});
 
-        // instructor profile (best-effort — bio/experience ke liye)
+        // instructor profile (best-effort, bio/experience ke liye)
         const insId = a.instructor?._id || a.instructor?.id;
         if (insId) {
           api
@@ -423,7 +451,7 @@ function ActivityDetailPage() {
     return (
       <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
         <Helmet>
-          <title>Activity not found — Kidventures</title>
+          <title>Activity not found, Kidventures</title>
         </Helmet>
         <Navbar />
         <div className="px-4 py-20 text-center sm:px-10">
@@ -470,7 +498,7 @@ function ActivityDetailPage() {
     Array.isArray(a.languages) && a.languages.length
       ? a.languages.join(", ")
       : "English";
-  // Parent bilkul yehi deta hai — commission instructor se katta hai
+  // Parent bilkul yehi deta hai, commission instructor se katta hai
   const price = a.price ?? "";
   const siblingDiscountPercent =
     a.siblingDiscount?.enabled && Number(a.siblingDiscount.percent) > 0
@@ -521,6 +549,34 @@ function ActivityDetailPage() {
 
   const dates = futureSessionDates(a);
   const times = timesForDate(a, selectedDate);
+
+  /* ---- fundraiser class: multi-date selection ---- */
+  const isFundraiser = !!a.fundraiser?.enabled;
+  const now = new Date();
+  const upcomingSessions = (a.sessions || [])
+    .filter(
+      (s) => s?.date && new Date(s.date) >= now && s.status !== "cancelled",
+    )
+    .sort((x, y) => new Date(x.date) - new Date(y.date));
+
+  const pickedSessions = upcomingSessions.filter((s) =>
+    pickedSessionIds.includes(String(s._id || s.id)),
+  );
+
+  const toggleSession = (sid) =>
+    setPickedSessionIds((ids) =>
+      ids.includes(sid) ? ids.filter((x) => x !== sid) : [...ids, sid],
+    );
+
+  // WhatsApp message me dates ki line: fundraiser par jitni dates chuni
+  // hain sab, warna purani single date/time wali soorat.
+  const whenText = isFundraiser
+    ? pickedSessions
+        .map((s) => `${fmtDate(s.date)}${s.startTime ? ` at ${s.startTime}` : ""}`)
+        .join(" and ")
+    : `${selectedDate ? fmtDate(selectedDate) : ""}${
+        selectedTime ? ` at ${selectedTime}` : ""
+      }`.trim();
   const selectedSession = (a.sessions || []).find(
     (s) =>
       s?.date &&
@@ -538,13 +594,13 @@ function ActivityDetailPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
-        <title>{a.title} — Kidventures</title>
+        <title>{a.title}, Kidventures</title>
         <meta
           name="description"
           content={String(a.description || "").slice(0, 155)}
         />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content={`${a.title} — Kidventures`} />
+        <meta property="og:title" content={`${a.title}, Kidventures`} />
         <meta
           property="og:description"
           content={String(a.description || "").slice(0, 155)}
@@ -835,7 +891,7 @@ function ActivityDetailPage() {
             <div>
               <div className="mb-4 flex items-center gap-3">
                 <span className="text-3xl font-bold text-brand-brown">
-                  {rating || "—"}
+                  {rating || "-"}
                 </span>
                 <div className="text-[13px] text-brand-brown/70">
                   ★ average · {reviews} {reviews === 1 ? "review" : "reviews"}
@@ -954,7 +1010,7 @@ function ActivityDetailPage() {
           )}
         </div>
 
-        {/* RIGHT — booking card */}
+        {/* RIGHT, booking card */}
         <div className="min-w-0 flex-1 lg:max-w-[340px]">
           <div className="mb-4 rounded-2xl bg-white p-5 shadow-[0_2px_20px_rgba(61,43,31,0.12)]">
             {a.fundraiser?.enabled ? (
@@ -963,7 +1019,7 @@ function ActivityDetailPage() {
                   Charity fundraiser class
                 </div>
                 <div className="text-sm text-brand-brown/70">
-                  All proceeds support this instructor's fundraiser — pay
+                  All proceeds support this instructor's fundraiser, pay
                   directly through their link, then verify on WhatsApp.
                 </div>
               </>
@@ -973,7 +1029,7 @@ function ActivityDetailPage() {
                   Delegate pricing
                 </div>
                 <div className="text-sm text-brand-brown/70">
-                  No fixed price — you choose the amount per child at
+                  No fixed price, you choose the amount per child at
                   checkout.
                 </div>
               </>
@@ -984,7 +1040,7 @@ function ActivityDetailPage() {
                     ? `From AED ${price}`
                     : price !== ""
                       ? `AED ${price}`
-                      : "—"}
+                      : "-"}
                 </div>
                 <div className="text-xs text-brand-brown/60">
                   {a.flexiblePricing?.enabled
@@ -1006,39 +1062,87 @@ function ActivityDetailPage() {
               </div>
             ) : (
               <>
-                <div className="mb-2.5 text-[13px] font-bold">Select Date</div>
-                <div className="mb-4 flex justify-center [&_.react-datepicker]:border-gray-200">
-                  <DatePicker
-                    selected={selectedDate}
-                    onChange={(date) => {
-                      setSelectedDate(date);
-                      const t = timesForDate(a, date);
-                      setSelectedTime(t[0] || "");
-                    }}
-                    includeDates={dates}
-                    minDate={new Date()}
-                    inline
-                  />
-                </div>
+                {isFundraiser ? (
+                  /* Fundraiser class: parent jitni dates chahe chun sakta
+                     hai (misaal ke tor par 2-day workshop ke dono din),
+                     aur sab chuni hui dates WhatsApp message me chali
+                     jati hain. Payment donation link se hoti hai, is liye
+                     yahan seat reserve karne wala koi step nahi. */
+                  <>
+                    <div className="mb-1 text-[13px] font-bold">
+                      Select your dates
+                    </div>
+                    <div className="mb-2.5 text-[11px] text-brand-brown/60">
+                      Pick every date you'd like to attend, they'll be
+                      included in your WhatsApp message.
+                    </div>
+                    <div className="mb-4 flex flex-col gap-2">
+                      {upcomingSessions.map((s) => {
+                        const sid = String(s._id || s.id);
+                        const chosen = pickedSessionIds.includes(sid);
+                        return (
+                          <label
+                            key={sid}
+                            className={`flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3.5 py-2.5 text-[13px] ${
+                              chosen
+                                ? "border-brand-orange bg-brand-cream"
+                                : "border-gray-200 bg-white"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={chosen}
+                              onChange={() => toggleSession(sid)}
+                              className="h-4 w-4 accent-brand-orange"
+                            />
+                            <span className="font-semibold">
+                              {fmtDate(s.date)}
+                              {s.startTime ? ` · ${s.startTime}` : ""}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-2.5 text-[13px] font-bold">
+                      Select Date
+                    </div>
+                    <div className="mb-4 flex justify-center [&_.react-datepicker]:border-gray-200">
+                      <DatePicker
+                        selected={selectedDate}
+                        onChange={(date) => {
+                          setSelectedDate(date);
+                          const t = timesForDate(a, date);
+                          setSelectedTime(t[0] || "");
+                        }}
+                        includeDates={dates}
+                        minDate={new Date()}
+                        inline
+                      />
+                    </div>
 
-                <div className="mb-2.5 text-[13px] font-bold">
-                  Available Time
-                </div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {times.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setSelectedTime(t)}
-                      className={`rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                        selectedTime === t
-                          ? "border-brand-orange bg-brand-orange text-white"
-                          : "border-gray-200 bg-white text-brand-brown"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                    <div className="mb-2.5 text-[13px] font-bold">
+                      Available Time
+                    </div>
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {times.map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setSelectedTime(t)}
+                          className={`rounded-lg border px-3.5 py-2 text-xs font-semibold ${
+                            selectedTime === t
+                              ? "border-brand-orange bg-brand-orange text-white"
+                              : "border-gray-200 bg-white text-brand-brown"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <div className="mb-2.5 text-[13px] font-bold">
                   Number of Children
@@ -1059,7 +1163,12 @@ function ActivityDetailPage() {
                   </button>
                 </div>
 
-                {seatsLeft != null &&
+                {/* Fundraiser class par seats manually coordinate hoti hain
+                    (koi auto reservation nahi), aur wahan single session
+                    select bhi nahi hota, is liye ye line sirf normal
+                    classes par dikhati hai. */}
+                {!isFundraiser &&
+                  seatsLeft != null &&
                   (seatsLeft <= 0 ? (
                     <div className="mb-3.5 flex items-center gap-1.5 text-xs text-[#c0392b]">
                       <span className="inline-block h-2 w-2 rounded-full bg-current" />{" "}
@@ -1090,14 +1199,11 @@ function ActivityDetailPage() {
                   Donate & Reserve Your Spot
                 </a>
                 <a
-                  href={`https://wa.me/${(a.fundraiser.whatsapp || "").replace(
-                    /[^\d]/g,
-                    "",
+                  href={`https://wa.me/${waNumber(
+                    a.fundraiser.whatsapp,
                   )}?text=${encodeURIComponent(
                     `Hi! I'd like to book ${count} spot(s) for "${a.title}"${
-                      selectedDate ? ` on ${fmtDate(selectedDate)}` : ""
-                    }${
-                      selectedTime ? ` at ${selectedTime}` : ""
+                      whenText ? ` on ${whenText}` : ""
                     }. I've made my fundraiser payment and I'm attaching the screenshot.`,
                   )}`}
                   target="_blank"

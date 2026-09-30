@@ -124,7 +124,7 @@ const bookingSchema = new mongoose.Schema(
 
       /**
        * Cancel ke waqt policy ka kaunsa tier laga. Admin ko baad me
-       * yeh dekh kar faisla karna hota hai — khaas kar "partial" par,
+       * yeh dekh kar faisla karna hota hai, khaas kar "partial" par,
        * jahan rakam provider ki policy par munhasir hai.
        */
       refundTier: {
@@ -132,7 +132,7 @@ const bookingSchema = new mongoose.Schema(
         enum: ["full", "partial", "none", "not_applicable"],
       },
 
-      // "full" par poori rakam, warna 0 — asli refund admin Stripe se karta hai
+      // "full" par poori rakam, warna 0, asli refund admin Stripe se karta hai
       refundAmount: { type: Number, default: 0 },
 
       // Admin ne refund kar diya ya nahi
@@ -143,7 +143,7 @@ const bookingSchema = new mongoose.Schema(
         index: true,
       },
 
-      // Admin ne kab aur kya faisla kiya — audit trail
+      // Admin ne kab aur kya faisla kiya, audit trail
       reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       reviewedAt: Date,
       reviewNote: String,
@@ -193,7 +193,7 @@ bookingSchema.pre("save", function () {
  *
  *   48 ghante se zyada pehle  -> full refund (processing fees minus)
  *   24 se 48 ghante ke beech  -> partial refund ho sakta hai, provider ki
- *                                policy par — faisla insaan karta hai
+ *                                policy par, faisla insaan karta hai
  *   24 ghante se kam          -> aam tor par koi refund nahi
  *
  * (Pehle code sirf ek hi shart lagata tha: 24+ ghante = poora refund.

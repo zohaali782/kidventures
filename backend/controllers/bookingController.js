@@ -316,7 +316,7 @@ const createBooking = async (req, res, next) => {
     /* --------------------------- 4. Paisay ---------------------------
      *
      * Commission model: COMMISSION DEDUCTED FROM INSTRUCTOR
-     * (Airbnb-host style — Uber-rider-surcharge NAHI).
+     * (Airbnb-host style, Uber-rider-surcharge NAHI).
      *
      * Parent bilkul WAHI price deta hai jo listing par dikhti hai -
      * koi extra "service fee" upar se nahi jorha jata. Commission
@@ -460,10 +460,10 @@ const createBooking = async (req, res, next) => {
         { $inc: decFields },
         { arrayFilters },
       ).catch((err) =>
-        // Error chupana nahi — yeh woh soorat hai jahan seat kisi ke kaam
+        // Error chupana nahi, yeh woh soorat hai jahan seat kisi ke kaam
         // aaye baghair block ho jati hai, aur kisi ko pata nahi chalta.
         console.error(
-          `! Seat rollback failed — activity ${activityId}, session(s) ` +
+          `! Seat rollback failed, activity ${activityId}, session(s) ` +
             `${sessionIdsInvolved.join(",")}, ${numberOfChildren} seat(s): ${err.message}`,
         ),
       );
@@ -522,7 +522,7 @@ const getInstructorBookings = async (req, res, next) => {
     }
 
     /**
-     * Instructor ko sirf confirmed bookings dikhani chahiyen — "pending"
+     * Instructor ko sirf confirmed bookings dikhani chahiyen, "pending"
      * wali abhi paid nahi hui.
      *
      * Pehle ?status= jo bhi aata wohi laga diya jata tha, yaani instructor
@@ -620,12 +620,12 @@ const cancelBooking = async (req, res, next) => {
     }
 
     /**
-     * REFUND TIER — site ke Refund & Cancellation page wali policy:
+     * REFUND TIER, site ke Refund & Cancellation page wali policy:
      *   48h+     -> full refund
      *   24h-48h  -> partial ho sakta hai (provider ki policy par)
      *   24h se kam -> aam tor par kuch nahi
      *
-     * Asli paisa yahan wapas nahi hota — cancelBooking sirf seat free karta
+     * Asli paisa yahan wapas nahi hota, cancelBooking sirf seat free karta
      * hai aur tier record karta hai. Refund admin Stripe se karta hai
      * (POST /api/payments/:bookingId/refund), kyunke "partial" ki rakam
      * ka faisla insaan hi kar sakta hai. Yeh policy page se bhi match karta
@@ -652,7 +652,7 @@ const cancelBooking = async (req, res, next) => {
      *
      * Pehle yahan findById ke baad booking.save() hota tha. Un dono ke
      * darmiyan agar Stripe ka webhook payment confirm kar deta, to yeh save
-     * us confirmation ko MITA deta — paise kat jate aur booking cancelled
+     * us confirmation ko MITA deta, paise kat jate aur booking cancelled
      * reh jati. Isi tarah do cancel requests ek sath aatin to seats do
      * dafa release ho jatin.
      *
@@ -694,7 +694,7 @@ const cancelBooking = async (req, res, next) => {
 
     // Seats wapas chhor do taake koi aur book kar sake. Bundle booking ho to
     // uski HAR session ki seat release honi chahiye, na ke sirf primary
-    // (canonical) sessionId ki — warna baqi dates hamesha ke liye block
+    // (canonical) sessionId ki, warna baqi dates hamesha ke liye block
     // rehtin.
     const sessionIdsToRelease =
       cancelled.bundleSessions && cancelled.bundleSessions.length > 0
@@ -727,16 +727,16 @@ const cancelBooking = async (req, res, next) => {
       { arrayFilters: releaseArrayFilters },
     ).catch((err) => {
       console.error(
-        `! Seat release error — booking ${cancelled.bookingNumber}: ${err.message}`,
+        `! Seat release error, booking ${cancelled.bookingNumber}: ${err.message}`,
       );
       return null;
     });
 
-    // Pehle yahan .catch(() => {}) tha — seat block ho jati aur kisi ko
+    // Pehle yahan .catch(() => {}) tha, seat block ho jati aur kisi ko
     // pata na chalta.
     if (seatResult && seatResult.modifiedCount === 0) {
       console.error(
-        `! Seat release failed — booking ${cancelled.bookingNumber}, ` +
+        `! Seat release failed, booking ${cancelled.bookingNumber}, ` +
           `activity ${cancelled.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
       );
     }
@@ -924,7 +924,7 @@ const getBookingReceipt = async (req, res, next) => {
     };
 
     heading("Class Details");
-    row("Instructor", booking.instructor?.name || "—");
+    row("Instructor", booking.instructor?.name || "-");
     if (booking.bundleTitle) {
       row("Bundle", booking.bundleTitle);
     }
@@ -991,7 +991,7 @@ const getBookingReceipt = async (req, res, next) => {
       .fontSize(9)
       .fillColor(BRAND.gray)
       .text(
-        "Kidventures, Dubai, UAE — for any questions, contact us through the website.",
+        "Kidventures, Dubai, UAE. For any questions, contact us through the website.",
         50,
         760,
         { align: "center", width: 495 },

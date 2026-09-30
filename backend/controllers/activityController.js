@@ -11,10 +11,10 @@ const { cleanVideoUrl } = require("../utils/safeUrl");
 const escapeRegex = (text) =>
   String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Search query ki hadd — bina limit ke har request poori collection scan karti hai */
+/** Search query ki hadd, bina limit ke har request poori collection scan karti hai */
 const MAX_SEARCH_LENGTH = 80;
 
-/** Query param ko number banata hai — NaN/Infinity par null deta hai */
+/** Query param ko number banata hai, NaN/Infinity par null deta hai */
 const cleanNumber = (value) => {
   if (value === undefined || value === null || value === "") return null;
   const n = Number(value);
@@ -248,11 +248,11 @@ const getActivityById = async (req, res, next) => {
  * SECURITY: "images" jaan boojh kar YAHAN NAHI hai.
  *
  * Pehle woh is list me tha, jis ka matlab tha ke instructor request body me
- * apni marzi ki images array bhej sakta tha — apni marzi ke publicId ke sath.
+ * apni marzi ki images array bhej sakta tha, apni marzi ke publicId ke sath.
  * Aur deleteActivityImage usi publicId ko Cloudinary se hata deta tha.
  *
  * Yaani: instructor A kisi doosre ki class ka image URL dekhta (publicId URL
- * me hi likha hota hai), use apni class me daal deta, phir delete kar deta —
+ * me hi likha hota hai), use apni class me daal deta, phir delete kar deta,
  * aur doosre instructor ka image hamesha ke liye khatam. Us ko khabar bhi na
  * hoti.
  *
@@ -301,7 +301,7 @@ function sanitizeFaqs(input) {
 
 /**
  * Sibling discount ab instructor apni marzi se on/off aur percent set karta
- * hai — is liye body se aane wali value ko trust nahi karte, hamesha yahan
+ * hai, is liye body se aane wali value ko trust nahi karte, hamesha yahan
  * clean/clamp karte hain (0-50%, off hone par 0).
  */
 function sanitizeSiblingDiscount(input) {
@@ -336,7 +336,7 @@ const createActivity = async (req, res, next) => {
       if (req.body[field] !== undefined) data[field] = req.body[field];
     });
 
-    // videoUrl sirf https YouTube/Vimeo — warna "javascript:" ya koi bhi
+    // videoUrl sirf https YouTube/Vimeo, warna "javascript:" ya koi bhi
     // bahri link embed ho sakta hai
     if (data.videoUrl !== undefined) {
       const safeVideo = cleanVideoUrl(data.videoUrl);
@@ -452,20 +452,20 @@ const updateActivity = async (req, res, next) => {
      *
      * Pehle masla yeh tha: instructor ek seedhi saadhi class submit karta,
      * admin use approve kar deta (status "active"), aur us ke BAAD woh title,
-     * description, price, location — sab badal deta. Status "active" hi rehta,
+     * description, price, location, sab badal deta. Status "active" hi rehta,
      * yaani badla hua content live chala jata aur kisi admin ki nazar us par
      * na parti.
      *
-     * Bachon ki activities wali site par yeh sab se ahem gap hai — approval
+     * Bachon ki activities wali site par yeh sab se ahem gap hai, approval
      * ka matlab hi khatam ho jata hai agar approval ke baad content badla ja
      * sake.
      *
      * Ab: agar non-admin kisi LIVE class ka maadi content badle, to class
      * wapas "pending" ho jati hai aur dobara review me jati hai.
      * Chhoti cheezein (materialsNote, whatToBring waghera) is me shaamil
-     * nahi — un par dobara review ki zaroorat nahi.
+     * nahi, un par dobara review ki zaroorat nahi.
      */
-    // videoUrl ki jaanch update par bhi — create jaisi hi
+    // videoUrl ki jaanch update par bhi, create jaisi hi
     if (req.body.videoUrl !== undefined) {
       const safeVideo = cleanVideoUrl(req.body.videoUrl);
       if (safeVideo === null) {
@@ -542,7 +542,7 @@ const updateActivity = async (req, res, next) => {
         activity.status = requested;
         if (req.body.statusNote) activity.statusNote = req.body.statusNote;
       } else if (["draft", "pending"].includes(requested)) {
-        // Instructor khud ko "active" nahi kar sakta — aur agar class abhi
+        // Instructor khud ko "active" nahi kar sakta, aur agar class abhi
         // review me bheji gayi hai to woh use "draft" me chhupa bhi nahi sakta
         if (!sentBackForReview || requested === "pending") {
           activity.status = requested;
@@ -722,8 +722,8 @@ const deleteSession = async (req, res, next) => {
     }
 
     // Ye session kisi ACTIVE bundle ka hissa hai? To pehle bundle theek
-    // karo (dosri session laga do ya bundle archive karo) - warna bundle
-    // ki apni sessionIds list toot jayegi (aur is booking flow me
+    // karo (doosri session laga do ya bundle archive karo), warna bundle
+    // ki apni sessionIds list toot jayegi (aur booking flow me
     // bookingController.js ka "misconfigured" error dega).
     const usedInBundle = (activity.bundles || []).find(
       (b) =>
@@ -746,6 +746,23 @@ const deleteSession = async (req, res, next) => {
         message: "Session has bookings, so it was cancelled instead of removed",
         activity,
       });
+    }
+
+    // Session waqai hat rahi hai. Upar wala check sirf ACTIVE bundles rokta
+    // hai, to archived bundles me is session ka id ab bhi para ho sakta hai.
+    // Usay yahin nikal dete hain, warna wo id kisi aisi session ko point
+    // karta reh jata jo maujood hi nahi, aur baad me koi bhi cleanup us
+    // bundle ko dobara active kar deta to booking par "misconfigured" aata.
+    const removedId = session._id.toString();
+    for (const bundle of activity.bundles || []) {
+      const before = bundle.sessionIds.length;
+      bundle.sessionIds = bundle.sessionIds.filter(
+        (id) => id.toString() !== removedId,
+      );
+      // 2 se kam sessions wala bundle ab bundle raha hi nahi
+      if (before !== bundle.sessionIds.length && bundle.sessionIds.length < 2) {
+        bundle.status = "archived";
+      }
     }
 
     session.deleteOne();

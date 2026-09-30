@@ -15,7 +15,7 @@ const Activity = require("../models/Activity");
  *
  * Purana code find() karta tha, phir booking.save() se cancel karta tha.
  * In dono ke darmiyan agar Stripe ka webhook aa jata (payment kamyab), to
- * yeh cron us PAID booking ko cancel kar deta — paise le liye, seat gayi.
+ * yeh cron us PAID booking ko cancel kar deta, paise le liye, seat gayi.
  *
  * Ab ek hi atomic findOneAndUpdate use hoti hai jis me shart dobara lagi hai:
  * "sirf tab cancel karo jab booking ab bhi pending aur unpaid ho".
@@ -23,7 +23,7 @@ const Activity = require("../models/Activity");
  * booking ko haath nahi lagta.
  * -------------------------------------------------------------------------
  */
-// Agar pichla run abhi chal raha ho to naya shuru na ho — warna do runs
+// Agar pichla run abhi chal raha ho to naya shuru na ho, warna do runs
 // ek hi booking par kaam kar ke seats do dafa release kar sakte hain.
 let isRunning = false;
 
@@ -49,7 +49,7 @@ const releaseExpiredReservations = async () => {
     let skipped = 0;
 
     for (const booking of expired) {
-      // 1. Booking cancel karo — lekin sirf tab jab woh ab bhi pending ho.
+      // 1. Booking cancel karo, lekin sirf tab jab woh ab bhi pending ho.
       //    Yehi shart race condition ko rokti hai.
       const cancelled = await Booking.findOneAndUpdate(
         {
@@ -76,7 +76,7 @@ const releaseExpiredReservations = async () => {
         continue;
       }
 
-      // 2. Ab seat wapas chhodo. Pehle cancel, phir seat — is tarteeb se
+      // 2. Ab seat wapas chhodo. Pehle cancel, phir seat, is tarteeb se
       //    seat kabhi do dafa release nahi hoti. Bundle booking ho to
       //    uski HAR session ki seat release honi chahiye (na ke sirf
       //    primary sessionId ki), warna bundle ki baqi dates hamesha
@@ -117,12 +117,12 @@ const releaseExpiredReservations = async () => {
           // Purana code yahan error chupa deta tha (.catch(() => {})), jis se
           // seat hamesha ke liye block ho jati aur kisi ko pata na chalta.
           console.error(
-            `! Seat release failed — booking ${booking._id}, activity ${booking.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
+            `! Seat release failed, booking ${booking._id}, activity ${booking.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
           );
         }
       } catch (err) {
         console.error(
-          `! Seat release error — booking ${booking._id}: ${err.message}`,
+          `! Seat release error, booking ${booking._id}: ${err.message}`,
         );
       }
 

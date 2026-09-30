@@ -12,7 +12,7 @@ const tpl = require("../utils/emailTemplates");
  */
 const toFils = (aed) => Math.round(aed * 100);
 
-/** Paisa hamesha 2 decimal par — warna 87.49999999 jaisi rakam ban jati hai. */
+/** Paisa hamesha 2 decimal par, warna 87.49999999 jaisi rakam ban jati hai. */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 /**
@@ -98,7 +98,7 @@ const createPaymentIntent = async (req, res, next) => {
     }
 
     if (!paymentIntent) {
-      // Stripe Connect: funds are split via a destination charge —
+      // Stripe Connect: funds are split via a destination charge,
       // application_fee_amount stays with the platform, the rest goes to
       // the instructor. Block the charge if Connect onboarding isn't done.
       const instructorProfile = await InstructorProfile.findOne({
@@ -204,7 +204,7 @@ const handleWebhook = async (req, res) => {
    *
    * Pehle yahan 200 foran bhej diya jata tha aur kaam baad me hota tha.
    * Agar us kaam me DB error aa jata (connection blip waghera), to Stripe
-   * ko lagta ke sab theek hai aur woh DOBARA nahi bhejta — parent ka paisa
+   * ko lagta ke sab theek hai aur woh DOBARA nahi bhejta, parent ka paisa
    * kat chuka hota aur booking kabhi confirm na hoti.
    *
    * DB writes chhoti hain (Stripe 20+ second deta hai). Emails phir bhi
@@ -223,8 +223,8 @@ const handleWebhook = async (req, res) => {
         break;
 
       /**
-       * Refund kahin se bhi hua ho — admin dashboard se, Stripe Dashboard
-       * se, ya Stripe ne khud dispute par kiya ho — yeh event aata hai.
+       * Refund kahin se bhi hua ho, admin dashboard se, Stripe Dashboard
+       * se, ya Stripe ne khud dispute par kiya ho, yeh event aata hai.
        *
        * Is ke baghair Stripe Dashboard se kiya gaya refund hamare database
        * ko pata hi nahi chalta: booking "paid" dikhti rehti, Refunds tab me
@@ -267,7 +267,7 @@ const onPaymentSucceeded = async (paymentIntent) => {
    * Pehle yahan sirf yeh dekha jata tha ke booking already confirmed/paid
    * to nahi. Us se ek khatarnak surat nikalti thi: parent ne pending booking
    * cancel kar di (seats chhor di gayin), phir Stripe ka webhook aaya, aur
-   * cancelled booking dobara "confirmed" ban gayi — jabke seat kisi aur ko
+   * cancelled booking dobara "confirmed" ban gayi, jabke seat kisi aur ko
    * ja chuki hoti. Session oversold, aur kisi ko khabar nahi.
    *
    * Ab shart update ke andar hi hai: pending nahi to haath hi nahi lagta.
@@ -282,21 +282,21 @@ const onPaymentSucceeded = async (paymentIntent) => {
   );
 
   if (!booking) {
-    // Update match nahi hui — do wajuhat ho sakti hain
+    // Update match nahi hui, do wajuhat ho sakti hain
     const existing = await Booking.findById(bookingId);
 
     if (!existing) return;
 
-    // (a) Yehi webhook pehle bhi aa chuka tha — Stripe dobara bhejta hai
+    // (a) Yehi webhook pehle bhi aa chuka tha, Stripe dobara bhejta hai
     if (existing.status === "confirmed" || existing.paymentStatus === "paid") {
       return;
     }
 
     // (b) Booking cancel/expire ho chuki thi aur us ke baad paisa aa gaya.
-    //     Yeh paisa parent ko wapas karna hoga — insaan ko dekhna parega.
+    //     Yeh paisa parent ko wapas karna hoga, insaan ko dekhna parega.
     console.error(
       `! PAYMENT RECEIVED FOR ${existing.status.toUpperCase()} BOOKING ` +
-        `${existing.bookingNumber} — refund required (intent ${paymentIntent.id})`,
+        `${existing.bookingNumber}, refund required (intent ${paymentIntent.id})`,
     );
 
     await Payment.updateOne(
@@ -324,7 +324,7 @@ const onPaymentSucceeded = async (paymentIntent) => {
       },
     },
   ).catch((err) => {
-    // Pehle yahan .catch(() => {}) tha — error chup chaap gum ho jata tha
+    // Pehle yahan .catch(() => {}) tha, error chup chaap gum ho jata tha
     console.error(
       `! Stats update failed for activity ${booking.activity}: ${err.message}`,
     );
@@ -388,9 +388,9 @@ const sendBookingEmails = async (bookingId) => {
 };
 
 /**
- * Refund hua — chahe hamare admin panel se ya Stripe Dashboard se.
+ * Refund hua, chahe hamare admin panel se ya Stripe Dashboard se.
  *
- * Stripe har charge par `amount_refunded` (fils me) bhejta hai — yaani ab
+ * Stripe har charge par `amount_refunded` (fils me) bhejta hai, yaani ab
  * tak KUL kitna refund ho chuka. Hum usi ko sach mante hain, kyunki wohi
  * asal paise ka record hai.
  *
@@ -444,7 +444,7 @@ const onChargeRefunded = async (charge) => {
   if (fullRefund && !["cancelled", "refunded"].includes(booking.status)) {
     booking.status = "refunded";
 
-    // Seat wapas chhor do — sirf tab jab booking pehle cancel na hui ho
+    // Seat wapas chhor do, sirf tab jab booking pehle cancel na hui ho
     // (cancel ke waqt seat pehle hi chhori ja chuki hoti hai). Bundle
     // booking ho to uski HAR session ki seat release honi chahiye.
     const sessionIdsToRelease =
@@ -478,14 +478,14 @@ const onChargeRefunded = async (charge) => {
       { arrayFilters: refundArrayFilters },
     ).catch((err) => {
       console.error(
-        `! Seat release error on webhook refund — ${booking.bookingNumber}: ${err.message}`,
+        `! Seat release error on webhook refund, ${booking.bookingNumber}: ${err.message}`,
       );
       return null;
     });
 
     if (seatResult && seatResult.modifiedCount === 0) {
       console.error(
-        `! Seat release failed on webhook refund — ${booking.bookingNumber}`,
+        `! Seat release failed on webhook refund, ${booking.bookingNumber}`,
       );
     }
   }
@@ -500,7 +500,7 @@ const onChargeRefunded = async (charge) => {
   await booking.save();
 
   console.log(
-    `✓ Refund synced from Stripe: ${booking.bookingNumber} — ` +
+    `✓ Refund synced from Stripe: ${booking.bookingNumber}, ` +
       `${totalRefunded} ${payment.currency} (${fullRefund ? "full" : "partial"})`,
   );
 };
@@ -607,7 +607,7 @@ const refundPayment = async (req, res, next) => {
       /**
        * Number.isFinite ka check ZAROORI hai.
        *
-       * Number("abc") = NaN, aur NaN ka har comparison false hota hai —
+       * Number("abc") = NaN, aur NaN ka har comparison false hota hai,
        * yaani "NaN <= 0" bhi false aur "NaN > max" bhi false. Pehle wale
        * code me aisi rakam dono checks paar kar jati thi aur Stripe ko
        * NaN chala jata tha.
@@ -633,7 +633,7 @@ const refundPayment = async (req, res, next) => {
      *
      * Do admin (ya ek admin ka double click) ek sath refund kar dein to
      * dono ka maxRefundable check pass ho sakta hai aur Stripe par do
-     * refunds chali jati hain — asal paisa dobara wapas.
+     * refunds chali jati hain, asal paisa dobara wapas.
      *
      * Is liye Stripe call se PEHLE totalRefunded ko atomically barha kar
      * jagah "reserve" karte hain. Yeh update sirf tab match karti hai jab
@@ -654,7 +654,7 @@ const refundPayment = async (req, res, next) => {
     }
 
     // Stripe Connect: refunding the parent doesn't automatically claw back
-    // the instructor's share of a destination charge — it must be reversed
+    // the instructor's share of a destination charge, it must be reversed
     // explicitly. Both flags default to true (full reversal); pass
     // { reverseFromInstructor: false } to let the instructor keep their
     // share on a goodwill refund.
@@ -672,7 +672,7 @@ const refundPayment = async (req, res, next) => {
         refund_application_fee: reverseFromInstructor && refundOurCommission,
       });
     } catch (stripeError) {
-      // Stripe ne mana kar diya — reserve ki hui rakam wapas chhor do,
+      // Stripe ne mana kar diya, reserve ki hui rakam wapas chhor do,
       // warna aage ke jaiz refunds block ho jayenge.
       await Payment.updateOne(
         { _id: payment._id },
@@ -706,7 +706,7 @@ const refundPayment = async (req, res, next) => {
     if (fullRefund && booking.status !== "cancelled") {
       booking.status = "refunded";
 
-      // Seats wapas chhod do — bundle booking ho to uski HAR session ki
+      // Seats wapas chhod do, bundle booking ho to uski HAR session ki
       // seat release honi chahiye, na ke sirf primary sessionId ki.
       const sessionIdsToRelease =
         booking.bundleSessions && booking.bundleSessions.length > 0
@@ -739,16 +739,16 @@ const refundPayment = async (req, res, next) => {
         { arrayFilters: refundArrayFilters },
       ).catch((err) => {
         console.error(
-          `! Seat release error on refund — booking ${booking.bookingNumber}: ${err.message}`,
+          `! Seat release error on refund, booking ${booking.bookingNumber}: ${err.message}`,
         );
         return null;
       });
 
-      // Pehle yahan .catch(() => {}) tha — seat hamesha ke liye block ho
+      // Pehle yahan .catch(() => {}) tha, seat hamesha ke liye block ho
       // jati aur kisi ko pata na chalta.
       if (seatResult && seatResult.modifiedCount === 0) {
         console.error(
-          `! Seat release failed on refund — booking ${booking.bookingNumber}, ` +
+          `! Seat release failed on refund, booking ${booking.bookingNumber}, ` +
             `activity ${booking.activity}, session(s) ${sessionIdsToRelease.join(",")}`,
         );
       }

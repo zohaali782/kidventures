@@ -387,7 +387,7 @@ export default function ParentDashboard() {
   return (
     <div className="bg-white text-brand-brown">
       <Helmet>
-        <title>My Account — Kidventures</title>
+        <title>My Account, Kidventures</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <Navbar />
@@ -678,7 +678,7 @@ export default function ParentDashboard() {
                       setDraft({ ...draft, gender: e.target.value })
                     }
                   >
-                    <option value="">—</option>
+                    <option value="">,</option>
                     <option value="male">Boy</option>
                     <option value="female">Girl</option>
                     <option value="other">Prefer not to say</option>
@@ -700,7 +700,7 @@ export default function ParentDashboard() {
                   onChange={(e) =>
                     setDraft({ ...draft, allergies: e.target.value })
                   }
-                  placeholder="e.g. Peanuts — or leave blank"
+                  placeholder="e.g. Peanuts, or leave blank"
                 />
               </div>
               <div>
@@ -761,13 +761,23 @@ export default function ParentDashboard() {
               {cancelTarget.activity?.title || cancelTarget.activityTitle}
             </p>
             <p className="mb-4 text-xs opacity-65">
-              {fmtDate(cancelTarget.sessionDate)}
-              {cancelTarget.startTime ? ` · ${cancelTarget.startTime}` : ""}
+              {/* Bundle ho to saari dates, taake parent ko pata ho ke cancel
+                  karne se poora bundle (sab din) cancel ho raha hai */}
+              {cancelTarget.bundleSessions?.length > 1
+                ? cancelTarget.bundleSessions
+                    .map(
+                      (s) =>
+                        `${fmtDate(s.date)}${s.startTime ? ` · ${s.startTime}` : ""}`,
+                    )
+                    .join("  +  ")
+                : `${fmtDate(cancelTarget.sessionDate)}${
+                    cancelTarget.startTime ? ` · ${cancelTarget.startTime}` : ""
+                  }`}
               {" · AED "}
               {cancelTarget.totalAmount}
             </p>
 
-            {/* Refund policy — parent ko pehle se saaf pata hona chahiye */}
+            {/* Refund policy, parent ko pehle se saaf pata hona chahiye */}
             {(() => {
               const tier = refundTierFor(cancelTarget);
               const tone =
@@ -920,8 +930,17 @@ function BookingList({
                   </div>
                   <div className="flex flex-wrap gap-4 text-xs opacity-80">
                     <span className="inline-flex items-center gap-1">
-                      <IcCal size={13} /> {fmtDate(b.sessionDate)}
-                      {b.startTime ? ` · ${b.startTime}` : ""}
+                      <IcCal size={13} />{" "}
+                      {/* Bundle booking me saari dates dikhani hain, warna
+                          parent ko lagega sirf pehle din ki booking hui hai */}
+                      {b.bundleSessions?.length > 1
+                        ? b.bundleSessions
+                            .map(
+                              (s) =>
+                                `${fmtDate(s.date)}${s.startTime ? ` · ${s.startTime}` : ""}`,
+                            )
+                            .join("  +  ")
+                        : `${fmtDate(b.sessionDate)}${b.startTime ? ` · ${b.startTime}` : ""}`}
                     </span>
                     {cls.location?.area && (
                       <span className="inline-flex items-center gap-1">

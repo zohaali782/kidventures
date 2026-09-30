@@ -342,7 +342,7 @@ const approveActivity = async (req, res, next) => {
  * @route   PUT /api/admin/activities/:id/suspend
  * @access  Admin
  *
- * NAYA — mock UI ke "Suspend/Unsuspend" button ke liye. Approve
+ * NAYA, mock UI ke "Suspend/Unsuspend" button ke liye. Approve
  * (upar) sirf ek dafa "Live" karta hai; ye kabhi bhi Live class ko
  * chhupane/wapas dikhane ke liye hai.
  */
@@ -356,17 +356,29 @@ const toggleSuspendActivity = async (req, res, next) => {
         .json({ success: false, message: "Class not found" });
     }
 
-    const suspending = activity.status !== "suspended";
-    activity.status = suspending ? "suspended" : "active";
-    activity.statusNote = suspending
-      ? req.body?.reason?.trim() || "Suspended by admin"
-      : undefined;
+    /**
+     * "archived" ko bhi wapas live karne wali haalat mana jata hai.
+     *
+     * Class delete karne par agar uski bookings hon to wo delete nahi hoti,
+     * archive ho jati hai (dekho activityController ka deleteActivity).
+     * Pehle yahan sirf "suspended" ko restore mana jata tha, yani archived
+     * class par ye button usay pehle suspend karta, phir dobara dabane par
+     * active. Admin ko do baar dabana parta aur samajh nahi aata tha ke
+     * archived class wapas kaise laayein.
+     */
+    const restoring =
+      activity.status === "suspended" || activity.status === "archived";
+
+    activity.status = restoring ? "active" : "suspended";
+    activity.statusNote = restoring
+      ? undefined
+      : req.body?.reason?.trim() || "Suspended by admin";
 
     await activity.save();
 
     res.json({
       success: true,
-      message: suspending ? "Class suspended" : "Class is live again",
+      message: restoring ? "Class is live again" : "Class suspended",
       activity,
     });
   } catch (error) {
@@ -379,7 +391,7 @@ const toggleSuspendActivity = async (req, res, next) => {
  * @route   DELETE /api/admin/activities/:id
  * @access  Admin
  *
- * NAYA — agar booking record maujood hain to hard-delete na karo,
+ * NAYA, agar booking record maujood hain to hard-delete na karo,
  * archive kar do (jaisa instructor-side delete karta hai).
  */
 const removeActivity = async (req, res, next) => {
@@ -418,7 +430,7 @@ const removeActivity = async (req, res, next) => {
  * @access  Admin
  * Body: { categoryId }
  *
- * NAYA — instructor ne class banate waqt "Other" chuna tha aur free-text
+ * NAYA, instructor ne class banate waqt "Other" chuna tha aur free-text
  * category type ki thi (suggestedCategory). Admin yahan usay ek real,
  * official Category se map kar deta hai.
  */
@@ -466,7 +478,7 @@ const resolveCategorySuggestion = async (req, res, next) => {
  * @access  Admin
  * Body: { enabled, link, whatsapp }
  *
- * NAYA — sirf EK khaas instructor ki class ke liye. Jab ye on ho, to
+ * NAYA, sirf EK khaas instructor ki class ke liye. Jab ye on ho, to
  * frontend par normal Stripe checkout ki jagah "donate via link +
  * WhatsApp verify" flow dikhta hai - seat auto-reserve nahi hoti, na
  * commission lagta hai (parent externally donate karta hai, phir
@@ -562,7 +574,7 @@ const toggleBlockUser = async (req, res, next) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*                     NAYE — Admin Dashboard ke liye                  */
+/*                     NAYE, Admin Dashboard ke liye                  */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -683,9 +695,9 @@ const getAllBookings = async (req, res, next) => {
  * @access  Admin
  *
  * Jab parent booking cancel karta hai to paisa khud-ba-khud wapas NAHI
- * jata — booking par sirf nishan lagta hai (refundStatus: "pending_review").
+ * jata, booking par sirf nishan lagta hai (refundStatus: "pending_review").
  * Wajah yeh hai ke policy ka darmiyana tier (24-48 ghante) kehta hai
- * "partial refund may be offered, depending on the provider's policy" —
+ * "partial refund may be offered, depending on the provider's policy",
  * aur woh faisla insaan hi kar sakta hai.
  *
  * Yeh list us kaam ki qatar hai. Is ke baghair refund requests khamoshi
@@ -702,7 +714,7 @@ const getPendingRefunds = async (req, res, next) => {
       .sort({ "cancellation.cancelledAt": -1 })
       .limit(200);
 
-    // Jo pehle cancel hui, us ka intezar zyada lamba — woh upar
+    // Jo pehle cancel hui, us ka intezar zyada lamba, woh upar
     const withWaiting = bookings.map((b) => {
       const cancelledAt = b.cancellation?.cancelledAt;
       const hoursWaiting = cancelledAt
@@ -767,7 +779,7 @@ const resolveRefund = async (req, res, next) => {
       return res.status(409).json({
         success: false,
         message:
-          "This refund is no longer pending — someone may have already handled it.",
+          "This refund is no longer pending, someone may have already handled it.",
       });
     }
 

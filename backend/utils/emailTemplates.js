@@ -5,7 +5,7 @@ const BRAND = {
   cream: "#FBEDDE",
 };
 
-// CLIENT_URL ab CORS ke liye comma-separated list ho sakta hai — links ke
+// CLIENT_URL ab CORS ke liye comma-separated list ho sakta hai, links ke
 // liye sirf pehla URL lete hain (dekhein authController.js ka APP_URL).
 //
 // ZAROORI: CLIENT_URL ko FRONTEND_URL se PEHLE check karte hain (authController.js
@@ -19,12 +19,12 @@ const APP = () =>
     .trim();
 
 /**
- * SECURITY — esc()
+ * SECURITY, esc()
  *
  * In emails ka har hissa user ka likha hua hota hai: class ka title
  * (instructor likhta hai), bachay ka naam (parent likhta hai), rejection
  * reason (admin likhta hai). Agar wo seedha HTML me chala jaye to koi bhi
- * apna markup inject kar sakta hai — misaal ke taur par class ka title:
+ * apna markup inject kar sakta hai, misaal ke taur par class ka title:
  *
  *   Painting</td></tr><tr><td><a href="https://fake-site.com">Payment failed, click here</a>
  *
@@ -57,7 +57,7 @@ const safeUrl = (url) => {
 
 /**
  * Subject line me user ka data aata hai (class ka title). Us me newline ho
- * to SMTP header injection ho sakti hai — attacker apne extra headers (Bcc
+ * to SMTP header injection ho sakti hai, attacker apne extra headers (Bcc
  * waghera) daal sakta hai. Is liye newlines hata kar length cap kar dete hain.
  */
 const subj = (text) =>
@@ -71,7 +71,7 @@ const aed = (n) => `AED ${Number(n || 0).toFixed(2)}`;
 
 const fmtDate = (date, startTime) => {
   const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return "—";
+  if (Number.isNaN(parsed.getTime())) return "-";
 
   const d = parsed.toLocaleDateString("en-GB", {
     weekday: "short",
@@ -79,24 +79,30 @@ const fmtDate = (date, startTime) => {
     month: "short",
     year: "numeric",
   });
-  // NOTE: yahan escape nahi karte — row() aur body me daalte waqt hota hai,
+  // NOTE: yahan escape nahi karte, row() aur body me daalte waqt hota hai,
   // warna double-escaping ho jati hai.
   return startTime ? `${d}, ${startTime}` : d;
 };
 
 /**
- * Booking ke "When" ki value banata hai - normal single-session booking ke
+ * Booking ke "When" ki value banata hai, normal single-session booking ke
  * liye sirf ek date/time, magar multi-day BUNDLE booking ke liye har ek
  * din alag line par (warna sirf pehli/primary date dikhti, parent/instructor
  * ko lagta bas ek hi din book hua hai).
+ *
+ * SECURITY: ye ready HTML wapas karta hai (rowRaw ise escape nahi karta),
+ * is liye har hissa yahan KHUD esc() se guzarta hai. startTime instructor
+ * ka likha hua text hai (addSession usay bina format check ke save karta
+ * hai), yani bina escape kiye wo seedha parent ke email me markup inject
+ * kar sakta tha. Sirf "<br>" hamara apna hai.
  */
 const fmtWhen = (booking) => {
   if (booking.bundleSessions && booking.bundleSessions.length > 0) {
     return booking.bundleSessions
-      .map((s) => fmtDate(s.date, s.startTime))
+      .map((s) => esc(fmtDate(s.date, s.startTime)))
       .join("<br>");
   }
-  return fmtDate(booking.sessionDate, booking.startTime);
+  return esc(fmtDate(booking.sessionDate, booking.startTime));
 };
 
 function layout({ heading, body, ctaText, ctaUrl }) {
@@ -335,7 +341,7 @@ function passwordReset({ name, resetUrl }) {
           This link works once and expires in 1 hour.
         </p>
         <p style="margin:0;font-size:13px;color:#777;">
-          If you didn't ask for this, you can ignore this email — your password
+          If you didn't ask for this, you can ignore this email, your password
           stays as it is.
         </p>`,
       ctaText: "Choose a new password",

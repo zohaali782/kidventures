@@ -585,7 +585,7 @@ export default function AdminDashboard() {
 
   /* ---------------------------- pending refunds ----------------------------
    *
-   * Jab parent booking cancel karta hai to paisa khud-ba-khud wapas nahi jata —
+   * Jab parent booking cancel karta hai to paisa khud-ba-khud wapas nahi jata,
    * booking par sirf "pending_review" ka nishan lagta hai. Yeh tab us kaam ki
    * qatar hai. Is ke baghair refund requests DB me pari reh jati hain aur kisi
    * ko pata nahi chalta.
@@ -649,7 +649,7 @@ export default function AdminDashboard() {
         bs.map((b) => (b._id === refundFor._id ? data.booking : b)),
       );
 
-      // Agar yeh booking refunds ki qatar me thi to ab wahan se nikal do —
+      // Agar yeh booking refunds ki qatar me thi to ab wahan se nikal do,
       // paisa wapas ja chuka hai, dobara review ki zaroorat nahi.
       const wasQueued = refundQueue.some((b) => b._id === refundFor._id);
       if (wasQueued) {
@@ -659,7 +659,7 @@ export default function AdminDashboard() {
             status: "processed",
           })
           .catch(() => {
-            // Nishan na lag saka — qatar dobara load kar lo taake yeh
+            // Nishan na lag saka, qatar dobara load kar lo taake yeh
             // booking gum na ho jaye
             loadRefundQueue();
           });
@@ -713,7 +713,7 @@ export default function AdminDashboard() {
     try {
       const { data } = await api.delete(`/categories/${id}`);
       // Agar classes maujood thin to backend usay sirf hide karta hai
-      // (isActive: false) instead of delete — is-liye list se hata dena hi theek hai.
+      // (isActive: false) instead of delete, is-liye list se hata dena hi theek hai.
       setCatList((cl) => cl.filter((c) => (c._id || c.id) !== id));
       flash(data.message || "Category removed.");
     } catch (err) {
@@ -837,7 +837,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#F7F5F2] text-brand-brown">
       <Helmet>
-        <title>Admin Dashboard — Kidventures</title>
+        <title>Admin Dashboard, Kidventures</title>
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -1126,7 +1126,7 @@ export default function AdminDashboard() {
                         className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3.5 py-2.5"
                       >
                         <div className="text-xs">
-                          <b>{c.title}</b> — suggested: "{c.suggestedCategory}"
+                          <b>{c.title}</b>, suggested: "{c.suggestedCategory}"
                         </div>
                         <button
                           onClick={() => setPickCategoryFor(c)}
@@ -1169,8 +1169,8 @@ export default function AdminDashboard() {
                       <div className="min-w-[180px] flex-1">
                         <div className="text-sm font-bold">{c.title}</div>
                         <div className="text-xs opacity-60">
-                          {c.category?.name || c.suggestedCategory || "—"} · by{" "}
-                          {c.instructor?.name || "—"} ·{" "}
+                          {c.category?.name || c.suggestedCategory || "-"} · by{" "}
+                          {c.instructor?.name || "-"} ·{" "}
                           {c.flexiblePricing?.enabled && !c.price
                             ? "Delegate pricing"
                             : `AED ${c.price}`}
@@ -1196,7 +1196,11 @@ export default function AdminDashboard() {
                             onClick={() => toggleClassSuspend(c._id)}
                             className="rounded-lg border border-brand-orange bg-white px-3 py-1.5 text-xs font-semibold text-brand-orange"
                           >
-                            {c.status === "suspended" ? "Unsuspend" : "Suspend"}
+                            {c.status === "archived"
+                              ? "Restore"
+                              : c.status === "suspended"
+                                ? "Unsuspend"
+                                : "Suspend"}
                           </button>
                         )}
                         <button
@@ -1328,14 +1332,14 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* REFUNDS — cancelled bookings waiting on a refund decision */}
+          {/* REFUNDS, cancelled bookings waiting on a refund decision */}
           {tab === "refunds" && (
             <div className="rounded-2xl bg-white px-4.5 shadow-sm">
               <div className="border-b border-gray-100 py-4">
                 <div className="text-sm font-bold">Refunds to review</div>
                 <div className="mt-1 text-xs opacity-65">
                   Parents cancelled these bookings. Money has NOT been returned
-                  yet — refund from here, then mark it resolved.
+                  yet, refund from here, then mark it resolved.
                 </div>
               </div>
 
@@ -1360,7 +1364,7 @@ export default function AdminDashboard() {
                     tier === "full"
                       ? "FULL REFUND"
                       : tier === "partial"
-                        ? "PARTIAL — YOU DECIDE"
+                        ? "PARTIAL, YOU DECIDE"
                         : String(tier || "").toUpperCase();
 
                   // 48 ghante se zyada intezar = parent shikayat karne wala hai
@@ -1425,7 +1429,7 @@ export default function AdminDashboard() {
                           onClick={() => resolveRefund(b, "processed")}
                           disabled={resolvingId === b._id}
                           className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-                          title="Already refunded — just clear it from this list"
+                          title="Already refunded, just clear it from this list"
                         >
                           Mark done
                         </button>
@@ -1534,7 +1538,7 @@ export default function AdminDashboard() {
             <>
               <div className="mb-4.5 rounded-xl bg-brand-cream px-4.5 py-3.5 text-[13px] leading-relaxed">
                 These are classes parents searched for but couldn't find. Use
-                this to decide which instructors to recruit next — the highest
+                this to decide which instructors to recruit next, the highest
                 demand is at the top.
               </div>
               <div className="rounded-2xl bg-white px-4.5 shadow-sm">
@@ -1591,7 +1595,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() =>
                             flash(
-                              "Email notifications aren't wired yet — coming with the emails step.",
+                              "Email notifications aren't wired yet, coming with the emails step.",
                             )
                           }
                           className="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold"
@@ -1638,7 +1642,7 @@ export default function AdminDashboard() {
                         <IcMail size={13} /> {viewingDetail.user.email}
                       </a>
                     ) : (
-                      <b>—</b>
+                      <b>,</b>
                     )}
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
@@ -1653,7 +1657,7 @@ export default function AdminDashboard() {
                         <IcWhatsapp size={13} /> {viewingDetail.user.phone}
                       </a>
                     ) : (
-                      <b>—</b>
+                      <b>,</b>
                     )}
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
@@ -1663,7 +1667,7 @@ export default function AdminDashboard() {
                         .map((c) => c.name)
                         .join(", ") ||
                         viewingDetail.suggestedCategory ||
-                        "—"}
+                        "-"}
                     </b>
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
@@ -1875,7 +1879,11 @@ export default function AdminDashboard() {
                   onClick={() => toggleClassSuspend(viewClass._id)}
                   className="rounded-lg border border-brand-orange bg-white px-4 py-2 text-sm font-bold text-brand-orange"
                 >
-                  {viewClass.status === "suspended" ? "Unsuspend" : "Suspend"}
+                  {viewClass.status === "archived"
+                    ? "Restore"
+                    : viewClass.status === "suspended"
+                      ? "Unsuspend"
+                      : "Suspend"}
                 </button>
               )}
               <button
@@ -1910,7 +1918,7 @@ export default function AdminDashboard() {
                     <IcMail size={13} /> {viewUser.email}
                   </a>
                 ) : (
-                  <b>—</b>
+                  <b>,</b>
                 )}
               </div>
               <div className="flex justify-between">
@@ -1925,7 +1933,7 @@ export default function AdminDashboard() {
                     <IcWhatsapp size={13} /> {viewUser.phone}
                   </a>
                 ) : (
-                  <b>—</b>
+                  <b>,</b>
                 )}
               </div>
               <div className="flex justify-between">
@@ -1959,7 +1967,7 @@ export default function AdminDashboard() {
           <div className="w-full max-w-[400px] rounded-2xl bg-white p-6">
             <h3 className="mb-1 text-base font-bold">Assign a category</h3>
             <p className="mb-3 text-xs opacity-60">
-              "{pickCategoryFor.title}" — suggested: "
+              "{pickCategoryFor.title}", suggested: "
               {pickCategoryFor.suggestedCategory}"
             </p>
             <select
@@ -2040,12 +2048,12 @@ function RefundModal({ booking, saving, onCancel, onConfirm }) {
       <div className="w-full max-w-[420px] rounded-2xl bg-white p-6">
         <h3 className="mb-1 text-base font-bold">Refund this booking</h3>
         <p className="mb-4 text-xs opacity-60">
-          {booking.activityTitle || booking.activity?.title} —{" "}
+          {booking.activityTitle || booking.activity?.title} ,{" "}
           {booking.bookingNumber}
         </p>
 
         <label className="mb-1.5 block text-xs font-semibold text-brand-brown/80">
-          Amount (AED) — leave blank for a full refund of {AED(full)}
+          Amount (AED), leave blank for a full refund of {AED(full)}
         </label>
         <input
           type="number"

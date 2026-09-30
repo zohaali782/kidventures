@@ -162,7 +162,7 @@ const activitySchema = new mongoose.Schema(
     whatToBring: String,
     /**
      * Default text site ke Refund & Cancellation page se match karta hai.
-     * Instructor chahe to apni class ke liye alag policy likh sakta hai —
+     * Instructor chahe to apni class ke liye alag policy likh sakta hai,
      * page bhi yehi kehta hai ke terms activity ke hisaab se badal sakti hain.
      */
     cancellationPolicy: {
@@ -303,21 +303,34 @@ activitySchema.pre("save", function () {
     this.fundraiser.whatsapp = "";
   }
 
-  // Bundles: kam se kam 2 sessions honi chahiye, aur har sessionId isi
-  // activity ki apni sessions me se hi hona chahiye (koi doosri class ka
+  // Bundles: kam se kam 2 alag alag sessions honi chahiye, aur har sessionId
+  // isi activity ki apni sessions me se hi hona chahiye (koi doosri class ka
   // session id yahan na aa jaye).
-  if (this.bundles && this.bundles.length > 0) {
+  //
+  // Sirf ACTIVE bundles check hote hain. Archived bundle purana record hai,
+  // ho sakta hai uski koi session baad me hata di gayi ho. Agar us par bhi
+  // yehi shart lagti to poori activity dobara kabhi save na hoti (har edit,
+  // har seat update par yahi error aata) - yani ek chhoti si safai poori
+  // class ko hamesha ke liye lock kar deti.
+  for (const bundle of this.bundles || []) {
+    if (bundle.status !== "active") continue;
+
     const validSessionIds = new Set(
       (this.sessions || []).map((s) => s._id.toString()),
     );
-    for (const bundle of this.bundles) {
-      const ids = (bundle.sessionIds || []).map((id) => id.toString());
-      if (ids.length < 2) {
-        throw new Error("A bundle needs at least 2 sessions");
-      }
-      if (ids.some((id) => !validSessionIds.has(id))) {
-        throw new Error("A bundle can only include this class's own sessions");
-      }
+    const ids = (bundle.sessionIds || []).map((id) => id.toString());
+    const uniqueIds = new Set(ids);
+
+    if (uniqueIds.size < 2) {
+      throw new Error("A bundle needs at least 2 different sessions");
+    }
+    // Ek hi session do baar: seat reserve karte waqt MongoDB ke arrayFilters
+    // aapas me takra jate hain (conflict error), is liye yahin rok dete hain.
+    if (uniqueIds.size !== ids.length) {
+      throw new Error("A bundle cannot include the same session twice");
+    }
+    if (ids.some((id) => !validSessionIds.has(id))) {
+      throw new Error("A bundle can only include this class's own sessions");
     }
   }
 });
