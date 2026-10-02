@@ -24,6 +24,13 @@ const reviewSchema = new mongoose.Schema(
       trim: true,
       maxlength: 1000,
     },
+    /**
+     * Review likhne wale ki is class ki booking is site se hui thi ya nahi.
+     * Review likhne par is ki koi rok nahi (dekho reviewController ka
+     * createReview), ye sirf record ke liye hai, taake aage chal kar
+     * "Verified booking" ka nishan dikhana ho to purana data mojood ho.
+     */
+    verifiedBooking: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

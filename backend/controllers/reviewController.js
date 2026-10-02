@@ -5,7 +5,7 @@ const Activity = require("../models/Activity");
 const Booking = require("../models/Booking");
 const InstructorProfile = require("../models/InstructorProfile");
 
-/** String ko ObjectId banata hai — ghalat ho to null */
+/** String ko ObjectId banata hai, ghalat ho to null */
 const toObjectId = (value) => {
   const str = String(value || "");
   return mongoose.Types.ObjectId.isValid(str)
@@ -17,7 +17,7 @@ const toObjectId = (value) => {
  * Activity ki rating.average aur rating.count recompute karta hai
  * saari uski reviews se. Review add/edit/delete ke baad call hota hai.
  *
- * BUGFIX: pehle yahan activityId seedha aata tha — aur woh request body ki
+ * BUGFIX: pehle yahan activityId seedha aata tha, aur woh request body ki
  * STRING hoti thi. Aggregation pipeline me Mongoose schema casting NAHI
  * lagti (normal find() ke bar-aks), is liye string kabhi ObjectId se match
  * hi nahi karti thi. Nateeja: $match hamesha khali, aur har review ke baad
@@ -118,7 +118,7 @@ const getReviews = async (req, res, next) => {
         .json({ success: false, message: "activity query param is required" });
     }
 
-    // Ghalat id par pehle CastError se 500 aata tha — ab saaf 400
+    // Ghalat id par pehle CastError se 500 aata tha, ab saaf 400
     const activityId = toObjectId(activity);
     if (!activityId) {
       return res
@@ -145,8 +145,10 @@ const getReviews = async (req, res, next) => {
  * @access  Parent
  * Body: { activity, rating, comment }
  *
- * SECURITY: sirf wahi parent review kar sakta hai jisne is class ki
- * confirmed/completed booking ki ho - warna koi bhi random rating de sakta.
+ * NOTE: pehle sirf wohi parent review kar sakta tha jisne is class ki
+ * booking ki ho. Ab wo shart hata di gayi hai (neeche tafseel), kyunke
+ * bohat se instructors ke asli students unki onsite classes attend kar
+ * chuke hain jo is site se book hi nahi hui thin.
  */
 const createReview = async (req, res, next) => {
   try {
@@ -170,7 +172,7 @@ const createReview = async (req, res, next) => {
      * Number.isInteger ka check zaroori hai.
      *
      * Pehle sirf "numRating < 1 || numRating > 5" tha. Number("abc") = NaN
-     * hota hai, aur NaN ka har comparison false — yaani NaN dono checks paar
+     * hota hai, aur NaN ka har comparison false, yaani NaN dono checks paar
      * kar jata aur aage Mongoose par crash karta. 4.7 jaisi rating bhi chal
      * jati thi, halanke stars poore hi hote hain.
      */
@@ -190,16 +192,24 @@ const createReview = async (req, res, next) => {
     }
 
     /**
-     * Ownership check: parent ne is class ki booking ki ho.
+     * KAUN REVIEW KAR SAKTA HAI
      *
-     * AUR — class ho bhi chuki ho.
+     * Pehle do sharten thin: is class ki booking mojood ho, aur us ki
+     * session guzar chuki ho. Maqsad ye tha ke instructor apne doston se
+     * 5-star na lagwa le, aur koi harif bina gaye 1-star na de de.
      *
-     * Pehle sirf status "confirmed" kaafi tha, jis ka matlab tha ke koi agle
-     * mahine ki class book kar ke usi waqt 5-star (ya 1-star) review likh
-     * sakta tha. Yaani instructor apne doston se bina attend kiye achi
-     * rating lagwa sakta, aur koi harif bina gaye buri rating de sakta.
+     * Client ke kehne par ye sharten hata di gayi hain, taake wo log bhi
+     * apna tajurba likh saken jinhon ne instructor ki onsite class attend
+     * ki thi magar booking is site se nahi hui thi.
      *
-     * Ab session ki date guzri hui honi chahiye.
+     * Jo pehre ab bhi qaim hain: sirf "parent" account review kar sakta
+     * hai (route par authorize("parent"), yani instructor apni hi class
+     * par review nahi likh sakta), aur ek user ek class par sirf ek hi
+     * review de sakta hai (Review model ka unique index).
+     *
+     * Booking thi ya nahi, ye ab bhi record hota hai (verifiedBooking),
+     * bas us par koi rok nahi. Agar aage chal kar "Verified booking" ka
+     * nishan dikhana ho to data pehle se mojood hoga.
      */
     const attendedBooking = await Booking.findOne({
       parent: req.user._id,
@@ -208,23 +218,6 @@ const createReview = async (req, res, next) => {
       sessionDate: { $lt: new Date() },
     }).select("_id");
 
-    if (!attendedBooking) {
-      // Booking hai magar class abhi hui nahi — alag message, taake
-      // parent ko samajh aaye ke masla kya hai
-      const upcoming = await Booking.exists({
-        parent: req.user._id,
-        activity: activityId,
-        status: { $in: ["confirmed", "completed"] },
-      });
-
-      return res.status(403).json({
-        success: false,
-        message: upcoming
-          ? "You can leave a review once the class has taken place"
-          : "You can only review classes you've booked",
-      });
-    }
-
     let review;
     try {
       review = await Review.create({
@@ -232,6 +225,7 @@ const createReview = async (req, res, next) => {
         user: req.user._id,
         rating: numRating,
         comment: comment?.trim(),
+        verifiedBooking: !!attendedBooking,
       });
     } catch (err) {
       // duplicate key -> already reviewed
