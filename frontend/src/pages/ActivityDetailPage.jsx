@@ -671,6 +671,11 @@ function ActivityDetailPage() {
                 {isOnline ? "Online" : "In-person"}
               </span>
             </div>
+            {/* Baqi images. Mobile par side column mein nahi aa sakti (cover
+                dab jata), is liye wahan cover ke neeche ek scroll hone wali
+                qatar ban jati hai, aur bari screen par purani side column
+                hi rehti hai. Pehle ye poori tarah "hidden sm:flex" thi, yani
+                phone par sirf ek hi tasveer dikhti thi. */}
             {images.length > 1 && (
               <div className="hidden w-[120px] flex-col gap-3 sm:flex">
                 {images.slice(1, 4).map((src, i) => (
@@ -685,6 +690,21 @@ function ActivityDetailPage() {
               </div>
             )}
           </div>
+
+          {images.length > 1 && (
+            <div className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-1 sm:hidden">
+              {images.slice(1).map((src, i) => (
+                <img
+                  key={i}
+                  src={cldOptimize(src, 300)}
+                  alt={`${a.title} ${i + 2}`}
+                  loading="lazy"
+                  className="h-[88px] w-[112px] shrink-0 cursor-pointer rounded-xl object-cover"
+                  onClick={() => setLightboxIndex(i + 1)}
+                />
+              ))}
+            </div>
+          )}
 
           <h1 className="mb-2.5 text-2xl font-bold text-brand-brown sm:text-[28px]">
             {a.title}
@@ -749,9 +769,22 @@ function ActivityDetailPage() {
           <h3 className="mb-2.5 text-base font-bold text-brand-brown">
             About this class
           </h3>
-          <p className="mb-6 text-sm leading-relaxed text-brand-brown/85">
-            {a.description}
-          </p>
+          {/* Instructor jo paragraph breaks likhta hai wo pehle gum ho jate
+              the (HTML newlines ko ek space bana deta hai), is liye poori
+              tafseel ek thos block ban jati thi. Ab har khali line ke hisaab
+              se alag paragraph banta hai, aur ek line ka break bhi qaim
+              rehta hai (whitespace-pre-line). */}
+          <div className="mb-6 space-y-3 text-sm leading-relaxed text-brand-brown/85">
+            {String(a.description || "")
+              .split(/\n\s*\n/)
+              .map((para) => para.trim())
+              .filter(Boolean)
+              .map((para, i) => (
+                <p key={i} className="whitespace-pre-line">
+                  {para}
+                </p>
+              ))}
+          </div>
 
           {learn.length > 0 && (
             <>
