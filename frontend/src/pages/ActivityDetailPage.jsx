@@ -8,6 +8,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import Stars from "../components/Stars";
 import api from "../api/axios";
 import { addRecentlyViewed } from "../api/favorites";
 import { getStoredUser } from "../api/auth";
@@ -727,9 +728,22 @@ function ActivityDetailPage() {
           </div>
 
           <div className="mb-4 flex items-center gap-4 text-[13px]">
-            <span className="font-bold text-brand-gold">
-              ★ {rating}{" "}
-              <span className="text-brand-orange">({reviews} reviews)</span>
+            <span className="flex items-center gap-1.5 font-bold">
+              <Stars value={rating} size={18} />
+              {reviews > 0 ? (
+                <>
+                  <span className="text-brand-brown">
+                    {Number(rating).toFixed(1)}
+                  </span>
+                  <span className="font-semibold text-brand-brown/60">
+                    ({reviews} {reviews === 1 ? "review" : "reviews"})
+                  </span>
+                </>
+              ) : (
+                <span className="font-semibold text-brand-brown/60">
+                  No reviews yet
+                </span>
+              )}
             </span>
           </div>
 
@@ -1357,9 +1371,17 @@ function ActivityDetailPage() {
                       by {r.instructor}
                     </div>
                   )}
-                  <div className="my-1 text-xs font-bold text-brand-gold">
-                    ★ {r.rating} ({r.reviews})
-                  </div>
+                  {r.reviews > 0 && (
+                    <div className="my-1 flex items-center gap-1.5">
+                      <Stars value={r.rating} size={14} />
+                      <span className="text-xs font-bold text-brand-brown">
+                        {Number(r.rating).toFixed(1)}
+                      </span>
+                      <span className="text-[11px] text-brand-brown/55">
+                        ({r.reviews})
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs">
                     <span className="text-brand-brown/70">
                       Ages {r.ageGroup}

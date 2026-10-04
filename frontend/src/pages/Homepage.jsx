@@ -6,6 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import "../datepicker-theme.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import Stars from "../components/Stars";
 import FavoriteButton from "../components/FavoriteButton";
 import RecentlyViewed from "../components/RecentlyViewed";
 import { BadgeRow } from "../components/BadgeMedal";
@@ -37,7 +38,7 @@ import { cldOptimize } from "../utils/img";
 
 
 /* ============================================================
-   ICONS (sab SVG, koi emoji nahi) — ye frontend cheez hai, backend se nahi aati
+   ICONS (sab SVG, koi emoji nahi), ye frontend cheez hai, backend se nahi aati
    ============================================================ */
 const CatIcon = ({ children }) => (
   <svg
@@ -185,7 +186,7 @@ const UserIcon = () => (
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
-// Compact checkmark badge — used for the small trust-signal row under the
+// Compact checkmark badge, used for the small trust-signal row under the
 // search bar (kept minimal on purpose so it doesn't take up much space).
 const CheckBadgeIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -200,7 +201,7 @@ const CheckBadgeIcon = () => (
   </svg>
 );
 
-/* "How It Works" step icons — currentColor taake har card apna accent
+/* "How It Works" step icons, currentColor taake har card apna accent
    rang khud de sake (bg-brand-cream badge ke andar). */
 const HowIcon = ({ children, size = 24 }) => (
   <svg
@@ -251,7 +252,7 @@ const IcReviewStep = (p) => (
    Agar field naam alag ho to sirf yahan adjust karna.
    ============================================================ */
 
-// backend array direct de ya { data:[...] } / { activities:[...] } — dono handle
+// backend array direct de ya { data:[...] } / { activities:[...] }, dono handle
 const toList = (d) =>
   Array.isArray(d)
     ? d
@@ -280,7 +281,7 @@ const asText = (v) => {
   return "";
 };
 
-// location string bhi ho sakti hai ya object { area, city, address } — safe string do
+// location string bhi ho sakti hai ya object { area, city, address }, safe string do
 const pickLocation = (v) => {
   if (!v) return "";
   if (typeof v === "string") return v;
@@ -289,7 +290,7 @@ const pickLocation = (v) => {
   return "";
 };
 
-// image string ho ya object { url } / { secure_url } — safe URL (ya null) do
+// image string ho ya object { url } / { secure_url }, safe URL (ya null) do
 const pickImg = (...vals) => {
   for (const v of vals) {
     if (!v) continue;
@@ -325,7 +326,7 @@ const normActivity = (a) => ({
     pickLocation(a.area) ||
     pickLocation(a.neighborhood) ||
     (a.isOnline ? "Online" : ""),
-  // Parent bilkul yehi deta hai — commission instructor ki earning se katta hai.
+  // Parent bilkul yehi deta hai, commission instructor ki earning se katta hai.
   price: a.price ?? "",
   rating: asNum(a.rating ?? a.averageRating),
   reviews: asNum(a.reviews ?? a.reviewCount ?? a.numReviews),
@@ -415,7 +416,7 @@ function Dropdown({
           />
           {/*
             SCROLL BUG FIX: pehle yeh hamesha "left-0" tha, jis ki wajah se
-            teesre (rightmost) dropdown — jaise mobile par "Age" — ka panel
+            teesre (rightmost) dropdown, jaise mobile par "Age", ka panel
             (min-w-[180px]) screen ke right edge se bahar nikal jata tha.
             Us se poori page ki scrollWidth viewport se zyada ho jati thi,
             aur page mobile par side-to-side drag/scroll hone lagti thi
@@ -454,7 +455,7 @@ function Dropdown({
   );
 }
 
-/* Date filter — ab preset codes ("today"/"weekend"...) ki jagah asli
+/* Date filter, ab preset codes ("today"/"weekend"...) ki jagah asli
    calendar hai. Panel wahi "Dropdown" jaisa dikhta hai, andar sirf
    react-datepicker inline calendar hai. */
 function DateDropdown({ icon, label, value, onChange }) {
@@ -760,7 +761,7 @@ function Homepage() {
     if (onlineOnly) params.append("location", "Online");
     else if (location) params.append("location", location);
     if (dateValue) {
-      // Local date (YYYY-MM-DD) — toISOString() UTC ki wajah se ek din
+      // Local date (YYYY-MM-DD), toISOString() UTC ki wajah se ek din
       // peeche/aage chali jati, is liye khud bana rahe hain.
       const y = dateValue.getFullYear();
       const m = String(dateValue.getMonth() + 1).padStart(2, "0");
@@ -776,11 +777,11 @@ function Homepage() {
       {/* SEO */}
       <Helmet>
         <title>
-          Kidventures — Kids&apos; Activities &amp; Classes in Dubai
+          Kidventures, Kids&apos; Activities &amp; Classes in Dubai
         </title>
         <meta
           name="description"
-          content="Discover and book trusted kids' activities and classes across Dubai — art, coding, robotics, baking and more. Verified instructors, easy booking."
+          content="Discover and book trusted kids' activities and classes across Dubai, art, coding, robotics, baking and more. Verified instructors, easy booking."
         />
       </Helmet>
 
@@ -813,7 +814,7 @@ function Homepage() {
           {/* SEARCH BAR */}
           <div className="rounded-2xl bg-white p-2 shadow-[0_4px_20px_rgba(0,0,0,0.12)]">
             <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-stretch md:gap-0">
-              {/* Keyword — mobile pe full width, desktop pe pehla khaana */}
+              {/* Keyword, mobile pe full width, desktop pe pehla khaana */}
               <div className="flex flex-col px-3 py-2 md:min-w-[200px] md:flex-[2]">
                 <div className="flex items-center gap-1.5">
                   <SearchIcon />
@@ -831,7 +832,7 @@ function Homepage() {
                 />
               </div>
 
-              {/* Filters — mobile: 3-column compact grid | desktop: inline row with dividers */}
+              {/* Filters, mobile: 3-column compact grid | desktop: inline row with dividers */}
               <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-brand-cream/30 p-1.5 md:flex md:flex-1 md:gap-0 md:divide-x md:divide-gray-200 md:rounded-none md:border-l md:border-gray-200 md:bg-transparent md:p-0 md:pl-1">
                 <Dropdown
                   icon={<PinIcon />}
@@ -869,7 +870,7 @@ function Homepage() {
                 />
               </div>
 
-              {/* Button — mobile full width, desktop right side */}
+              {/* Button, mobile full width, desktop right side */}
               <button
                 onClick={handleSearch}
                 className="h-12 w-full cursor-pointer whitespace-nowrap rounded-[10px] bg-brand-orange px-6 text-sm font-bold text-white md:ml-2 md:w-auto md:self-center"
@@ -878,7 +879,7 @@ function Homepage() {
               </button>
             </div>
 
-            {/* "Online" ab Location dropdown me nahi — apna alag toggle hai,
+            {/* "Online" ab Location dropdown me nahi, apna alag toggle hai,
                 kyunke ek class ya to kisi jagah hoti hai ya online, dono nahi */}
             <label className="mt-1.5 flex w-fit cursor-pointer items-center gap-2 px-3 text-[12px] font-medium text-brand-brown/80">
               <input
@@ -891,7 +892,7 @@ function Homepage() {
             </label>
           </div>
 
-          {/* INFO CARDS — compact checkmark badges (kept short on purpose,
+          {/* INFO CARDS, compact checkmark badges (kept short on purpose,
               the old version had a full description under each and took up
               too much room). Each badge gets its own white pill background
               so it stays readable over the hero photo instead of floating
@@ -1020,9 +1021,17 @@ function Homepage() {
                           ""
                         )}
                       </span>
-                      <span className="text-brand-gold">
-                        ★ {a.rating} ({a.reviews})
-                      </span>
+                      {a.reviews > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Stars value={a.rating} size={15} />
+                          <span className="font-bold text-brand-brown">
+                            {Number(a.rating).toFixed(1)}
+                          </span>
+                          <span className="text-brand-brown/55">
+                            ({a.reviews})
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -1066,7 +1075,7 @@ function Homepage() {
                 {ins.photo ? (
                   <img
                     src={cldOptimize(ins.photo, 120)}
-                    alt={`${ins.name} — instructor`}
+                    alt={`${ins.name}, instructor`}
                     loading="lazy"
                     className="mx-auto mb-2.5 h-[60px] w-[60px] rounded-full object-cover"
                   />

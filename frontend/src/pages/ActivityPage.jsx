@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import FavoriteButton from "../components/FavoriteButton";
+import Stars from "../components/Stars";
 import api from "../api/axios";
 import { toList, normActivity } from "../api/normalize";
 import { cldOptimize } from "../utils/img";
@@ -130,9 +131,20 @@ function ActivityCard({ a }) {
           <FavoriteButton item={a} className="absolute right-2.5 top-2.5" />
         </div>
         <div className="p-3">
-          <div className="text-[11px] font-bold text-brand-gold">
-            ★ {a.rating} ({a.reviews})
-          </div>
+          {/* Rating sirf tab dikhti hai jab waqai koi review ho. Warna har
+              card par "0 (0)" chamakta tha, aur jis class ke paas asli
+              5 sitare hain wo bhi un mein gum ho jati thi. */}
+          {a.reviews > 0 && (
+            <div className="mb-1 flex items-center gap-1.5">
+              <Stars value={a.rating} size={16} />
+              <span className="text-[13px] font-bold text-brand-brown">
+                {Number(a.rating).toFixed(1)}
+              </span>
+              <span className="text-[11px] font-semibold text-brand-brown/55">
+                ({a.reviews})
+              </span>
+            </div>
+          )}
           <div className="mt-1 text-sm font-bold text-brand-brown">
             {a.title}
           </div>
@@ -389,10 +401,10 @@ function ActivityPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
-        <title>Activities & Classes for Kids in Dubai — Kidventures</title>
+        <title>Activities & Classes for Kids in Dubai, Kidventures</title>
         <meta
           name="description"
-          content="Browse and book trusted kids' activities and classes in Dubai — filter by category, age, price and location."
+          content="Browse and book trusted kids' activities and classes in Dubai, filter by category, age, price and location."
         />
       </Helmet>
 

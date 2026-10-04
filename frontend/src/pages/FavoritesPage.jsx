@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import Stars from "../components/Stars";
 import FavoriteButton from "../components/FavoriteButton";
 import { getFavorites } from "../api/favorites";
 import { cldOptimize } from "../utils/img";
@@ -20,7 +21,7 @@ function FavoritesPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
-        <title>Saved Classes — Kidventures</title>
+        <title>Saved Classes, Kidventures</title>
         <meta
           name="description"
           content="Your saved kids' activities and classes on Kidventures."
@@ -86,9 +87,17 @@ function FavoritesPage() {
                     <div className="text-sm font-bold text-brand-brown">
                       {a.title}
                     </div>
-                    <div className="my-1 text-xs font-bold text-brand-gold">
-                      ★ {a.rating} ({a.reviews})
-                    </div>
+                    {a.reviews > 0 && (
+                      <div className="my-1 flex items-center gap-1.5">
+                        <Stars value={a.rating} size={15} />
+                        <span className="text-xs font-bold text-brand-brown">
+                          {Number(a.rating).toFixed(1)}
+                        </span>
+                        <span className="text-[11px] text-brand-brown/55">
+                          ({a.reviews})
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs">
                       <span className="text-brand-brown/70">
                         {a.ageGroup ? `Ages ${a.ageGroup}` : ""}
