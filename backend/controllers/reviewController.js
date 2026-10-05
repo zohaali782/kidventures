@@ -104,32 +104,67 @@ const recomputeInstructorRating = async (instructorUserIdInput) => {
 };
 
 /**
- * @desc    Ek class ke saare reviews
+ * @desc    Reviews: ek class ke, ya ek instructor ki saari classes ke
  * @route   GET /api/reviews?activity=<id>&limit=20
+ *          GET /api/reviews?instructor=<userId>&limit=20
  * @access  Public
  */
 const getReviews = async (req, res, next) => {
   try {
-    const { activity } = req.query;
+    const { activity, instructor } = req.query;
 
-    if (!activity) {
-      return res
-        .status(400)
-        .json({ success: false, message: "activity query param is required" });
-    }
-
-    // Ghalat id par pehle CastError se 500 aata tha, ab saaf 400
-    const activityId = toObjectId(activity);
-    if (!activityId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid activity id" });
+    /**
+     * Do tarah se reviews mange ja sakte hain:
+     *
+     *   ?activity=<id>    ek class ke reviews (class detail page)
+     *   ?instructor=<id>  us instructor ki SAARI classes ke reviews
+     *
+     * Instructor wala raasta is liye banaya ke profile page pehle har
+     * class ke liye alag request bhejta tha (12 classes = 12 requests),
+     * aur 12 se zyada classes wale instructor ke kuch reviews reh jate
+     * the. Ab ek hi call kaafi hai.
+     */
+    if (!activity && !instructor) {
+      return res.status(400).json({
+        success: false,
+        message: "activity or instructor query param is required",
+      });
     }
 
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    const filter = {};
 
-    const reviews = await Review.find({ activity: activityId })
+    if (activity) {
+      // Ghalat id par pehle CastError se 500 aata tha, ab saaf 400
+      const activityId = toObjectId(activity);
+      if (!activityId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid activity id" });
+      }
+      filter.activity = activityId;
+    } else {
+      const instructorId = toObjectId(instructor);
+      if (!instructorId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid instructor id" });
+      }
+
+      const classIds = await Activity.find({ instructor: instructorId })
+        .select("_id")
+        .lean();
+
+      if (classIds.length === 0) {
+        return res.json({ success: true, count: 0, reviews: [] });
+      }
+
+      filter.activity = { $in: classIds.map((c) => c._id) };
+    }
+
+    const reviews = await Review.find(filter)
       .populate("user", "name avatar")
+      .populate("activity", "title slug")
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -139,17 +174,6 @@ const getReviews = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Review post karna
- * @route   POST /api/reviews
- * @access  Parent
- * Body: { activity, rating, comment }
- *
- * NOTE: pehle sirf wohi parent review kar sakta tha jisne is class ki
- * booking ki ho. Ab wo shart hata di gayi hai (neeche tafseel), kyunke
- * bohat se instructors ke asli students unki onsite classes attend kar
- * chuke hain jo is site se book hi nahi hui thin.
- */
 const createReview = async (req, res, next) => {
   try {
     const { activity, rating, comment } = req.body;

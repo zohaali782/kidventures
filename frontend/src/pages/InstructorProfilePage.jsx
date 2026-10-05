@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Navbar from "../components/Navbar";
@@ -216,6 +216,16 @@ export default function InstructorProfilePage() {
 
   const [reviews, setReviews] = useState(null); // null = abhi load nahi hua
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  // Ek hi baar fetch ho, aur effect dobara chalne par request cancel na ho
+  const reviewsFetched = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   /* ---- fetch profile + uski classes ---- */
   useEffect(() => {
@@ -226,6 +236,7 @@ export default function InstructorProfilePage() {
       setNotFound(false);
       setTab("about");
       setReviews(null);
+      reviewsFetched.current = false; // naye instructor ke reviews dobara aayen
       try {
         const { data } = await api.get(`/instructors/${id}`);
         if (!alive) return;
@@ -237,7 +248,7 @@ export default function InstructorProfilePage() {
         if (e?.response?.status === 404) setNotFound(true);
         else
           setErr(
-            "Is profile ko load karne mein masla hua. Dobara koshish karein.",
+            "We couldn't load this profile. Please try again.",
           );
       } finally {
         if (alive) setLoading(false);
@@ -325,52 +336,47 @@ export default function InstructorProfilePage() {
       : { average: 0, count: 0 };
   }, [profile, classes]);
 
-  /* ---- reviews tab: instructor ki classes ke reviews aggregate ---- */
+  /* ---- reviews tab: instructor ki saari classes ke reviews ----
+   *
+   * YAHAN PEHLE BUG THA: effect khud setReviewsLoading(true) karta tha,
+   * aur reviewsLoading usi effect ki dependency bhi thi. Yani state set
+   * hote hi effect dobara chalta, aur pehle run ka cleanup chal kar
+   * alive = false kar deta. Phir jab request wapas aati to alive false
+   * hone ki wajah se na reviews set hote, na loading band hoti, aur
+   * page hamesha "Loading reviews..." par atka rehta.
+   *
+   * Ab: fetch sirf ek baar chalta hai (ref se), cleanup request ko
+   * cancel nahi karta, aur sirf unmount par state set hona ruk jata hai.
+   * Saath hi ab ek hi API call jati hai (?instructor=), pehle har class
+   * ke liye alag request jati thi.
+   */
   useEffect(() => {
-    if (tab !== "reviews" || reviews !== null || reviewsLoading) return;
-    let alive = true;
+    if (tab !== "reviews" || reviewsFetched.current || loading) return;
+
+    reviewsFetched.current = true;
+    setReviewsLoading(true);
+
     (async () => {
-      setReviewsLoading(true);
       try {
-        const ids = classes.slice(0, 12).map(cId).filter(Boolean);
-        if (ids.length === 0) {
-          if (alive) setReviews([]);
-          return;
-        }
-        const results = await Promise.allSettled(
-          ids.map((cid) =>
-            api.get(`/reviews`, { params: { activity: cid, limit: 20 } }),
-          ),
-        );
-        const merged = [];
-        results.forEach((r, i) => {
-          if (r.status === "fulfilled") {
-            const list = toList(r.value?.data?.reviews || r.value?.data);
-            list.forEach((rv) =>
-              merged.push({
-                name: rv?.user?.name || rv?.parentName || rv?.name || "Parent",
-                rating: rv?.rating ?? 0,
-                comment: rv?.comment || rv?.text || "",
-                createdAt: rv?.createdAt || null,
-                className: classes[i]?.title || "",
-              }),
-            );
-          }
+        const { data } = await api.get(`/reviews`, {
+          params: { instructor: id, limit: 50 },
         });
-        merged.sort(
-          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
-        );
-        if (alive) setReviews(merged);
+        const list = toList(data?.reviews || data);
+        const merged = list.map((rv) => ({
+          name: rv?.user?.name || rv?.parentName || rv?.name || "Parent",
+          rating: rv?.rating ?? 0,
+          comment: rv?.comment || rv?.text || "",
+          createdAt: rv?.createdAt || null,
+          className: rv?.activity?.title || "",
+        }));
+        if (mountedRef.current) setReviews(merged);
       } catch {
-        if (alive) setReviews([]);
+        if (mountedRef.current) setReviews([]);
       } finally {
-        if (alive) setReviewsLoading(false);
+        if (mountedRef.current) setReviewsLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
-  }, [tab, classes, reviews, reviewsLoading]);
+  }, [tab, loading, id]);
 
   /* --------------------------------- states --------------------------------- */
   if (loading) {
@@ -818,7 +824,7 @@ export default function InstructorProfilePage() {
               )}
               {!reviewsLoading && reviews && reviews.length === 0 && (
                 <div className="py-6 text-sm opacity-60">
-                  Abhi tak koi review nahi.
+                  No reviews yet.
                 </div>
               )}
               {!reviewsLoading &&
