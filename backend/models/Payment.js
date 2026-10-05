@@ -69,6 +69,29 @@ const paymentSchema = new mongoose.Schema(
     totalRefunded: { type: Number, default: 0 },
 
     /* ------------------------- Instructor payout -------------------------- */
+    /**
+     * Paisa instructor tak kaise pohanchta hai:
+     *
+     *   "connect" = Stripe Connect wala raasta. Payment ke waqt hi commission
+     *               kat kar baqi paisa seedha instructor ke apne Stripe
+     *               account mein chala jata hai. Humein kuch nahi karna parta.
+     *
+     *   "manual"  = instructor ka Connect abhi tayyar nahi. Poora paisa
+     *               Kidventures ke account mein aata hai, aur uska hissa
+     *               admin khud uske bank mein bhejta hai (dekho admin
+     *               dashboard ka Payouts tab).
+     *
+     * Ye sirf record ke liye nahi hai: refund karte waqt reverse_transfer
+     * jaisi cheezein SIRF "connect" wali payments par bheji ja sakti hain,
+     * manual par Stripe error de deta hai.
+     */
+    payoutMode: {
+      type: String,
+      enum: ["connect", "manual"],
+      default: "connect",
+      index: true,
+    },
+
     // Phase 1 me payout manually ho sakta hai - bas record rakhna hai
     payoutStatus: {
       type: String,
@@ -79,10 +102,12 @@ const paymentSchema = new mongoose.Schema(
     payoutDate: Date,
     payoutReference: String,
     payoutNote: String,
+    // Kis admin ne payout "paid" mark kiya
+    payoutMarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
     /* --------------------------- Needs attention --------------------------- */
     /**
-     * Jab paisa aa jaye lekin booking se joda na ja sake — misaal ke taur par
+     * Jab paisa aa jaye lekin booking se joda na ja sake, misaal ke taur par
      * parent ne booking cancel kar di aur us ke baad Stripe ka webhook aaya.
      * Aise payment ka refund insaan ko karna parta hai, is liye nishan laga
      * dete hain warna woh khamoshi se gum ho jate hain.

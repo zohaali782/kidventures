@@ -212,6 +212,7 @@ const navItems = [
   { key: "users", label: "Users", icon: IcUser },
   { key: "bookings", label: "Bookings", icon: IcBook },
   { key: "refunds", label: "Refunds", icon: IcBook },
+  { key: "payouts", label: "Payouts", icon: IcBook },
   { key: "categories", label: "Categories", icon: IcTag },
   { key: "requests", label: "Class Requests", icon: IcStar },
 ];
@@ -624,6 +625,50 @@ export default function AdminDashboard() {
       setResolvingId(null);
     }
   };
+  /* ------------------------------ Payouts -------------------------------
+   *
+   * Jin instructors ka Stripe Connect tayyar nahi, un ki bookings ka poora
+   * paisa Kidventures ke account mein aata hai. Un ka hissa admin khud
+   * unke bank mein bhejta hai, aur yahan se "paid" mark karta hai.
+   * Connect wale instructors is list mein aate hi nahi, kyunke wahan paisa
+   * khud ba khud bat jata hai.
+   */
+  const [payouts, setPayouts] = useState([]);
+  const [payoutsOwed, setPayoutsOwed] = useState([]);
+  const [payoutsTotal, setPayoutsTotal] = useState(0);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutFilter, setPayoutFilter] = useState("pending");
+  const [payingId, setPayingId] = useState(null);
+
+  const loadPayouts = useCallback(async (status = "pending") => {
+    setPayoutsLoading(true);
+    try {
+      const { data } = await api.get("/admin/payouts", { params: { status } });
+      setPayouts(toList(data.payments));
+      setPayoutsOwed(toList(data.owed));
+      setPayoutsTotal(data.totalOwed || 0);
+    } catch {
+      setPayouts([]);
+      setPayoutsOwed([]);
+      setPayoutsTotal(0);
+    } finally {
+      setPayoutsLoading(false);
+    }
+  }, []);
+
+  const markPayoutPaid = async (payment, paid = true) => {
+    setPayingId(payment._id);
+    try {
+      const { data } = await api.put(`/admin/payouts/${payment._id}`, { paid });
+      flash(data?.message || "Updated");
+      loadPayouts(payoutFilter);
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't update this payout.");
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   const [refundSaving, setRefundSaving] = useState(false);
   const loadBookings = useCallback(async () => {
     setBookingsLoading(true);
@@ -777,6 +822,7 @@ export default function AdminDashboard() {
     if (tab === "users") loadUsers();
     if (tab === "bookings") loadBookings();
     if (tab === "refunds") loadRefundQueue();
+    if (tab === "payouts") loadPayouts(payoutFilter);
     if (tab === "categories") loadCategoriesTab();
     if (tab === "requests") loadClassRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1441,6 +1487,209 @@ export default function AdminDashboard() {
                         >
                           No refund
                         </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* PAYOUTS, un instructors ke liye jin ka Stripe Connect nahi hai */}
+          {tab === "payouts" && (
+            <div className="rounded-2xl bg-white px-4.5 shadow-sm">
+              <div className="border-b border-gray-100 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold">
+                      Instructor payouts, manual
+                    </div>
+                    <div className="mt-1 max-w-xl text-xs opacity-65">
+                      Kidventures collected the full amount for these
+                      bookings because these instructors have not finished
+                      Stripe Connect yet. Send each instructor their share from
+                      your bank, then press "Mark as paid" here. Instructors
+                      who are on Connect get paid automatically and never
+                      appear in this list.
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1.5">
+                    {[
+                      { k: "pending", l: "To pay" },
+                      { k: "paid", l: "Paid" },
+                      { k: "all", l: "All" },
+                    ].map((f) => (
+                      <button
+                        key={f.k}
+                        onClick={() => {
+                          setPayoutFilter(f.k);
+                          loadPayouts(f.k);
+                        }}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                          payoutFilter === f.k
+                            ? "bg-brand-orange text-white"
+                            : "border border-gray-200 bg-white"
+                        }`}
+                      >
+                        {f.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Per instructor total, taake ek hi transfer kaafi ho */}
+                {payoutsOwed.length > 0 && (
+                  <div className="mt-4 rounded-xl bg-brand-cream p-3.5">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-xs font-bold uppercase tracking-wide opacity-70">
+                        Total to send
+                      </div>
+                      <div className="text-sm font-bold">
+                        {AED(payoutsTotal)}
+                      </div>
+                    </div>
+
+                    {payoutsOwed.map((t) => (
+                      <div
+                        key={t.instructorId}
+                        className="flex flex-wrap items-center justify-between gap-2 border-t border-black/5 py-2 text-xs first:border-t-0"
+                      >
+                        <div>
+                          <span className="font-semibold">{t.name}</span>
+                          <span className="opacity-60">
+                            {" "}
+                            · {t.count} booking{t.count === 1 ? "" : "s"}
+                          </span>
+                          {t.email && (
+                            <a
+                              href={`mailto:${t.email}`}
+                              className="ml-2 font-semibold text-brand-brown underline"
+                            >
+                              Email
+                            </a>
+                          )}
+                          {t.phone && (
+                            <a
+                              href={waLink(t.phone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="ml-2 font-semibold text-green-700 underline"
+                            >
+                              WhatsApp
+                            </a>
+                          )}
+                        </div>
+                        <div className="font-bold">{AED(t.amount)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {payoutsLoading ? (
+                <div className="py-10 text-center text-sm opacity-60">
+                  Loading…
+                </div>
+              ) : payouts.length === 0 ? (
+                <div className="py-10 text-center text-sm opacity-60">
+                  {payoutFilter === "pending"
+                    ? "Nothing to send right now."
+                    : "Nothing in this list."}
+                </div>
+              ) : (
+                payouts.map((p, i) => {
+                  const done = p.payoutStatus === "paid";
+                  const b = p.booking || {};
+
+                  return (
+                    <div
+                      key={p._id}
+                      className={`flex flex-wrap items-center gap-3.5 py-3.5 ${
+                        i < payouts.length - 1
+                          ? "border-b border-gray-100"
+                          : ""
+                      }`}
+                    >
+                      <div className="min-w-[220px] flex-1">
+                        <div className="text-sm font-bold">
+                          {p.instructor?.name || "Instructor"}
+                        </div>
+                        <div className="text-xs opacity-60">
+                          {b.activityTitle || "Class"}
+                          {b.sessionDate ? ` · ${fmtDate(b.sessionDate)}` : ""}
+                          {b.bookingNumber ? ` · ${b.bookingNumber}` : ""}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                          {p.instructor?.email && (
+                            <a
+                              href={`mailto:${p.instructor.email}`}
+                              className="font-semibold text-brand-brown underline"
+                            >
+                              {p.instructor.email}
+                            </a>
+                          )}
+                          {p.instructor?.phone && (
+                            <a
+                              href={waLink(p.instructor.phone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold text-green-700 underline"
+                            >
+                              {p.instructor.phone}
+                            </a>
+                          )}
+                        </div>
+                        {p.totalRefunded > 0 && (
+                          <div className="mt-1 text-[11px] font-semibold text-amber-700">
+                            ⚠ {AED(p.totalRefunded)} was refunded, check the
+                            amount before sending
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-bold">
+                          {AED(p.instructorAmount)}
+                        </div>
+                        <div className="text-[11px] opacity-55">
+                          parent paid {AED(p.amount)}
+                        </div>
+                        <span
+                          className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
+                            done
+                              ? "bg-green-100 text-green-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {done ? "PAID" : "TO PAY"}
+                        </span>
+                        {done && p.payoutDate && (
+                          <div className="mt-1 text-[11px] opacity-55">
+                            {fmtDate(p.payoutDate)}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        {done ? (
+                          <button
+                            onClick={() => markPayoutPaid(p, false)}
+                            disabled={payingId === p._id}
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold opacity-70 disabled:opacity-50"
+                            title="Marked as paid by mistake, move it back to pending"
+                          >
+                            Undo
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => markPayoutPaid(p, true)}
+                            disabled={payingId === p._id}
+                            className="rounded-lg bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                          >
+                            {payingId === p._id ? "Saving…" : "Mark as paid"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

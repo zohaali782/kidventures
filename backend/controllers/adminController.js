@@ -2,6 +2,7 @@ const InstructorProfile = require("../models/InstructorProfile");
 const Activity = require("../models/Activity");
 const Category = require("../models/Category");
 const Booking = require("../models/Booking");
+const Payment = require("../models/Payment");
 const ClassRequest = require("../models/ClassRequest");
 const User = require("../models/User");
 const { sendEmail } = require("../utils/sendEmail");
@@ -837,6 +838,146 @@ const getClassRequests = async (req, res, next) => {
   }
 };
 
+/* ============================ INSTRUCTOR PAYOUTS =========================== *
+ *
+ * Jin instructors ka Stripe Connect tayyar nahi, un ki bookings ka poora
+ * paisa Kidventures ke account mein aata hai (dekho paymentController ka
+ * createPaymentIntent). Un ka hissa admin khud uske bank mein bhejta hai,
+ * aur yahan se "paid" mark karta hai.
+ *
+ * Connect wali payments is list mein nahi aatin, kyunke wahan paisa khud
+ * hi bat jata hai, admin ko kuch nahi karna hota.
+ */
+
+/**
+ * @desc    Manual payouts ki list (default: jo abhi baqi hain)
+ * @route   GET /api/admin/payouts?status=pending|paid|all
+ * @access  Admin
+ */
+const getPayouts = async (req, res, next) => {
+  try {
+    const status = String(req.query.status || "pending");
+
+    const filter = {
+      payoutMode: "manual",
+      // Sirf wo paise jo waqai aa chuke hain
+      status: { $in: ["succeeded", "partially_refunded"] },
+    };
+
+    if (status === "pending") filter.payoutStatus = "pending";
+    else if (status === "paid") filter.payoutStatus = "paid";
+    // "all" par koi payoutStatus filter nahi
+
+    const payments = await Payment.find(filter)
+      .populate("instructor", "name email phone")
+      .populate({
+        path: "booking",
+        select: "bookingNumber activityTitle sessionDate numberOfChildren",
+      })
+      .sort({ createdAt: 1 })
+      .limit(200);
+
+    /**
+     * Har instructor ka total bhi bhej dete hain, taake admin ek hi
+     * transfer mein saara paisa bhej sake aur phir alag alag rows
+     * "paid" mark kar de.
+     */
+    const totals = {};
+    payments.forEach((p) => {
+      if (p.payoutStatus !== "pending") return;
+      const key = p.instructor?._id?.toString() || "unknown";
+      if (!totals[key]) {
+        totals[key] = {
+          instructorId: key,
+          name: p.instructor?.name || "Instructor",
+          email: p.instructor?.email || "",
+          phone: p.instructor?.phone || "",
+          amount: 0,
+          count: 0,
+        };
+      }
+      totals[key].amount += Number(p.instructorAmount) || 0;
+      totals[key].count += 1;
+    });
+
+    const owed = Object.values(totals).map((t) => ({
+      ...t,
+      amount: Math.round(t.amount * 100) / 100,
+    }));
+
+    res.json({
+      success: true,
+      count: payments.length,
+      totalOwed:
+        Math.round(owed.reduce((sum, t) => sum + t.amount, 0) * 100) / 100,
+      owed,
+      payments,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Ek payout ko "paid" (ya wapas "pending") mark karna
+ * @route   PUT /api/admin/payouts/:id
+ * @access  Admin
+ * Body: { paid: true|false, reference, note }
+ *
+ * Yahan koi asal paisa nahi chalta, ye sirf record hai ke admin ne
+ * instructor ke bank mein transfer kar diya hai.
+ */
+const markPayout = async (req, res, next) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment not found" });
+    }
+
+    if (payment.payoutMode !== "manual") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This payout went through Stripe Connect, there is nothing to send manually",
+      });
+    }
+
+    if (payment.payoutStatus === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "This booking was refunded, so no payout is due",
+      });
+    }
+
+    const paid = req.body.paid !== false;
+
+    payment.payoutStatus = paid ? "paid" : "pending";
+    payment.payoutDate = paid ? new Date() : undefined;
+    payment.payoutReference = paid
+      ? String(req.body.reference || "").trim().slice(0, 120)
+      : undefined;
+    // Note sirf tab badlo jab admin ne naya note bheja ho, warna pehle
+    // ka likha hua (jaise "Booking was fully refunded") mit jata hai
+    if (req.body.note !== undefined) {
+      payment.payoutNote = String(req.body.note || "").trim().slice(0, 300);
+    }
+    payment.payoutMarkedBy = paid ? req.user._id : undefined;
+
+    await payment.save();
+
+    res.json({
+      success: true,
+      message: paid ? "Payout marked as paid" : "Payout moved back to pending",
+      payment,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getInstructorApplications,
   getApplicationDetail,
@@ -858,4 +999,6 @@ module.exports = {
   getClassRequests,
   getPendingRefunds,
   resolveRefund,
+  getPayouts,
+  markPayout,
 };

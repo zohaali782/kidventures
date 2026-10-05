@@ -22,6 +22,8 @@ const {
   getClassRequests,
   getPendingRefunds,
   resolveRefund,
+  getPayouts,
+  markPayout,
 } = require("../controllers/adminController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -64,6 +66,12 @@ router.get("/bookings", getAllBookings);
 // Cancelled bookings jin ka refund abhi review ka intezar kar raha hai
 router.get("/refunds", getPendingRefunds);
 router.put("/refunds/:id/resolve", resolveRefund);
+
+/* -------------------------- Instructor payouts --------------------------- */
+// Jin instructors ka Stripe Connect tayyar nahi, un ka hissa admin khud
+// bhejta hai aur yahan se "paid" mark karta hai
+router.get("/payouts", getPayouts);
+router.put("/payouts/:id", markPayout);
 
 /* ---------------------------- Class Requests ---------------------------- */
 router.get("/class-requests", getClassRequests);

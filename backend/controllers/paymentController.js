@@ -98,35 +98,54 @@ const createPaymentIntent = async (req, res, next) => {
     }
 
     if (!paymentIntent) {
-      // Stripe Connect: funds are split via a destination charge,
-      // application_fee_amount stays with the platform, the rest goes to
-      // the instructor. Block the charge if Connect onboarding isn't done.
+      /**
+       * DO RAASTE, instructor ke Stripe Connect ki haalat ke hisaab se:
+       *
+       * 1. Connect tayyar hai (chargesEnabled): destination charge. Paisa
+       *    usi waqt bat jata hai, commission platform ke paas rukta hai
+       *    aur baqi seedha instructor ke Stripe account mein.
+       *
+       * 2. Connect tayyar nahi: poora paisa Kidventures ke apne account
+       *    mein aata hai, aur instructor ka hissa admin baad mein uske
+       *    bank mein bhejta hai (admin dashboard ka Payouts tab).
+       *
+       * Pehle doosri soorat mein booking hi rok di jati thi, yani jab tak
+       * instructor Connect mukammal na kare uski class bik hi nahi sakti
+       * thi. Shuruati dinon mein ye bara rukawat hai, is liye ab dono
+       * tareeqe sath sath chaltay hain.
+       *
+       * Stripe is tarah ke manual model ki ijazat deta hai, teen sharton
+       * ke sath: parent ke statement par Kidventures ka naam aaye, jisay
+       * paisa bhejo uski shanakht verify ho, aur refunds/disputes/support
+       * Kidventures khud sambhale.
+       */
       const instructorProfile = await InstructorProfile.findOne({
         user: booking.instructor,
       }).select("stripeConnect");
 
-      if (!instructorProfile?.stripeConnect?.chargesEnabled) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This instructor hasn't finished setting up payouts yet. Please try again later or contact support.",
-        });
-      }
+      const connectAccountId = instructorProfile?.stripeConnect?.chargesEnabled
+        ? instructorProfile.stripeConnect.accountId
+        : null;
+
+      const payoutMode = connectAccountId ? "connect" : "manual";
 
       paymentIntent = await stripe.paymentIntents.create({
         amount: toFils(booking.totalAmount),
         currency: (booking.currency || "AED").toLowerCase(),
-        // Platform commission; the remainder is sent to the instructor
-        // via transfer_data.destination below
-        application_fee_amount: toFils(booking.commissionAmount),
-        transfer_data: {
-          destination: instructorProfile.stripeConnect.accountId,
-        },
+        // Connect wali soorat mein hi paisa bata jata hai. Manual mein ye
+        // dono fields bheji hi nahi jatin, warna Stripe error deta hai.
+        ...(connectAccountId
+          ? {
+              application_fee_amount: toFils(booking.commissionAmount),
+              transfer_data: { destination: connectAccountId },
+            }
+          : {}),
         // metadata webhook me kaam aati hai - kaunsi booking hai
         metadata: {
           bookingId: booking._id.toString(),
           bookingNumber: booking.bookingNumber,
           parentId: booking.parent.toString(),
+          payoutMode,
         },
         automatic_payment_methods: { enabled: true },
       });
@@ -146,6 +165,11 @@ const createPaymentIntent = async (req, res, next) => {
 
       payment.stripePaymentIntentId = paymentIntent.id;
       payment.status = "pending";
+      payment.payoutMode = payoutMode;
+      // Connect wale paise ka payout khud ho jata hai, manual wala admin
+      // ki list mein "pending" rehta hai jab tak bhej na diya jaye.
+      payment.payoutStatus = payoutMode === "connect" ? "paid" : "pending";
+      if (payoutMode === "connect") payment.payoutDate = new Date();
       await payment.save();
 
       booking.payment = payment._id;
@@ -658,6 +682,14 @@ const refundPayment = async (req, res, next) => {
     // explicitly. Both flags default to true (full reversal); pass
     // { reverseFromInstructor: false } to let the instructor keep their
     // share on a goodwill refund.
+    //
+    // AHEM: ye dono flags SIRF Connect wali payment par bheje ja sakte hain.
+    // Manual payment mein koi transfer hua hi nahi (poora paisa Kidventures
+    // ke account mein hai), is liye Stripe reverse_transfer par error de
+    // deta aur refund hi na hota. Wahan refund seedha hamare account se
+    // jata hai, aur instructor ka hissa (agar pehle bhej diya gaya ho)
+    // admin ko khud uss se wapas lena hota hai.
+    const isConnectPayment = payment.payoutMode !== "manual";
     const reverseFromInstructor = req.body.reverseFromInstructor !== false;
     const refundOurCommission = req.body.refundOurCommission !== false;
 
@@ -668,8 +700,13 @@ const refundPayment = async (req, res, next) => {
         payment_intent: payment.stripePaymentIntentId,
         amount: toFils(refundAmount),
         reason: "requested_by_customer",
-        reverse_transfer: reverseFromInstructor,
-        refund_application_fee: reverseFromInstructor && refundOurCommission,
+        ...(isConnectPayment
+          ? {
+              reverse_transfer: reverseFromInstructor,
+              refund_application_fee:
+                reverseFromInstructor && refundOurCommission,
+            }
+          : {}),
       });
     } catch (stripeError) {
       // Stripe ne mana kar diya, reserve ki hui rakam wapas chhor do,
