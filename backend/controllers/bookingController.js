@@ -478,6 +478,544 @@ const createBooking = async (req, res, next) => {
 };
 
 /**
+ * Fundraiser booking kitni der tak bina tasdeeq ke seat roke rakh sakti hai.
+ *
+ * Aam booking me ye 15 minute hai, kyunke parent usi waqt card se payment
+ * kar raha hota hai. Yahan parent ko pehle charity ki site par jana hai,
+ * donate karna hai, phir WhatsApp par screenshot bhejna hai, aur phir
+ * instructor ko usay dekh kar confirm karna hai. Ye sab 15 minute me nahi
+ * hota, is liye poora din diya hai.
+ */
+const FUNDRAISER_HOLD_HOURS = 24;
+
+/**
+ * Dono fundraiser raaston ki mushtarak jaanch (parent khud bhare ya
+ * instructor haath se likhe). Ghalti ho to { error } wapas karta hai,
+ * warna saaf suthra data.
+ *
+ * Ek hi jagah rakhne ki wajah: seat reserve karne wali ganit nazuk hai,
+ * aur do jagah copy ho jaye to ek jagah ki tabdeeli doosri jagah reh
+ * jati hai.
+ */
+const prepareFundraiserBooking = async ({
+  activityId,
+  sessionIds,
+  parentName,
+  numberOfChildren,
+  childNames,
+}) => {
+  if (!activityId || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+    return {
+      error: { code: 400, message: "Please choose a class and at least one date" },
+    };
+  }
+
+  const name = String(parentName || "").trim();
+  if (!name) {
+    return { error: { code: 400, message: "Please enter the parent's name" } };
+  }
+
+  /**
+   * Number.isInteger ka check zaroori hai: Number("abc") = NaN hota hai
+   * aur NaN ka har comparison false, yaani "NaN < 1" bhi false. Aisi
+   * value aage seat reserve karne wali ganit ko kharab kar deti.
+   */
+  const kids = Number(numberOfChildren);
+  if (!Number.isInteger(kids) || kids < 1 || kids > 10) {
+    return {
+      error: {
+        code: 400,
+        message: "Number of children must be a whole number between 1 and 10",
+      },
+    };
+  }
+
+  const activity = await Activity.findById(activityId);
+  if (!activity) {
+    return { error: { code: 404, message: "Class not found" } };
+  }
+
+  /**
+   * Sirf fundraiser classes. Aam class par agar ye raasta khula hota to
+   * koi bhi bina paise diye seats bhar sakta tha. Wahan payment ka apna
+   * poora raasta mojood hai.
+   */
+  if (!activity.fundraiser?.enabled) {
+    return {
+      error: {
+        code: 400,
+        message: "This way of booking is only for charity fundraiser classes",
+      },
+    };
+  }
+
+  const wantedIds = [...new Set(sessionIds.map(String))];
+  const sessionsToReserve = wantedIds
+    .map((id) => activity.sessions.find((ses) => String(ses._id) === id))
+    .filter(Boolean);
+
+  if (sessionsToReserve.length !== wantedIds.length) {
+    return {
+      error: {
+        code: 400,
+        message: "One of the selected dates no longer exists on this class",
+      },
+    };
+  }
+
+  // Bachon ke naam ek line me bhi likhe ja sakte hain, comma se alag.
+  // Naam marzi ke hain, lekin agar diye hain to tadaad se zyada nahi ho
+  // sakte, warna seat ka hisaab aur naamon ki list chup chaap alag alag
+  // ho jate.
+  const names = String(childNames || "")
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean);
+
+  if (names.length > kids) {
+    return {
+      error: {
+        code: 400,
+        message: `You entered ${names.length} names but only ${kids} child${
+          kids === 1 ? "" : "ren"
+        }. Please check the count.`,
+      },
+    };
+  }
+
+  return { activity, sessionsToReserve, name, kids, names };
+};
+
+/**
+ * Seats ko atomically rok leta hai, bilkul wohi tareeqa jo aam booking me
+ * hai: check aur update ek hi database operation me, taake do log ek hi
+ * lamhe me aakhri seat na le sakein. Ek bhi date full ho to kuch bhi
+ * reserve nahi hota, aadhi booking nahi banti.
+ */
+const reserveFundraiserSeats = async ({ activity, sessionsToReserve, kids }) => {
+  const arrayFilters = sessionsToReserve.map((ses, i) => ({
+    [`s${i}._id`]: ses._id,
+  }));
+  const incFields = Object.fromEntries(
+    sessionsToReserve.map((ses, i) => [`sessions.$[s${i}].seatsBooked`, kids]),
+  );
+
+  const reserved = await Activity.findOneAndUpdate(
+    {
+      _id: activity._id,
+      $and: sessionsToReserve.map((ses) => ({
+        sessions: {
+          $elemMatch: {
+            _id: ses._id,
+            capacity: ses.capacity, // capacity beech me badli to fail
+            seatsBooked: { $lte: ses.capacity - kids },
+          },
+        },
+      })),
+    },
+    { $inc: incFields },
+    { new: true, arrayFilters },
+  );
+
+  if (!reserved) {
+    const seatsLeft = Math.min(
+      ...sessionsToReserve.map((ses) =>
+        Math.max(ses.capacity - ses.seatsBooked, 0),
+      ),
+    );
+    return { ok: false, seatsLeft, incFields, arrayFilters };
+  }
+
+  return { ok: true, incFields, arrayFilters };
+};
+
+/**
+ * Reserve ki hui seats wapas chhorta hai. Jab booking banane me koi masla
+ * aa jaye to ye zaroori hai, warna woh seats kisi ke kaam aaye baghair
+ * hamesha ke liye block ho jati hain aur kisi ko khabar nahi hoti.
+ */
+const releaseFundraiserSeats = async (activityId, incFields, arrayFilters) => {
+  const decFields = Object.fromEntries(
+    Object.entries(incFields).map(([key, val]) => [key, -val]),
+  );
+
+  await Activity.updateOne(
+    { _id: activityId },
+    { $inc: decFields },
+    { arrayFilters },
+  ).catch((err) =>
+    console.error(
+      `! Fundraiser seat rollback failed, activity ${activityId}: ${err.message}`,
+    ),
+  );
+};
+
+/** Booking ka woh hissa jo dono raaston me bilkul ek jaisa hai */
+const fundraiserBookingFields = ({ activity, sessionsToReserve, kids, names }) => {
+  const sortedSessions = [...sessionsToReserve].sort(
+    (a, b) => new Date(a.date) - new Date(b.date),
+  );
+  const primarySession = sortedSessions[0];
+
+  return {
+    source: "manual",
+
+    activity: activity._id,
+    activityTitle: activity.title,
+    instructor: activity.instructor,
+
+    sessionId: primarySession._id,
+    sessionDate: primarySession.date,
+    startTime: primarySession.startTime,
+    endTime: primarySession.endTime,
+    sessionLabel: primarySession.label,
+
+    // Ek se zyada date ho to sab bundleSessions me, bilkul bundle booking
+    // ki tarah. Seat release aur attendee list isi field ko padhti hain,
+    // is liye cancel par saari dates ki seat wapas aati hai.
+    ...(sortedSessions.length > 1 && {
+      bundleSessions: sortedSessions.map((ses) => ({
+        sessionId: ses._id,
+        date: ses.date,
+        startTime: ses.startTime,
+        endTime: ses.endTime,
+        label: ses.label,
+      })),
+    }),
+
+    children: names.map((n) => ({ name: n })),
+    numberOfChildren: kids,
+
+    /**
+     * Paisa Kidventures se guzra hi nahi, is liye yahan sab 0 hai. Agar
+     * yahan class ki qeemat likh dete to admin ki revenue aur instructor
+     * ki earnings dono me aisa paisa shamil ho jata jo kabhi hamare
+     * account me aaya hi nahi.
+     */
+    pricePerChild: 0,
+    subtotalBeforeDiscount: 0,
+    discountPercent: 0,
+    discountAmount: 0,
+    subtotal: 0,
+    currency: activity.currency,
+    commissionPercent: 0,
+    commissionAmount: 0,
+    instructorEarning: 0,
+    totalAmount: 0,
+  };
+};
+
+/**
+ * @desc    Charity fundraiser class ki seat parent khud rok leta hai
+ * @route   POST /api/bookings/fundraiser
+ * @access  Public, login ki zaroorat nahi
+ *
+ * Body: { activityId, sessionIds: [], parentName, parentPhone, parentEmail,
+ *         numberOfChildren, childNames, notes }
+ *
+ * YE KYUN BANA
+ *
+ * Fundraiser class par payment charity ki apni website par hoti hai. Woh
+ * humein kuch wapas nahi bhejti, is liye "paisa aa gaya" wali khabar
+ * hum tak sirf WhatsApp ke screenshot se pohanchti hai. Us ka matlab ye
+ * nikla ke parent jo kuch bhi chunta tha woh kahin save hi nahi hota tha,
+ * aur instructor ko sab kuch dobara haath se likhna parta tha.
+ *
+ * Ab parent donation link par jane se PEHLE ye chhota form bharta hai.
+ * Booking usi waqt ban jati hai aur seat us ke naam ruk jati hai, magar
+ * "pending" halat me. Phir woh donate karta hai aur WhatsApp par
+ * screenshot bhejta hai jis me booking number bhi likha hota hai.
+ * Instructor sirf Confirm dabata hai.
+ *
+ * Seat {FUNDRAISER_HOLD_HOURS} ghante tak ruki rehti hai. Jo log form
+ * bhar ke gayab ho jayen un ki seat khud ba khud khul jati hai, kyunke
+ * yahan paymentStatus "unpaid" rakha hai aur releaseExpiredReservations
+ * wahi dekh kar seat chhor deta hai. Tasdeeq ke baad hi woh "external"
+ * banta hai.
+ */
+const reserveFundraiserSpot = async (req, res, next) => {
+  try {
+    const prepared = await prepareFundraiserBooking(req.body);
+
+    if (prepared.error) {
+      return res
+        .status(prepared.error.code)
+        .json({ success: false, message: prepared.error.message });
+    }
+
+    const { activity, sessionsToReserve, name, kids, names } = prepared;
+
+    const phone = String(req.body.parentPhone || "").trim();
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your WhatsApp number",
+      });
+    }
+
+    /**
+     * DOUBLE SUBMIT SE BACHAO.
+     *
+     * Button do dafa dab jaye, ya parent form bhar kar wapas aa kar phir
+     * bhar de, to do bookings ban jatin aur dugni seats ruk jatin. Yahan
+     * koi account nahi hota, is liye pehchan ke liye number hi hai.
+     */
+    const alreadyWaiting = await Booking.findOne({
+      activity: activity._id,
+      source: "manual",
+      status: "pending",
+      "offlineParent.phone": phone,
+    }).select("bookingNumber");
+
+    if (alreadyWaiting) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "You already have a spot held on this class. Check your WhatsApp, " +
+          `your booking number is ${alreadyWaiting.bookingNumber}.`,
+        bookingNumber: alreadyWaiting.bookingNumber,
+      });
+    }
+
+    const { ok, seatsLeft, incFields, arrayFilters } =
+      await reserveFundraiserSeats({ activity, sessionsToReserve, kids });
+
+    if (!ok) {
+      return res.status(409).json({
+        success: false,
+        message:
+          seatsLeft === 0
+            ? "Sorry, one of these dates is now full"
+            : `Only ${seatsLeft} seat(s) left on one of these dates`,
+        seatsAvailable: seatsLeft,
+      });
+    }
+
+    try {
+      const booking = await Booking.create({
+        ...fundraiserBookingFields({ activity, sessionsToReserve, kids, names }),
+
+        offlineParent: {
+          name,
+          phone: phone.slice(0, 40),
+          email: String(req.body.parentEmail || "").trim().slice(0, 160),
+        },
+
+        // Tasdeeq hone tak "pending" aur "unpaid". Isi se seat khud
+        // chhutti hai agar parent donate hi na kare.
+        status: "pending",
+        paymentStatus: "unpaid",
+        reservationExpiresAt: new Date(
+          Date.now() + FUNDRAISER_HOLD_HOURS * 60 * 60 * 1000,
+        ),
+
+        parentNotes: String(req.body.notes || "").slice(0, 500),
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `Your spot is held for ${FUNDRAISER_HOLD_HOURS} hours. Please donate and send your screenshot on WhatsApp.`,
+        bookingNumber: booking.bookingNumber,
+        booking,
+      });
+    } catch (bookingError) {
+      await releaseFundraiserSeats(activity._id, incFields, arrayFilters);
+      throw bookingError;
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Charity fundraiser class ki booking haath se likhna
+ * @route   POST /api/bookings/manual
+ * @access  Instructor (apni class) / Admin
+ *
+ * Body: { activityId, sessionIds: [], parentName, parentPhone, parentEmail,
+ *         numberOfChildren, childNames, notes }
+ *
+ * Ye raasta tab ke liye hai jab parent ne form na bhara ho, misaal ke taur
+ * par seedha WhatsApp par message kar diya ho, ya booking us waqt ki ho jab
+ * ye form mojood hi nahi tha. Instructor ne screenshot apni aankhon se dekh
+ * liya hai, is liye ye booking seedha confirmed banti hai.
+ */
+const createManualBooking = async (req, res, next) => {
+  try {
+    const prepared = await prepareFundraiserBooking(req.body);
+
+    if (prepared.error) {
+      return res
+        .status(prepared.error.code)
+        .json({ success: false, message: prepared.error.message });
+    }
+
+    const { activity, sessionsToReserve, name, kids, names } = prepared;
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner =
+      activity.instructor?.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isOwner) {
+      return res
+        .status(403)
+        .json({ success: false, message: "This is not your class" });
+    }
+
+    const { ok, seatsLeft, incFields, arrayFilters } =
+      await reserveFundraiserSeats({ activity, sessionsToReserve, kids });
+
+    if (!ok) {
+      return res.status(409).json({
+        success: false,
+        message:
+          seatsLeft === 0
+            ? "One of these dates is already full"
+            : `Only ${seatsLeft} seat(s) left on one of these dates`,
+        seatsAvailable: seatsLeft,
+      });
+    }
+
+    try {
+      const booking = await Booking.create({
+        ...fundraiserBookingFields({ activity, sessionsToReserve, kids, names }),
+
+        recordedBy: req.user._id,
+        offlineParent: {
+          name,
+          phone: String(req.body.parentPhone || "").trim().slice(0, 40),
+          email: String(req.body.parentEmail || "").trim().slice(0, 160),
+        },
+
+        // Instructor screenshot dekh chuka hai, is liye seedha confirmed
+        status: "confirmed",
+        paymentStatus: "external",
+
+        parentNotes: String(req.body.notes || "").slice(0, 500),
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Booking added. The seats are now reserved.",
+        booking,
+      });
+    } catch (bookingError) {
+      await releaseFundraiserSeats(activity._id, incFields, arrayFilters);
+      throw bookingError;
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Fundraiser bookings jo tasdeeq ka intezar kar rahi hain
+ * @route   GET /api/bookings/fundraiser/pending
+ * @access  Instructor (apni classes) / Admin
+ *
+ * getInstructorBookings jaan boojh kar "pending" bookings nahi dikhati,
+ * kyunke aam pending booking ka matlab hai "paisa abhi aaya hi nahi" aur
+ * us ke bachon ke naam aur allergy notes instructor ko nahi dikhne
+ * chahiyen. Yahan maamla alag hai: ye wohi bookings hain jo instructor ne
+ * khud confirm karni hain, aur sirf fundraiser classes ki hain.
+ */
+const getPendingFundraiserBookings = async (req, res, next) => {
+  try {
+    const filter = {
+      source: "manual",
+      status: "pending",
+    };
+
+    // Admin sab dekh sakta hai, instructor sirf apni classes ki
+    if (req.user.role !== "admin") {
+      filter.instructor = req.user._id;
+    }
+
+    const bookings = await Booking.find(filter)
+      .populate("activity", "title slug")
+      .sort({ createdAt: 1 });
+
+    res.json({ success: true, count: bookings.length, bookings });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Fundraiser booking ki payment confirm karna
+ * @route   PUT /api/bookings/fundraiser/:id/confirm
+ * @access  Instructor (apni class) / Admin
+ *
+ * Instructor ne WhatsApp par donation ka screenshot dekh liya, ab seat
+ * pakki ho jati hai: reservationExpiresAt hat jata hai (warna cleanup
+ * usay cancel kar deta) aur paymentStatus "external" ban jata hai, jis ka
+ * matlab hai paisa charity ke paas gaya, hamare paas nahi.
+ */
+const confirmFundraiserBooking = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking || booking.source !== "manual") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner =
+      booking.instructor?.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isOwner) {
+      return res
+        .status(403)
+        .json({ success: false, message: "This is not your class" });
+    }
+
+    if (booking.status === "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message: "This booking is already confirmed",
+      });
+    }
+
+    /**
+     * ATOMIC: shart update ke andar hai. Agar in do lamhon ke beech cleanup
+     * ne seat chhor kar booking cancel kar di (24 ghante poore ho gaye), to
+     * ye update match hi nahi karegi aur hum cancelled booking ko dobara
+     * zinda nahi karenge, jis ki seat ja chuki hoti hai.
+     */
+    const confirmed = await Booking.findOneAndUpdate(
+      { _id: booking._id, status: "pending" },
+      {
+        $set: {
+          status: "confirmed",
+          paymentStatus: "external",
+          recordedBy: req.user._id,
+        },
+        $unset: { reservationExpiresAt: "" },
+      },
+      { new: true },
+    );
+
+    if (!confirmed) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This spot expired and the seat was released. Please add the booking again.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Booking confirmed. The seat is now theirs.",
+      booking: confirmed,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Parent ki apni bookings
  * @route   GET /api/bookings/my
  * @access  Parent
@@ -572,9 +1110,11 @@ const getBookingById = async (req, res, next) => {
         .json({ success: false, message: "Booking not found" });
     }
 
-    // ACCESS CHECK - teen me se koi ek hona zaroori hai
+    // ACCESS CHECK - teen me se koi ek hona zaroori hai.
+    // Manual (fundraiser) booking ka koi parent account hota hi nahi, is
+    // liye optional chaining - warna yahan null par crash hota tha.
     const userId = req.user._id.toString();
-    const isParent = booking.parent._id.toString() === userId;
+    const isParent = booking.parent?._id?.toString() === userId;
     const isInstructor = booking.instructor._id.toString() === userId;
     const isAdmin = req.user.role === "admin";
 
@@ -605,10 +1145,20 @@ const cancelBooking = async (req, res, next) => {
         .json({ success: false, message: "Booking not found" });
     }
 
-    const isParent = booking.parent.toString() === req.user._id.toString();
+    const userId = req.user._id.toString();
+    const isParent = booking.parent?.toString() === userId;
     const isAdmin = req.user.role === "admin";
 
-    if (!isParent && !isAdmin) {
+    /**
+     * Manual (fundraiser) booking kisi parent account ki nahi hoti, usay
+     * cancel karne wala wohi instructor hona chahiye jiski class hai,
+     * warna koi usay cancel hi nahi kar pata.
+     */
+    const isOwnInstructor =
+      booking.source === "manual" &&
+      booking.instructor?.toString() === userId;
+
+    if (!isParent && !isAdmin && !isOwnInstructor) {
       return res
         .status(403)
         .json({ success: false, message: "Not your booking" });
@@ -670,7 +1220,11 @@ const cancelBooking = async (req, res, next) => {
         $set: {
           status: "cancelled",
           cancellation: {
-            cancelledBy: isAdmin ? "admin" : "parent",
+            cancelledBy: isAdmin
+              ? "admin"
+              : isOwnInstructor
+                ? "instructor"
+                : "parent",
             cancelledAt: new Date(),
             reason: req.body.reason?.slice(0, 300),
             refundTier,
@@ -798,8 +1352,10 @@ const getSessionAttendees = async (req, res, next) => {
         name: child.name,
         age: child.age,
         allergies: child.allergies || "None",
-        parentName: booking.parent?.name,
-        parentPhone: booking.parent?.phone,
+        // Manual booking par parent account nahi hota, naam/number
+        // offlineParent me hote hain
+        parentName: booking.parent?.name || booking.offlineParent?.name,
+        parentPhone: booking.parent?.phone || booking.offlineParent?.phone,
         bookingNumber: booking.bookingNumber,
       })),
     );
@@ -833,7 +1389,7 @@ const getBookingReceipt = async (req, res, next) => {
 
     // ACCESS CHECK - wahi teen log jo getBookingById me hain
     const userId = req.user._id.toString();
-    const isParent = booking.parent._id.toString() === userId;
+    const isParent = booking.parent?._id?.toString() === userId;
     const isInstructor = booking.instructor._id.toString() === userId;
     const isAdmin = req.user.role === "admin";
 
@@ -1007,6 +1563,10 @@ const getBookingReceipt = async (req, res, next) => {
 
 module.exports = {
   createBooking,
+  createManualBooking,
+  reserveFundraiserSpot,
+  getPendingFundraiserBookings,
+  confirmFundraiserBooking,
   getMyBookings,
   getInstructorBookings,
   getBookingById,

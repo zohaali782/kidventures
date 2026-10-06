@@ -107,6 +107,20 @@ const IcClose = (p) => (
 const AED = (n) =>
   "AED " +
   (Number(n) || 0).toLocaleString("en-AE", { maximumFractionDigits: 0 });
+
+/* UAE ka local number (05x...) wa.me ke liye international banata hai.
+   Number pehle se country code ke sath ho to usay chhera nahi jata, sirf
+   00 ki jagah country code seedha. */
+const waLink = (phone) => {
+  let digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2); // 00971... -> 971...
+  } else if (digits.length === 10 && digits.startsWith("05")) {
+    digits = "971" + digits.slice(1); // 0501234567 -> 971501234567
+  }
+  return `https://wa.me/${digits}`;
+};
 const fmtDate = (d) => {
   if (!d) return "";
   const dt = new Date(d);
@@ -307,6 +321,148 @@ export default function InstructorDashboard() {
     setTimeout(() => setToast(""), 2200);
   };
 
+  /* ------------------------ fundraiser bookings -------------------------
+   *
+   * Charity fundraiser class par parent Kidventures ko paisa nahi deta,
+   * woh seedha donation link par karta hai aur WhatsApp par screenshot
+   * bhejta hai. Is liye koi booking apne aap nahi banti aur seat ka hisaab
+   * kahin nazar nahi aata. Yahan se instructor woh booking khud likh deta
+   * hai, taake seats ghat jayen aur attendee list bun jaye.
+   */
+  const fundraiserClasses = useMemo(
+    () => classes.filter((c) => c.fundraiser?.enabled),
+    [classes],
+  );
+
+  const emptyFbForm = {
+    activityId: "",
+    sessionIds: [],
+    parentName: "",
+    parentPhone: "",
+    numberOfChildren: 1,
+    childNames: "",
+  };
+  const [fbOpen, setFbOpen] = useState(false);
+  const [fbForm, setFbForm] = useState(emptyFbForm);
+  const [fbSaving, setFbSaving] = useState(false);
+
+  /**
+   * Jo parents form bhar kar apni seat rok chuke hain, magar screenshot ki
+   * tasdeeq baqi hai. Ye bookings getInstructorBookings se nahi aatin
+   * (wo jaan boojh kar pending bookings nahi bhejti), is liye in ka apna
+   * endpoint hai.
+   */
+  const [fbPending, setFbPending] = useState([]);
+  const [confirmingId, setConfirmingId] = useState(null);
+
+  const loadFbPending = useCallback(async () => {
+    try {
+      const { data } = await api.get("/bookings/fundraiser/pending");
+      setFbPending(toList(data.bookings));
+    } catch {
+      setFbPending([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFbPending();
+  }, [loadFbPending]);
+
+  const confirmFbBooking = async (booking) => {
+    setConfirmingId(booking._id);
+    try {
+      await api.put(`/bookings/fundraiser/${booking._id}/confirm`);
+
+      // Confirmed list aur pending list dono refresh
+      const [bkRes] = await Promise.allSettled([
+        api.get("/bookings/instructor"),
+      ]);
+      if (bkRes.status === "fulfilled") {
+        setBookings(toList(bkRes.value.data.bookings || bkRes.value.data));
+      }
+      await loadFbPending();
+      showToast("Booking confirmed.");
+    } catch (error) {
+      showToast(
+        error?.response?.data?.message || "Couldn't confirm this booking.",
+      );
+      // Seat expire ho gayi ho to wo booking list se nikal jani chahiye
+      await loadFbPending();
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const fbClass = fundraiserClasses.find((c) => c._id === fbForm.activityId);
+
+  const manualBookings = useMemo(
+    () => bookings.filter((b) => b.source === "manual"),
+    [bookings],
+  );
+
+  const toggleFbSession = (sid) =>
+    setFbForm((f) => ({
+      ...f,
+      sessionIds: f.sessionIds.includes(sid)
+        ? f.sessionIds.filter((x) => x !== sid)
+        : [...f.sessionIds, sid],
+    }));
+
+  const submitFbBooking = async (e) => {
+    e.preventDefault();
+    if (fbSaving) return;
+
+    if (!fbForm.activityId || fbForm.sessionIds.length === 0) {
+      showToast("Pick the class and at least one date.");
+      return;
+    }
+    if (!fbForm.parentName.trim()) {
+      showToast("Enter the parent's name.");
+      return;
+    }
+
+    setFbSaving(true);
+    try {
+      await api.post("/bookings/manual", {
+        activityId: fbForm.activityId,
+        sessionIds: fbForm.sessionIds,
+        parentName: fbForm.parentName,
+        parentPhone: fbForm.parentPhone,
+        numberOfChildren: Number(fbForm.numberOfChildren),
+        childNames: fbForm.childNames,
+      });
+
+      // Booking list aur seat counts dono dobara mangwao
+      const [bkRes, clsRes] = await Promise.allSettled([
+        api.get("/bookings/instructor"),
+        api.get("/activities/my-classes"),
+      ]);
+      if (bkRes.status === "fulfilled") {
+        setBookings(toList(bkRes.value.data.bookings || bkRes.value.data));
+      }
+      if (clsRes.status === "fulfilled") {
+        setClasses(
+          toList(
+            clsRes.value.data.activities ||
+              clsRes.value.data.classes ||
+              clsRes.value.data,
+          ),
+        );
+      }
+
+      await loadFbPending();
+      setFbForm(emptyFbForm);
+      setFbOpen(false);
+      showToast("Booking added.");
+    } catch (error) {
+      showToast(
+        error?.response?.data?.message || "Couldn't add this booking.",
+      );
+    } finally {
+      setFbSaving(false);
+    }
+  };
+
   /**
    * Redirects to Stripe's hosted onboarding page (full-page redirect, as
    * Stripe recommends, not a popup). Status refreshes automatically when
@@ -331,7 +487,7 @@ export default function InstructorDashboard() {
   };
 
   const doLogout = async () => {
-    // logout ab server ko call karta hai taake httpOnly cookie clear ho —
+    // logout ab server ko call karta hai taake httpOnly cookie clear ho,
     // is liye navigate karne se pehle await zaroori hai.
     await logout();
     nav("/login");
@@ -442,7 +598,7 @@ export default function InstructorDashboard() {
   return (
     <div className="min-h-screen bg-[#F7F5F2] text-brand-brown">
       <Helmet>
-        <title>Instructor Dashboard — Kidventures</title>
+        <title>Instructor Dashboard - Kidventures</title>
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -601,11 +757,13 @@ export default function InstructorDashboard() {
                     recentBookings.map((b, i) => (
                       <Row key={i}>
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gold text-xs font-bold text-brand-brown">
-                          {(b.parent?.name || "?").charAt(0).toUpperCase()}
+                          {(b.parent?.name || b.offlineParent?.name || "?")
+                            .charAt(0)
+                            .toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-bold">
-                            {b.parent?.name || "Parent"}
+                            {b.parent?.name || b.offlineParent?.name || "Parent"}
                           </div>
                           <div className="truncate text-xs opacity-60">
                             {b.numberOfChildren || b.children?.length || 1}{" "}
@@ -614,7 +772,9 @@ export default function InstructorDashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-xs font-bold">
-                            {AED(b.instructorEarning)}
+                            {b.source === "manual"
+                              ? "Fundraiser"
+                              : AED(b.instructorEarning)}
                           </div>
                           <div className="text-[10px] opacity-50">
                             {fmtDate(b.createdAt)}
@@ -624,6 +784,269 @@ export default function InstructorDashboard() {
                     ))
                   )}
                 </Panel>
+
+                {/* fundraiser bookings, charity classes ke liye */}
+                {fundraiserClasses.length > 0 && (
+                  <div className="lg:col-span-2">
+                    <Panel title="Fundraiser Bookings">
+                      <div className="-mt-1 mb-3 text-xs opacity-60">
+                        Parents reserve their spot on the class page, then pay
+                        the charity and send you the screenshot on WhatsApp.
+                        Confirm each one below once you've seen the payment.
+                        If someone messaged you without using the form, add
+                        their booking by hand instead.
+                      </div>
+
+                      {/* Tasdeeq ka intezar */}
+                      {fbPending.length > 0 && (
+                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5">
+                          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-800">
+                            Waiting for your confirmation ({fbPending.length})
+                          </div>
+
+                          {fbPending.map((b) => (
+                            <div
+                              key={b._id}
+                              className="flex flex-wrap items-center gap-3 border-t border-amber-200/70 py-2.5 first:border-t-0"
+                            >
+                              <div className="min-w-[180px] flex-1">
+                                <div className="text-sm font-bold">
+                                  {b.offlineParent?.name || "Parent"}
+                                  <span className="ml-2 text-xs font-normal opacity-60">
+                                    {b.bookingNumber}
+                                  </span>
+                                </div>
+                                <div className="text-xs opacity-65">
+                                  {b.numberOfChildren} child
+                                  {b.numberOfChildren === 1 ? "" : "ren"} ·{" "}
+                                  {b.activityTitle || b.activity?.title}
+                                </div>
+                                <div className="text-xs opacity-65">
+                                  {b.bundleSessions?.length > 1
+                                    ? b.bundleSessions
+                                        .map((ses) => fmtDate(ses.date))
+                                        .join(", ")
+                                    : fmtDate(b.sessionDate)}
+                                </div>
+                              </div>
+
+                              {b.offlineParent?.phone && (
+                                <a
+                                  href={waLink(b.offlineParent.phone)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-lg border border-[#25D366] bg-white px-3 py-1.5 text-xs font-semibold text-[#25D366] no-underline"
+                                >
+                                  WhatsApp
+                                </a>
+                              )}
+
+                              <button
+                                onClick={() => confirmFbBooking(b)}
+                                disabled={confirmingId === b._id}
+                                className="rounded-lg bg-brand-orange px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                              >
+                                {confirmingId === b._id
+                                  ? "Saving…"
+                                  : "Payment received"}
+                              </button>
+                            </div>
+                          ))}
+
+                          <div className="mt-2 text-[11px] text-amber-900/70">
+                            Each held seat is released automatically after 24
+                            hours if you don't confirm it.
+                          </div>
+                        </div>
+                      )}
+
+                      {!fbOpen ? (
+                        <button
+                          onClick={() => setFbOpen(true)}
+                          className="mb-3 rounded-lg bg-brand-orange px-3.5 py-2 text-xs font-bold text-white"
+                        >
+                          + Add a booking
+                        </button>
+                      ) : (
+                        <form
+                          onSubmit={submitFbBooking}
+                          className="mb-4 rounded-xl bg-brand-cream/60 p-3.5"
+                        >
+                          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide opacity-65">
+                            Class
+                          </label>
+                          <select
+                            value={fbForm.activityId}
+                            onChange={(e) =>
+                              setFbForm((f) => ({
+                                ...f,
+                                activityId: e.target.value,
+                                sessionIds: [],
+                              }))
+                            }
+                            className="mb-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                          >
+                            <option value="">Choose a class</option>
+                            {fundraiserClasses.map((c) => (
+                              <option key={c._id} value={c._id}>
+                                {c.title}
+                              </option>
+                            ))}
+                          </select>
+
+                          {fbClass && (
+                            <>
+                              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide opacity-65">
+                                Dates they're attending
+                              </label>
+                              <div className="mb-3 flex flex-col gap-1.5">
+                                {toList(fbClass.sessions).length === 0 ? (
+                                  <div className="text-xs opacity-60">
+                                    This class has no dates yet.
+                                  </div>
+                                ) : (
+                                  toList(fbClass.sessions).map((ses) => {
+                                    const sid = String(ses._id);
+                                    const left =
+                                      (ses.capacity ?? 0) -
+                                      (ses.seatsBooked ?? 0);
+                                    return (
+                                      <label
+                                        key={sid}
+                                        className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={fbForm.sessionIds.includes(
+                                            sid,
+                                          )}
+                                          onChange={() => toggleFbSession(sid)}
+                                        />
+                                        <span className="font-semibold">
+                                          {fmtDate(ses.date)}
+                                        </span>
+                                        <span className="opacity-60">
+                                          {ses.startTime || ""}
+                                          {ses.label ? ` · ${ses.label}` : ""}
+                                        </span>
+                                        <span className="ml-auto opacity-55">
+                                          {left} left
+                                        </span>
+                                      </label>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </>
+                          )}
+
+                          <div className="mb-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                            <input
+                              value={fbForm.parentName}
+                              onChange={(e) =>
+                                setFbForm((f) => ({
+                                  ...f,
+                                  parentName: e.target.value,
+                                }))
+                              }
+                              placeholder="Parent's name"
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                            />
+                            <input
+                              value={fbForm.parentPhone}
+                              onChange={(e) =>
+                                setFbForm((f) => ({
+                                  ...f,
+                                  parentPhone: e.target.value,
+                                }))
+                              }
+                              placeholder="WhatsApp number"
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                            />
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              value={fbForm.numberOfChildren}
+                              onChange={(e) =>
+                                setFbForm((f) => ({
+                                  ...f,
+                                  numberOfChildren: e.target.value,
+                                }))
+                              }
+                              placeholder="Children"
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <input
+                            value={fbForm.childNames}
+                            onChange={(e) =>
+                              setFbForm((f) => ({
+                                ...f,
+                                childNames: e.target.value,
+                              }))
+                            }
+                            placeholder="Children's names, separated by commas (optional)"
+                            className="mb-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                          />
+
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              disabled={fbSaving}
+                              className="rounded-lg bg-brand-orange px-3.5 py-2 text-xs font-bold text-white disabled:opacity-50"
+                            >
+                              {fbSaving ? "Saving…" : "Save booking"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFbOpen(false);
+                                setFbForm(emptyFbForm);
+                              }}
+                              className="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {manualBookings.length === 0 ? (
+                        <Empty text="No fundraiser bookings recorded yet." />
+                      ) : (
+                        manualBookings.map((b) => (
+                          <Row key={b._id}>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-bold">
+                                {b.offlineParent?.name || "Parent"}
+                              </div>
+                              <div className="truncate text-xs opacity-60">
+                                {b.numberOfChildren} child
+                                {b.numberOfChildren === 1 ? "" : "ren"} ·{" "}
+                                {b.activityTitle}
+                              </div>
+                              <div className="truncate text-xs opacity-60">
+                                {b.bundleSessions?.length > 1
+                                  ? b.bundleSessions
+                                      .map((ses) => fmtDate(ses.date))
+                                      .join(", ")
+                                  : fmtDate(b.sessionDate)}
+                                {b.offlineParent?.phone
+                                  ? ` · ${b.offlineParent.phone}`
+                                  : ""}
+                              </div>
+                            </div>
+                            <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-800">
+                              {b.bookingNumber}
+                            </span>
+                          </Row>
+                        ))
+                      )}
+                    </Panel>
+                  </div>
+                )}
 
                 {/* earnings */}
                 <Panel title="Earnings">
@@ -683,8 +1106,8 @@ export default function InstructorDashboard() {
                     <>
                       <p className="mb-3 text-xs leading-relaxed opacity-70">
                         {connectStatus?.connected
-                          ? "You've started payout setup but a few details are still missing — finish it so parents can book your classes."
-                          : "Set up your payout account so you can get paid directly for every booking, on a weekly schedule."}
+                          ? "You've started payout setup but a few details are still missing. Parents can still book you in the meantime, Kidventures will hold your share and send it to your bank by hand until this is finished."
+                          : "Parents can already book your classes. Until you set this up, Kidventures collects the payment and sends your share to your bank by hand. Set up payouts to get paid automatically instead."}
                       </p>
                       <button
                         onClick={handleConnectPayouts}

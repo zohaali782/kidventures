@@ -273,6 +273,19 @@ function ActivityDetailPage() {
    * ek session par chalta hai.
    */
   const [pickedSessionIds, setPickedSessionIds] = useState([]);
+
+  /* ---- fundraiser: parent apni seat khud rok leta hai ----
+   *
+   * Payment charity ki apni site par hoti hai aur woh humein kuch wapas
+   * nahi bhejti, is liye parent pehle yahan apni tafseel bhar kar seat
+   * rok leta hai. Booking usi waqt ban jati hai, "pending" halat me, aur
+   * instructor WhatsApp par screenshot dekh kar usay confirm karta hai.
+   */
+  const [fbName, setFbName] = useState("");
+  const [fbPhone, setFbPhone] = useState("");
+  const [fbSaving, setFbSaving] = useState(false);
+  const [fbError, setFbError] = useState("");
+  const [fbBookingNumber, setFbBookingNumber] = useState("");
   const [copied, setCopied] = useState(false);
   // Gallery lightbox - kaunsi image (images array ka index) bari dikha rahe
   // hain. null matlab lightbox band hai.
@@ -280,6 +293,7 @@ function ActivityDetailPage() {
   const [reviewList, setReviewList] = useState([]);
   const [myRating, setMyRating] = useState(0);
   const [myComment, setMyComment] = useState("");
+  const [myName, setMyName] = useState("");
   const [revError, setRevError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -299,15 +313,22 @@ function ActivityDetailPage() {
       setRevError("Please select a star rating");
       return;
     }
+    // Login na ho to naam lazmi hai, warna review list bay-naam ho jati hai
+    if (!isLoggedIn && !myName.trim()) {
+      setRevError("Please enter your name");
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post("/reviews", {
         activity: id,
         rating: myRating,
         comment: myComment.trim(),
+        ...(isLoggedIn ? {} : { guestName: myName.trim() }),
       });
       setMyRating(0);
       setMyComment("");
+      setMyName("");
       await loadReviews();
       try {
         const r = await api.get(`/activities/${id}`);
@@ -511,7 +532,20 @@ function ActivityDetailPage() {
   const approxLocation = !!coords && !exactCoords;
   const learn = Array.isArray(a.whatChildrenLearn) ? a.whatChildrenLearn : [];
   const faqs = Array.isArray(a.faqs) ? a.faqs : [];
-  const canReview = getStoredUser()?.role === "parent";
+  /**
+   * Review ab sab ke liye khuli hai, login ho ya na ho. Client ka faisla
+   * tha, taake wo log bhi likh saken jinhon ne instructor ki onsite class
+   * attend ki thi magar is site par account nahi banaya.
+   *
+   * Sirf ek rok bachi hai: instructor apni hi class par review na likhe.
+   */
+  const storedUser = getStoredUser();
+  const isLoggedIn = !!storedUser;
+  const storedUserId = storedUser?._id || storedUser?.id;
+  const classInstructorId =
+    a.instructor?._id || a.instructor?.id || a.instructor;
+  const ownClass =
+    !!storedUserId && String(classInstructorId || "") === String(storedUserId);
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
   const favItem = {
@@ -568,6 +602,48 @@ function ActivityDetailPage() {
     setPickedSessionIds((ids) =>
       ids.includes(sid) ? ids.filter((x) => x !== sid) : [...ids, sid],
     );
+
+  const holdFundraiserSpot = async () => {
+    setFbError("");
+
+    if (pickedSessionIds.length === 0) {
+      setFbError("Please pick at least one date");
+      return;
+    }
+    if (!fbName.trim()) {
+      setFbError("Please enter your name");
+      return;
+    }
+    if (!fbPhone.trim()) {
+      setFbError("Please enter your WhatsApp number");
+      return;
+    }
+
+    setFbSaving(true);
+    try {
+      const { data } = await api.post("/bookings/fundraiser", {
+        activityId: a._id || a.id,
+        sessionIds: pickedSessionIds,
+        parentName: fbName.trim(),
+        parentPhone: fbPhone.trim(),
+        numberOfChildren: count,
+      });
+      setFbBookingNumber(data.bookingNumber || "");
+    } catch (err) {
+      // Agar is number se pehle hi seat ruki hui hai to server wahi booking
+      // number wapas bhejta hai, usay dikha dena behtar hai bajaye error ke
+      const existing = err?.response?.data?.bookingNumber;
+      if (existing) {
+        setFbBookingNumber(existing);
+      } else {
+        setFbError(
+          err?.response?.data?.message || "Could not hold your spot.",
+        );
+      }
+    } finally {
+      setFbSaving(false);
+    }
+  };
 
   // WhatsApp message me dates ki line: fundraiser par jitni dates chuni
   // hain sab, warna purani single date/time wali soorat.
@@ -941,21 +1017,36 @@ function ActivityDetailPage() {
           )}
           {tab === "reviews" && (
             <div>
-              <div className="mb-4 flex items-center gap-3">
-                <span className="text-3xl font-bold text-brand-brown">
-                  {rating || "-"}
-                </span>
-                <div className="text-[13px] text-brand-brown/70">
-                  ★ average · {reviews} {reviews === 1 ? "review" : "reviews"}
-                </div>
-              </div>
-
-              {canReview ? (
-                <div className="mb-6 rounded-2xl border border-gray-100 p-4">
-                  <div className="mb-2 text-[13px] font-bold">
-                    Write a review
+              {/* Rating ki line sirf tab jab waqai koi review ho. Pehle
+                  yahan khali "-" aur "0 reviews" dikhta tha, jo tootay
+                  hue jaisa lagta tha. */}
+              {reviews > 0 && (
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="text-3xl font-bold text-brand-brown">
+                    {rating}
+                  </span>
+                  <div className="text-[13px] text-brand-brown/70">
+                    ★ average · {reviews} {reviews === 1 ? "review" : "reviews"}
                   </div>
-                  <div className="mb-2 flex gap-1">
+                </div>
+              )}
+
+              {ownClass ? (
+                <div className="mb-6 rounded-[10px] bg-brand-cream/50 px-4 py-3 text-[13px] text-brand-brown/75">
+                  This is your class, so you can't leave a review on it.
+                </div>
+              ) : (
+                <div className="mb-6 rounded-2xl border border-gray-100 p-4">
+                  <div className="mb-1 text-[13px] font-bold">
+                    {reviews === 0
+                      ? "Be the first to review this class"
+                      : "Write a review"}
+                  </div>
+                  <div className="mb-3 text-[11px] text-brand-brown/60">
+                    Attended this class? Tell other parents how it went.
+                  </div>
+
+                  <div className="mb-3 flex gap-1">
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button
                         key={n}
@@ -968,17 +1059,31 @@ function ActivityDetailPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Login hua ho to naam account se aata hai */}
+                  {!isLoggedIn && (
+                    <input
+                      value={myName}
+                      onChange={(e) => setMyName(e.target.value)}
+                      placeholder="Your name"
+                      maxLength={60}
+                      className="mb-2 w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm text-brand-brown outline-none focus:border-brand-orange"
+                    />
+                  )}
+
                   <textarea
                     value={myComment}
                     onChange={(e) => setMyComment(e.target.value)}
                     placeholder="Share your experience with other parents..."
                     className="mb-2 min-h-[80px] w-full resize-y rounded-[10px] border border-gray-200 px-3 py-2 text-sm text-brand-brown outline-none focus:border-brand-orange"
                   />
+
                   {revError && (
                     <div className="mb-2 text-xs text-[#c0392b]">
                       {revError}
                     </div>
                   )}
+
                   <button
                     onClick={submitReview}
                     disabled={submitting}
@@ -986,28 +1091,27 @@ function ActivityDetailPage() {
                   >
                     {submitting ? "Posting..." : "Post review"}
                   </button>
-                </div>
-              ) : (
-                <div className="mb-6 rounded-[10px] bg-brand-cream/50 px-4 py-3 text-[13px] text-brand-brown/75">
-                  <Link
-                    to="/login"
-                    className="font-bold text-brand-orange no-underline"
-                  >
-                    Log in
-                  </Link>{" "}
-                  as a parent to leave a review.
+
+                  {!isLoggedIn && (
+                    <div className="mt-2 text-[11px] text-brand-brown/55">
+                      <Link
+                        to="/login"
+                        className="font-bold text-brand-orange no-underline"
+                      >
+                        Log in
+                      </Link>{" "}
+                      instead if you booked through Kidventures, your review
+                      will show as a verified booking.
+                    </div>
+                  )}
                 </div>
               )}
 
-              {reviewList.length === 0 ? (
-                <div className="text-sm text-brand-brown/60">
-                  No reviews yet. Be the first to review this class!
-                </div>
-              ) : (
+              {reviewList.length > 0 && (
                 <div className="flex flex-col gap-4">
                   {reviewList.map((rv) => (
                     <div key={rv._id} className="border-b border-gray-100 pb-4">
-                      <div className="mb-1 flex items-center gap-2">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
                         {pickImg(rv.user?.avatar) ? (
                           <img
                             src={cldOptimize(pickImg(rv.user?.avatar), 60)}
@@ -1018,11 +1122,18 @@ function ActivityDetailPage() {
                           <div className="h-7 w-7 rounded-full bg-brand-gold" />
                         )}
                         <span className="text-[13px] font-bold text-brand-brown">
-                          {asText(rv.user?.name) || "Parent"}
+                          {asText(rv.user?.name) ||
+                            asText(rv.guestName) ||
+                            "Parent"}
                         </span>
                         <span className="text-xs text-brand-gold">
                           {"★".repeat(rv.rating)}
                         </span>
+                        {rv.verifiedBooking && (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-800">
+                            Booked on Kidventures
+                          </span>
+                        )}
                       </div>
                       {rv.comment && (
                         <p className="text-[13px] text-brand-brown/80">
@@ -1125,8 +1236,8 @@ function ActivityDetailPage() {
                       Select your dates
                     </div>
                     <div className="mb-2.5 text-[11px] text-brand-brown/60">
-                      Pick every date you'd like to attend, they'll be
-                      included in your WhatsApp message.
+                      Pick every date you'd like to attend. Your seat is held
+                      on each one.
                     </div>
                     <div className="mb-4 flex flex-col gap-2">
                       {upcomingSessions.map((s) => {
@@ -1242,34 +1353,87 @@ function ActivityDetailPage() {
             )}
 
             {a.fundraiser?.enabled ? (
-              <>
-                <a
-                  href={a.fundraiser.link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block rounded-[10px] bg-brand-orange py-3 text-center text-sm font-bold text-white no-underline"
-                >
-                  Donate & Reserve Your Spot
-                </a>
-                <a
-                  href={`https://wa.me/${waNumber(
-                    a.fundraiser.whatsapp,
-                  )}?text=${encodeURIComponent(
-                    `Hi! I'd like to book ${count} spot(s) for "${a.title}"${
-                      whenText ? ` on ${whenText}` : ""
-                    }. I've made my fundraiser payment and I'm attaching the screenshot.`,
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2.5 flex items-center justify-center gap-1.5 rounded-[10px] border border-[#25D366] py-3 text-center text-sm font-bold text-[#25D366] no-underline"
-                >
-                  <WhatsappIcon /> Verify payment on WhatsApp
-                </a>
-                <div className="mt-2.5 text-center text-[11px] text-brand-brown/55">
-                  Seats for this class are coordinated manually with the
-                  instructor.
-                </div>
-              </>
+              fbBookingNumber ? (
+                /* Seat ruk chuki hai. Ab donate aur screenshot wala qadam,
+                   aur dono jagah booking number sath jata hai taake
+                   instructor ko dhoondhna na pare. */
+                <>
+                  <div className="mb-3 rounded-[10px] bg-green-50 px-4 py-3 text-center">
+                    <div className="text-[13px] font-bold text-green-800">
+                      Your spot is held
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-green-900/70">
+                      Booking {fbBookingNumber}
+                    </div>
+                    <div className="mt-1.5 text-[11px] leading-relaxed text-green-900/70">
+                      We're holding it for 24 hours. Donate below, then send
+                      the screenshot on WhatsApp so the instructor can confirm
+                      it.
+                    </div>
+                  </div>
+
+                  <a
+                    href={a.fundraiser.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block rounded-[10px] bg-brand-orange py-3 text-center text-sm font-bold text-white no-underline"
+                  >
+                    Donate now
+                  </a>
+                  <a
+                    href={`https://wa.me/${waNumber(
+                      a.fundraiser.whatsapp,
+                    )}?text=${encodeURIComponent(
+                      `Hi! Booking ${fbBookingNumber}, ${count} spot(s) for "${a.title}"${
+                        whenText ? ` on ${whenText}` : ""
+                      }. I've made my fundraiser payment and I'm attaching the screenshot.`,
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2.5 flex items-center justify-center gap-1.5 rounded-[10px] border border-[#25D366] py-3 text-center text-sm font-bold text-[#25D366] no-underline"
+                  >
+                    <WhatsappIcon /> Send screenshot on WhatsApp
+                  </a>
+                </>
+              ) : (
+                /* Pehla qadam: tafseel bhar kar seat rok lo */
+                <>
+                  <div className="mb-2.5 text-[13px] font-bold">Your details</div>
+
+                  <input
+                    value={fbName}
+                    onChange={(e) => setFbName(e.target.value)}
+                    placeholder="Your name"
+                    maxLength={120}
+                    className="mb-2 w-full rounded-[10px] border border-gray-200 px-3 py-2.5 text-sm text-brand-brown outline-none focus:border-brand-orange"
+                  />
+                  <input
+                    value={fbPhone}
+                    onChange={(e) => setFbPhone(e.target.value)}
+                    placeholder="WhatsApp number"
+                    inputMode="tel"
+                    maxLength={40}
+                    className="mb-2 w-full rounded-[10px] border border-gray-200 px-3 py-2.5 text-sm text-brand-brown outline-none focus:border-brand-orange"
+                  />
+
+                  {fbError && (
+                    <div className="mb-2 text-xs text-[#c0392b]">{fbError}</div>
+                  )}
+
+                  <button
+                    onClick={holdFundraiserSpot}
+                    disabled={fbSaving}
+                    className="block w-full rounded-[10px] bg-brand-orange py-3 text-center text-sm font-bold text-white disabled:opacity-60"
+                  >
+                    {fbSaving ? "Holding your spot..." : "Reserve my spot"}
+                  </button>
+
+                  <div className="mt-2.5 text-center text-[11px] leading-relaxed text-brand-brown/55">
+                    No payment here. We hold your seat, then you donate on the
+                    charity's page and send the screenshot on WhatsApp.
+                  </div>
+                </>
+              )
             ) : (
               <>
                 <Link
