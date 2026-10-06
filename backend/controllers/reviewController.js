@@ -176,7 +176,7 @@ const getReviews = async (req, res, next) => {
 
 const createReview = async (req, res, next) => {
   try {
-    const { activity, rating, comment } = req.body;
+    const { activity, rating, comment, guestName } = req.body;
 
     if (!activity || !rating) {
       return res.status(400).json({
@@ -208,6 +208,36 @@ const createReview = async (req, res, next) => {
       });
     }
 
+    /**
+     * KAUN REVIEW KAR SAKTA HAI
+     *
+     * Shuru me do sharten thin: is class ki booking mojood ho, aur us ki
+     * session guzar chuki ho. Phir client ke kehne par booking wali shart
+     * hat gayi. Ab login ki shart bhi hat gayi hai, taake wo log bhi apna
+     * tajurba likh saken jinhon ne instructor ki onsite class attend ki thi
+     * magar is site par kabhi account banaya hi nahi.
+     *
+     * Jo pehre ab bhi qaim hain:
+     *
+     *   - Account wala user ek class par sirf ek hi review de sakta hai
+     *     (Review model ka partial unique index).
+     *   - Instructor apni hi class par review nahi likh sakta.
+     *   - Bina account ke likhne wale ko naam dena parta hai.
+     *   - Route par ek rate limit lagi hai (dekho reviewRoutes.js), warna
+     *     ek hi shakhs baith kar das reviews daal deta.
+     *   - Admin kisi bhi review ko mita sakta hai (admin dashboard ka
+     *     Reviews tab).
+     */
+    const isLoggedIn = !!req.user;
+    const name = String(guestName || "").trim();
+
+    if (!isLoggedIn && !name) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your name",
+      });
+    }
+
     const activityDoc = await Activity.findById(activityId);
     if (!activityDoc) {
       return res
@@ -216,37 +246,42 @@ const createReview = async (req, res, next) => {
     }
 
     /**
-     * KAUN REVIEW KAR SAKTA HAI
-     *
-     * Pehle do sharten thin: is class ki booking mojood ho, aur us ki
-     * session guzar chuki ho. Maqsad ye tha ke instructor apne doston se
-     * 5-star na lagwa le, aur koi harif bina gaye 1-star na de de.
-     *
-     * Client ke kehne par ye sharten hata di gayi hain, taake wo log bhi
-     * apna tajurba likh saken jinhon ne instructor ki onsite class attend
-     * ki thi magar booking is site se nahi hui thi.
-     *
-     * Jo pehre ab bhi qaim hain: sirf "parent" account review kar sakta
-     * hai (route par authorize("parent"), yani instructor apni hi class
-     * par review nahi likh sakta), aur ek user ek class par sirf ek hi
-     * review de sakta hai (Review model ka unique index).
-     *
-     * Booking thi ya nahi, ye ab bhi record hota hai (verifiedBooking),
-     * bas us par koi rok nahi. Agar aage chal kar "Verified booking" ka
-     * nishan dikhana ho to data pehle se mojood hoga.
+     * Instructor apni hi class par review na likh sake. Pehle ye kaam route
+     * ke authorize("parent") se hota tha, lekin ab wahan sirf optionalAuth
+     * hai, is liye shart yahan likhni pari.
      */
-    const attendedBooking = await Booking.findOne({
-      parent: req.user._id,
-      activity: activityId,
-      status: { $in: ["confirmed", "completed"] },
-      sessionDate: { $lt: new Date() },
-    }).select("_id");
+    if (
+      isLoggedIn &&
+      activityDoc.instructor?.toString() === req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can't review your own class",
+      });
+    }
+
+    /**
+     * Booking thi ya nahi, ye ab bhi record hota hai (verifiedBooking), bas
+     * us par koi rok nahi. Mehmaan review par ye hamesha false rehta hai,
+     * kyunke us ko kisi account se joda hi nahi ja sakta.
+     */
+    let attendedBooking = null;
+
+    if (isLoggedIn) {
+      attendedBooking = await Booking.findOne({
+        parent: req.user._id,
+        activity: activityId,
+        status: { $in: ["confirmed", "completed"] },
+        sessionDate: { $lt: new Date() },
+      }).select("_id");
+    }
 
     let review;
     try {
       review = await Review.create({
         activity: activityId,
-        user: req.user._id,
+        user: isLoggedIn ? req.user._id : undefined,
+        guestName: isLoggedIn ? undefined : name.slice(0, 60),
         rating: numRating,
         comment: comment?.trim(),
         verifiedBooking: !!attendedBooking,

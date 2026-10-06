@@ -213,6 +213,7 @@ const navItems = [
   { key: "bookings", label: "Bookings", icon: IcBook },
   { key: "refunds", label: "Refunds", icon: IcBook },
   { key: "payouts", label: "Payouts", icon: IcBook },
+  { key: "reviews", label: "Reviews", icon: IcBook },
   { key: "categories", label: "Categories", icon: IcTag },
   { key: "requests", label: "Class Requests", icon: IcStar },
 ];
@@ -669,6 +670,42 @@ export default function AdminDashboard() {
     }
   };
 
+  /* ------------------------------ Reviews -------------------------------
+   *
+   * Reviews ab bina login ke bhi likhi ja sakti hain, taake wo parents bhi
+   * likh saken jinhon ne instructor ki onsite class attend ki thi. Us ka
+   * natija ye hai ke jaali review rokne ka koi khud-kar pehra nahi bacha,
+   * is liye yahan se admin kisi bhi review ko mita sakta hai.
+   */
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+
+  const loadReviews = useCallback(async () => {
+    setReviewsLoading(true);
+    try {
+      const { data } = await api.get("/admin/reviews");
+      setReviews(toList(data.reviews));
+    } catch {
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
+
+  const removeReview = async (review) => {
+    setDeletingReviewId(review._id);
+    try {
+      await api.delete(`/admin/reviews/${review._id}`);
+      setReviews((list) => list.filter((r) => r._id !== review._id));
+      flash("Review deleted");
+    } catch (err) {
+      flash(err?.response?.data?.message || "Couldn't delete this review.");
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
+
   const [refundSaving, setRefundSaving] = useState(false);
   const loadBookings = useCallback(async () => {
     setBookingsLoading(true);
@@ -823,6 +860,7 @@ export default function AdminDashboard() {
     if (tab === "bookings") loadBookings();
     if (tab === "refunds") loadRefundQueue();
     if (tab === "payouts") loadPayouts(payoutFilter);
+    if (tab === "reviews") loadReviews();
     if (tab === "categories") loadCategoriesTab();
     if (tab === "requests") loadClassRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1333,6 +1371,14 @@ export default function AdminDashboard() {
                     b.status === "refunded" ||
                     b.paymentStatus === "refunded" ||
                     b.paymentStatus === "partially_refunded";
+
+                  /**
+                   * Fundraiser class ki booking instructor ne haath se likhi
+                   * hai. Paisa charity ke paas gaya, hamare paas aaya hi
+                   * nahi, is liye yahan na rakam dikhani hai aur na refund
+                   * ka button (Stripe par is ka koi payment hai hi nahi).
+                   */
+                  const isManual = b.source === "manual";
                   return (
                     <div
                       key={b._id}
@@ -1349,9 +1395,19 @@ export default function AdminDashboard() {
                           {b.activityTitle || b.activity?.title || "Class"}
                         </div>
                         <div className="text-xs opacity-60">
-                          {b.parent?.name || "Parent"} · {b.bookingNumber} ·{" "}
-                          {fmtDate(b.createdAt)}
+                          {b.parent?.name ||
+                            b.offlineParent?.name ||
+                            "Parent"}{" "}
+                          · {b.bookingNumber} · {fmtDate(b.createdAt)}
                         </div>
+                        {isManual && (
+                          <div className="mt-1 text-[11px] opacity-60">
+                            Added by hand, parent paid the charity directly
+                            {b.offlineParent?.phone
+                              ? ` · ${b.offlineParent.phone}`
+                              : ""}
+                          </div>
+                        )}
                         {isRefunded && (
                           <div className="mt-1 text-[11px] font-semibold text-red-600">
                             ⚠ Do not pay out the instructor for this booking
@@ -1359,18 +1415,25 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <div className="text-sm font-bold">
-                        {AED(b.totalAmount)}
+                        {isManual ? (
+                          <span className="rounded bg-brand-cream px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                            Fundraiser
+                          </span>
+                        ) : (
+                          AED(b.totalAmount)
+                        )}
                       </div>
                       <StatusPill status={b.status} />
-                      {(b.status === "confirmed" ||
-                        b.paymentStatus === "partially_refunded") && (
-                        <button
-                          onClick={() => setRefundFor(b)}
-                          className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600"
-                        >
-                          Refund
-                        </button>
-                      )}
+                      {!isManual &&
+                        (b.status === "confirmed" ||
+                          b.paymentStatus === "partially_refunded") && (
+                          <button
+                            onClick={() => setRefundFor(b)}
+                            className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600"
+                          >
+                            Refund
+                          </button>
+                        )}
                     </div>
                   );
                 })
@@ -1691,6 +1754,88 @@ export default function AdminDashboard() {
                           </button>
                         )}
                       </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* REVIEWS, kyunke ab koi bhi bina login ke likh sakta hai */}
+          {tab === "reviews" && (
+            <div className="rounded-2xl bg-white px-4.5 shadow-sm">
+              <div className="border-b border-gray-100 py-4">
+                <div className="text-sm font-bold">Reviews</div>
+                <div className="mt-1 max-w-xl text-xs opacity-65">
+                  Anyone can leave a review now, with or without an account,
+                  so this list is where you keep an eye on them. Deleting one
+                  also corrects the class and instructor ratings.
+                </div>
+              </div>
+
+              {reviewsLoading ? (
+                <div className="py-10 text-center text-sm opacity-60">
+                  Loading…
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="py-10 text-center text-sm opacity-60">
+                  No reviews yet.
+                </div>
+              ) : (
+                reviews.map((r, i) => {
+                  const isGuest = !r.user;
+
+                  return (
+                    <div
+                      key={r._id}
+                      className={`flex flex-wrap items-start gap-3.5 py-3.5 ${
+                        i < reviews.length - 1
+                          ? "border-b border-gray-100"
+                          : ""
+                      }`}
+                    >
+                      <div className="min-w-[220px] flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold">
+                            {r.user?.name || r.guestName || "Someone"}
+                          </span>
+                          <span className="text-brand-gold">
+                            {"★".repeat(r.rating)}
+                            <span className="text-gray-300">
+                              {"★".repeat(5 - r.rating)}
+                            </span>
+                          </span>
+                          {isGuest ? (
+                            <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                              NO ACCOUNT
+                            </span>
+                          ) : r.verifiedBooking ? (
+                            <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-800">
+                              BOOKED HERE
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-1 text-xs opacity-60">
+                          {r.activity?.title || "Class"} ·{" "}
+                          {fmtDate(r.createdAt)}
+                          {r.user?.email ? ` · ${r.user.email}` : ""}
+                        </div>
+
+                        {r.comment && (
+                          <div className="mt-1.5 text-[13px] leading-relaxed">
+                            {r.comment}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => removeReview(r)}
+                        disabled={deletingReviewId === r._id}
+                        className="rounded-lg border border-red-600 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 disabled:opacity-50"
+                      >
+                        {deletingReviewId === r._id ? "Deleting…" : "Delete"}
+                      </button>
                     </div>
                   );
                 })

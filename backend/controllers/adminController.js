@@ -3,6 +3,11 @@ const Activity = require("../models/Activity");
 const Category = require("../models/Category");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
+const Review = require("../models/Review");
+const {
+  recomputeActivityRating,
+  recomputeInstructorRating,
+} = require("./reviewController");
 const ClassRequest = require("../models/ClassRequest");
 const User = require("../models/User");
 const { sendEmail } = require("../utils/sendEmail");
@@ -978,6 +983,70 @@ const markPayout = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Saari reviews, nayi pehle
+ * @route   GET /api/admin/reviews
+ * @access  Admin
+ *
+ * Reviews ab bina login ke bhi likhi ja sakti hain, is liye "ek user ek
+ * review" wali shart sirf account walon par lagti hai. Jaali ya ghalat
+ * review rokne ka asal zariya yehi list hai.
+ */
+const getAllReviews = async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 200);
+
+    const reviews = await Review.find({})
+      .populate("user", "name email")
+      .populate("activity", "title slug instructor")
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json({ success: true, count: reviews.length, reviews });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Ek review mitana
+ * @route   DELETE /api/admin/reviews/:id
+ * @access  Admin
+ *
+ * Mitane ke baad us class ki rating aur us instructor ki overall rating
+ * dobara ginni parti hai, warna mitaya hua review ginti me shamil rehta
+ * hai aur average kabhi theek nahi hota.
+ */
+const deleteReview = async (req, res, next) => {
+  try {
+    const review = await Review.findById(req.params.id);
+
+    if (!review) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Review not found" });
+    }
+
+    const activityId = review.activity;
+    await review.deleteOne();
+
+    await recomputeActivityRating(activityId);
+
+    // Instructor ki overall rating ke liye pehle ye janna hoga ke class
+    // kis ki thi. Class khud mit chuki ho to sirf class wali rating kaafi.
+    const activityDoc = await Activity.findById(activityId).select(
+      "instructor",
+    );
+    if (activityDoc?.instructor) {
+      await recomputeInstructorRating(activityDoc.instructor);
+    }
+
+    res.json({ success: true, message: "Review deleted" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getInstructorApplications,
   getApplicationDetail,
@@ -1001,4 +1070,6 @@ module.exports = {
   resolveRefund,
   getPayouts,
   markPayout,
+  getAllReviews,
+  deleteReview,
 };

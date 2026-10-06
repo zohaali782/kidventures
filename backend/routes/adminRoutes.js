@@ -24,6 +24,8 @@ const {
   resolveRefund,
   getPayouts,
   markPayout,
+  getAllReviews,
+  deleteReview,
 } = require("../controllers/adminController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -72,6 +74,10 @@ router.put("/refunds/:id/resolve", resolveRefund);
 // bhejta hai aur yahan se "paid" mark karta hai
 router.get("/payouts", getPayouts);
 router.put("/payouts/:id", markPayout);
+
+/* --------------------------------- Reviews --------------------------------- */
+router.get("/reviews", getAllReviews);
+router.delete("/reviews/:id", deleteReview);
 
 /* ---------------------------- Class Requests ---------------------------- */
 router.get("/class-requests", getClassRequests);

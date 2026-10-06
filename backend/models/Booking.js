@@ -12,12 +12,48 @@ const bookingSchema = new mongoose.Schema(
   {
     bookingNumber: { type: String, unique: true, index: true },
 
+    /**
+     * BOOKING KAHAN SE AAYI
+     *
+     *   "online" = aam booking. Parent ne khud site par ki aur Stripe se
+     *              payment kiya. `parent` hamesha bhara hota hai.
+     *
+     *   "manual" = charity fundraiser wali class. Wahan payment hamare
+     *              system se guzarti hi nahi (parent seedha charity ke
+     *              link par donate karta hai aur WhatsApp par screenshot
+     *              bhejta hai), is liye koi account bhi nahi hota. Aisi
+     *              booking instructor ya admin apne dashboard se likhta
+     *              hai taake seat ka hisaab aur attendee list mojood rahe.
+     *              Yahan `parent` khali hota hai aur naam/number
+     *              `offlineParent` me rakhe jate hain.
+     */
+    source: {
+      type: String,
+      enum: ["online", "manual"],
+      default: "online",
+      index: true,
+    },
+
+    /**
+     * required: false, kyunke manual booking kisi account se nahi juri
+     * hoti. Jahan bhi booking.parent parha jaye, pehle source dekh lo ya
+     * optional chaining istemal karo.
+     */
     parent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
       index: true,
     },
+
+    // Sirf manual booking par: jis shakhs ne WhatsApp par seat li
+    offlineParent: {
+      name: { type: String, maxlength: 120 },
+      phone: { type: String, maxlength: 40 },
+      email: { type: String, maxlength: 160 },
+    },
+
+    // Kis instructor/admin ne ye manual booking likhi
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     activity: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Activity",
@@ -108,9 +144,22 @@ const bookingSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
+    /**
+     * "external" = paisa Kidventures se hoke guzra hi nahi (charity
+     * fundraiser, jahan parent seedha donation link par pay karta hai).
+     * Isay "paid" is liye nahi likhte ke phir refund wale raaste isay
+     * apna samajh lete, halanke hamare paas is ka ek dirham bhi nahi.
+     */
     paymentStatus: {
       type: String,
-      enum: ["unpaid", "paid", "failed", "refunded", "partially_refunded"],
+      enum: [
+        "unpaid",
+        "paid",
+        "external",
+        "failed",
+        "refunded",
+        "partially_refunded",
+      ],
       default: "unpaid",
       index: true,
     },

@@ -44,8 +44,11 @@ const createPaymentIntent = async (req, res, next) => {
         .json({ success: false, message: "Booking not found" });
     }
 
-    // OWNERSHIP: sirf apni booking ka payment
-    if (booking.parent.toString() !== req.user._id.toString()) {
+    // OWNERSHIP: sirf apni booking ka payment.
+    // Manual (fundraiser) booking ka koi parent account hota hi nahi, aur
+    // us ka payment hamare system se guzarta bhi nahi, is liye optional
+    // chaining se woh yahan khud ba khud 403 par ruk jati hai.
+    if (booking.parent?.toString() !== req.user._id.toString()) {
       return res
         .status(403)
         .json({ success: false, message: "Not your booking" });

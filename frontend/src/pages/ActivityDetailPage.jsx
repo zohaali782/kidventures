@@ -635,11 +635,25 @@ function ActivityDetailPage() {
       const existing = err?.response?.data?.bookingNumber;
       if (existing) {
         setFbBookingNumber(existing);
-      } else {
-        setFbError(
-          err?.response?.data?.message || "Could not hold your spot.",
-        );
+        setFbSaving(false);
+        return;
       }
+
+      /**
+       * Sirf wo paighaam dikhao jo hum ne khud likha ho (4xx). Server ke
+       * andar ka koi masla (5xx) ho to us ka asli text parent ko nahi
+       * dikhana chahiye, warna us ke samne database ki error aa jati hai
+       * jaisi "Path `parent` is required", jis ka us ke liye koi matlab
+       * nahi aur jo humari andarooni tafseel bhi zahir kar deti hai.
+       */
+      const status = err?.response?.status;
+      const serverMessage = err?.response?.data?.message;
+
+      setFbError(
+        status >= 400 && status < 500 && serverMessage
+          ? serverMessage
+          : "Something went wrong at our end. Please try again, or message the instructor on WhatsApp.",
+      );
     } finally {
       setFbSaving(false);
     }
