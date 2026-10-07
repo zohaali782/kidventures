@@ -286,6 +286,12 @@ function ActivityDetailPage() {
   const [fbSaving, setFbSaving] = useState(false);
   const [fbError, setFbError] = useState("");
   const [fbBookingNumber, setFbBookingNumber] = useState("");
+  /**
+   * Seat rukne ke waqt ki dates alag se mehfooz kar lete hain. Warna parent
+   * baad me checkbox badal de to WhatsApp message me ghalat dates chali
+   * jatin, jabke booking me purani hi hoti hain.
+   */
+  const [fbHeldWhen, setFbHeldWhen] = useState("");
   const [copied, setCopied] = useState(false);
   // Gallery lightbox - kaunsi image (images array ka index) bari dikha rahe
   // hain. null matlab lightbox band hai.
@@ -629,6 +635,7 @@ function ActivityDetailPage() {
         numberOfChildren: count,
       });
       setFbBookingNumber(data.bookingNumber || "");
+      setFbHeldWhen(whenText);
     } catch (err) {
       // Agar is number se pehle hi seat ruki hui hai to server wahi booking
       // number wapas bhejta hai, usay dikha dena behtar hai bajaye error ke
@@ -1021,11 +1028,13 @@ function ActivityDetailPage() {
           )}
           {tab === "instructor" && (
             <div className="text-sm leading-relaxed text-brand-brown/85">
-              <b>{insName}</b>
+              <div className="mb-1 font-bold">{insName}</div>
               {insProfile?.bio ? (
-                <>, {insProfile.bio}</>
+                <p>{insProfile.bio}</p>
               ) : (
-                ", profile details will appear here."
+                <p className="text-brand-brown/55">
+                  Profile details will appear here.
+                </p>
               )}
             </div>
           )}
@@ -1250,25 +1259,41 @@ function ActivityDetailPage() {
                       Select your dates
                     </div>
                     <div className="mb-2.5 text-[11px] text-brand-brown/60">
-                      Pick every date you'd like to attend. Your seat is held
-                      on each one.
+                      {fbBookingNumber
+                        ? "These are the dates we're holding for you."
+                        : "Pick every date you'd like to attend. Your seat is held on each one."}
                     </div>
                     <div className="mb-4 flex flex-col gap-2">
                       {upcomingSessions.map((s) => {
                         const sid = String(s._id || s.id);
                         const chosen = pickedSessionIds.includes(sid);
+                        // Seat ruk chuki ho to ab dates badalna nahi chahiye,
+                        // warna screen par kuch aur dikhta hai aur booking me
+                        // kuch aur mehfooz hota hai.
+                        const locked = !!fbBookingNumber;
+                        const left =
+                          s.capacity != null
+                            ? Math.max(s.capacity - (s.seatsBooked ?? 0), 0)
+                            : null;
+                        const full = left === 0;
+
                         return (
                           <label
                             key={sid}
-                            className={`flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3.5 py-2.5 text-[13px] ${
+                            className={`flex items-center gap-2.5 rounded-[10px] border px-3.5 py-2.5 text-[13px] ${
                               chosen
                                 ? "border-brand-orange bg-brand-cream"
                                 : "border-gray-200 bg-white"
+                            } ${
+                              locked || (full && !chosen)
+                                ? "cursor-not-allowed opacity-60"
+                                : "cursor-pointer"
                             }`}
                           >
                             <input
                               type="checkbox"
                               checked={chosen}
+                              disabled={locked || (full && !chosen)}
                               onChange={() => toggleSession(sid)}
                               className="h-4 w-4 accent-brand-orange"
                             />
@@ -1277,6 +1302,19 @@ function ActivityDetailPage() {
                               {s.startTime ? ` · ${s.startTime}` : ""}
                               {s.label ? ` · ${s.label}` : ""}
                             </span>
+                            {left != null && (
+                              <span
+                                className={`ml-auto text-[11px] font-semibold ${
+                                  full
+                                    ? "text-[#c0392b]"
+                                    : left <= 3
+                                      ? "text-brand-orange"
+                                      : "text-brand-brown/45"
+                                }`}
+                              >
+                                {full ? "Full" : `${left} left`}
+                              </span>
+                            )}
                           </label>
                         );
                       })}
@@ -1399,7 +1437,7 @@ function ActivityDetailPage() {
                       a.fundraiser.whatsapp,
                     )}?text=${encodeURIComponent(
                       `Hi! Booking ${fbBookingNumber}, ${count} spot(s) for "${a.title}"${
-                        whenText ? ` on ${whenText}` : ""
+                        fbHeldWhen ? ` on ${fbHeldWhen}` : ""
                       }. I've made my fundraiser payment and I'm attaching the screenshot.`,
                     )}`}
                     target="_blank"

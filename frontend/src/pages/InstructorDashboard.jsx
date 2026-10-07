@@ -786,7 +786,7 @@ export default function InstructorDashboard() {
                 </Panel>
 
                 {/* fundraiser bookings, charity classes ke liye */}
-                {fundraiserClasses.length > 0 && (
+                {(fundraiserClasses.length > 0 || fbPending.length > 0) && (
                   <div className="lg:col-span-2">
                     <Panel title="Fundraiser Bookings">
                       <div className="-mt-1 mb-3 text-xs opacity-60">
@@ -860,7 +860,7 @@ export default function InstructorDashboard() {
                         </div>
                       )}
 
-                      {!fbOpen ? (
+                      {fundraiserClasses.length === 0 ? null : !fbOpen ? (
                         <button
                           onClick={() => setFbOpen(true)}
                           className="mb-3 rounded-lg bg-brand-orange px-3.5 py-2 text-xs font-bold text-white"

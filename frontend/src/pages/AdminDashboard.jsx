@@ -2036,7 +2036,7 @@ export default function AdminDashboard() {
                         <IcMail size={13} /> {viewingDetail.user.email}
                       </a>
                     ) : (
-                      <b>,</b>
+                      <b className="opacity-45">Not given</b>
                     )}
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
@@ -2051,7 +2051,7 @@ export default function AdminDashboard() {
                         <IcWhatsapp size={13} /> {viewingDetail.user.phone}
                       </a>
                     ) : (
-                      <b>,</b>
+                      <b className="opacity-45">Not given</b>
                     )}
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
@@ -2312,7 +2312,7 @@ export default function AdminDashboard() {
                     <IcMail size={13} /> {viewUser.email}
                   </a>
                 ) : (
-                  <b>,</b>
+                  <b className="opacity-45">Not given</b>
                 )}
               </div>
               <div className="flex justify-between">
@@ -2327,7 +2327,7 @@ export default function AdminDashboard() {
                     <IcWhatsapp size={13} /> {viewUser.phone}
                   </a>
                 ) : (
-                  <b>,</b>
+                  <b className="opacity-45">Not given</b>
                 )}
               </div>
               <div className="flex justify-between">

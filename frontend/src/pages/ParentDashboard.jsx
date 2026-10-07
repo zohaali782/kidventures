@@ -678,7 +678,7 @@ export default function ParentDashboard() {
                       setDraft({ ...draft, gender: e.target.value })
                     }
                   >
-                    <option value="">,</option>
+                    <option value="">Select</option>
                     <option value="male">Boy</option>
                     <option value="female">Girl</option>
                     <option value="other">Prefer not to say</option>
