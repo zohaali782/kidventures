@@ -398,9 +398,23 @@ const sendBookingEmails = async (bookingId) => {
 
   if (!booking || booking.emailsSent?.confirmation) return;
 
+  /**
+   * Online class ho to joining link bhi email me jata hai. Yeh field
+   * model me "select: false" hai, is liye saaf maangna parta hai. Isi
+   * email ke zariye parent tak pohanchta hai, instructor ko haath se
+   * bhejna nahi parta.
+   */
+  const activity = await Activity.findById(booking.activity)
+    .select("+location.onlineLink format")
+    .lean();
+
+  const onlineLink =
+    activity?.format === "online" ? activity?.location?.onlineLink : "";
+
   const parentMail = tpl.bookingConfirmedParent({
     parentName: booking.parent?.name,
     booking,
+    onlineLink,
   });
   await sendEmail({ to: booking.parent?.email, ...parentMail });
 

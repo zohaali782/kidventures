@@ -294,6 +294,59 @@ export default function InstructorDashboard() {
     return rows.sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
   }, [classes]);
 
+  /**
+   * Har aane wali date ke sath us din aane wale parents ki list.
+   *
+   * KYUN: instructor ko class se pehle parents tak pohanchna hota hai,
+   * khaas kar online class ka Zoom link bhejne ke liye. Dashboard par
+   * sirf naam dikhta tha, na number na email, is liye use pata hi nahi
+   * chalta tha ke link kis ko bheje.
+   *
+   * Bundle aur multi-date booking us ki HAR date par ginni chahiye, is
+   * liye bundleSessions bhi dekhte hain, sirf sessionId nahi.
+   */
+  const rosterByDate = useMemo(() => {
+    const now = new Date();
+    const rows = [];
+
+    classes.forEach((cls) => {
+      toList(cls.sessions).forEach((ses) => {
+        const when = new Date(ses.date);
+        if (isNaN(when) || when < now || ses.status === "cancelled") return;
+
+        const sid = String(ses._id || ses.id);
+
+        const people = bookings.filter((bk) => {
+          if (String(bk.activity?._id || bk.activity) !== String(cls._id)) {
+            return false;
+          }
+          if (String(bk.sessionId) === sid) return true;
+          return toList(bk.bundleSessions).some(
+            (bs) => String(bs.sessionId) === sid,
+          );
+        });
+
+        if (people.length === 0) return;
+
+        rows.push({
+          key: `${cls._id}-${sid}`,
+          classTitle: cls.title,
+          isOnline: cls.format === "online",
+          date: ses.date,
+          startTime: ses.startTime,
+          label: ses.label,
+          people,
+          childCount: people.reduce(
+            (sum, bk) => sum + (bk.numberOfChildren || 1),
+            0,
+          ),
+        });
+      });
+    });
+
+    return rows.sort((x, y) => new Date(x.date) - new Date(y.date)).slice(0, 6);
+  }, [classes, bookings]);
+
   const recentBookings = useMemo(
     () =>
       [...bookings]
@@ -1047,6 +1100,112 @@ export default function InstructorDashboard() {
                     </Panel>
                   </div>
                 )}
+
+                {/* Kaun aa raha hai, aur un se rabta kaise ho */}
+                <div className="lg:col-span-2">
+                  <Panel title="Who's Coming">
+                    <div className="-mt-1 mb-3 text-xs opacity-60">
+                      Everyone booked on each upcoming date, with their
+                      contact. Online class? Send them the joining link from
+                      here.
+                    </div>
+
+                    {rosterByDate.length === 0 ? (
+                      <Empty text="No one booked on your upcoming dates yet." />
+                    ) : (
+                      rosterByDate.map((d) => (
+                        <div
+                          key={d.key}
+                          className="mb-4 rounded-xl border border-gray-100 last:mb-0"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-xl bg-brand-cream/70 px-3.5 py-2.5">
+                            <div className="text-xs font-bold">
+                              {fmtDate(d.date)}
+                              {d.startTime ? ` · ${d.startTime}` : ""}
+                              {d.label ? ` · ${d.label}` : ""}
+                              <span className="ml-2 font-normal opacity-65">
+                                {d.classTitle}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {d.isOnline && (
+                                <span className="rounded bg-brand-sky/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-sky">
+                                  Online
+                                </span>
+                              )}
+                              <span className="text-[11px] font-semibold opacity-70">
+                                {d.childCount} child
+                                {d.childCount === 1 ? "" : "ren"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {d.people.map((bk) => {
+                            const name =
+                              bk.parent?.name ||
+                              bk.offlineParent?.name ||
+                              "Parent";
+                            const phone =
+                              bk.parent?.phone || bk.offlineParent?.phone;
+                            const email =
+                              bk.parent?.email || bk.offlineParent?.email;
+
+                            return (
+                              <div
+                                key={bk._id}
+                                className="flex flex-wrap items-center gap-2.5 border-t border-gray-100 px-3.5 py-2.5"
+                              >
+                                <div className="min-w-[150px] flex-1">
+                                  <div className="text-sm font-semibold">
+                                    {name}
+                                    <span className="ml-2 text-xs font-normal opacity-55">
+                                      {bk.numberOfChildren || 1} child
+                                      {(bk.numberOfChildren || 1) === 1
+                                        ? ""
+                                        : "ren"}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] opacity-55">
+                                    {bk.bookingNumber}
+                                    {bk.source === "manual"
+                                      ? " · fundraiser"
+                                      : ""}
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {phone && (
+                                    <a
+                                      href={waLink(phone)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="rounded-lg border border-[#25D366] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#25D366] no-underline"
+                                    >
+                                      WhatsApp
+                                    </a>
+                                  )}
+                                  {email && (
+                                    <a
+                                      href={`mailto:${email}`}
+                                      className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold no-underline"
+                                    >
+                                      Email
+                                    </a>
+                                  )}
+                                  {!phone && !email && (
+                                    <span className="text-[11px] opacity-45">
+                                      No contact given
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))
+                    )}
+                  </Panel>
+                </div>
 
                 {/* earnings */}
                 <Panel title="Earnings">

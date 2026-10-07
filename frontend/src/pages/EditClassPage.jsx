@@ -155,6 +155,7 @@ export default function EditClassPage() {
           format: a.format || "in-person",
           area: a.location?.area || "",
           address: a.location?.address || "",
+          onlineLink: a.location?.onlineLink || "",
           languages: Array.isArray(a.languages)
             ? a.languages.join(", ")
             : "English",
@@ -294,6 +295,9 @@ export default function EditClassPage() {
         city: "Dubai",
         address: form.address.trim(),
       },
+      // location se alag bheja jata hai: isay badalne par class dobara
+      // review me nahi jati, aur online na ho to khali chala jata hai
+      onlineLink: form.format === "online" ? form.onlineLink.trim() : "",
       capacity: Number(form.capacity),
       materialsIncluded: form.materialsIncluded,
       whatToBring: form.whatToBring.trim(),
@@ -712,6 +716,24 @@ export default function EditClassPage() {
                 onChange={(e) => set("address", e.target.value)}
               />
             </Field>
+            {form.format === "online" && (
+              <Field
+                label="Joining link (Zoom, Meet, etc.)"
+                className="col-span-2"
+              >
+                <input
+                  className={inputCls}
+                  value={form.onlineLink}
+                  onChange={(e) => set("onlineLink", e.target.value)}
+                  placeholder="https://zoom.us/j/..."
+                />
+                <p className="mt-1 text-xs opacity-60">
+                  Only parents with a confirmed booking see this. It goes out
+                  with their confirmation email, so you don't have to send it
+                  yourself. Leave it empty to remove it.
+                </p>
+              </Field>
+            )}
             <Field label="Languages (comma separated)" className="col-span-2">
               <input
                 className={inputCls}

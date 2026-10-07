@@ -1097,7 +1097,13 @@ const getInstructorBookings = async (req, res, next) => {
 
     const bookings = await Booking.find(filter)
       .populate("activity", "title slug")
-      .populate("parent", "name phone")
+      /**
+       * Email bhi chahiye: online class ka Zoom link instructor ko khud
+       * parent tak pohanchana hota hai, aur sirf number se email nahi
+       * bheji ja sakti. (Fundraiser booking me account hi nahi hota, wahan
+       * naam aur number offlineParent me hote hain.)
+       */
+      .populate("parent", "name email phone")
       .sort({ sessionDate: 1 });
 
     res.json({ success: true, count: bookings.length, bookings });
@@ -1138,7 +1144,32 @@ const getBookingById = async (req, res, next) => {
         .json({ success: false, message: "Not authorized" });
     }
 
-    res.json({ success: true, booking });
+    /**
+     * ONLINE CLASS KA JOINING LINK.
+     *
+     * Sirf us booking ke sath jata hai jo confirmed ho. Pending booking
+     * ka matlab hai paisa abhi aaya hi nahi, aur cancelled ka matlab seat
+     * ja chuki, dono surton me link nahi milna chahiye warna koi bhi seat
+     * reserve kar ke, bina paise diye, link le kar class me baith jata.
+     *
+     * Field model me "select: false" hai, is liye alag se maanga ja raha
+     * hai. Class ka format online na ho to kuch nahi bhejte.
+     */
+    let onlineLink = "";
+
+    if (booking.status === "confirmed" || booking.status === "completed") {
+      const activityDoc = await Activity.findById(
+        booking.activity?._id || booking.activity,
+      )
+        .select("+location.onlineLink format")
+        .lean();
+
+      if (activityDoc?.format === "online") {
+        onlineLink = activityDoc.location?.onlineLink || "";
+      }
+    }
+
+    res.json({ success: true, booking, onlineLink });
   } catch (error) {
     next(error);
   }

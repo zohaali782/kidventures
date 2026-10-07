@@ -179,7 +179,7 @@ function rowRaw(label, valueHtml) {
 }
 
 /* ---------- 1. Parent: booking confirmed ---------- */
-function bookingConfirmedParent({ parentName, booking }) {
+function bookingConfirmedParent({ parentName, booking, onlineLink }) {
   const kids = (booking.children || []).map((c) => c.name).join(", ");
 
   const discountLine =
@@ -206,6 +206,19 @@ function bookingConfirmedParent({ parentName, booking }) {
           ${row("Total paid", aed(booking.totalAmount))}
           ${row("Booking ref", booking.bookingNumber)}
         </table>
+        ${
+          onlineLink
+            ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+          <tr><td style="background:#f6f3ee;border-radius:10px;padding:14px 16px;">
+            <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">Joining link</div>
+            <a href="${esc(onlineLink)}" style="font-size:13px;color:#1a73e8;word-break:break-all;">${esc(onlineLink)}</a>
+            <div style="font-size:12px;color:#777;margin-top:6px;">
+              This is an online class. Use the link above at the start time.
+            </div>
+          </td></tr>
+        </table>`
+            : ""
+        }
         <p style="margin:0;font-size:13px;color:#777;">
           Cancel more than 48 hours before the class for a full refund.
           Between 24 and 48 hours a partial refund may apply. Within

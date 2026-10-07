@@ -283,6 +283,7 @@ function ActivityDetailPage() {
    */
   const [fbName, setFbName] = useState("");
   const [fbPhone, setFbPhone] = useState("");
+  const [fbEmail, setFbEmail] = useState("");
   const [fbSaving, setFbSaving] = useState(false);
   const [fbError, setFbError] = useState("");
   const [fbBookingNumber, setFbBookingNumber] = useState("");
@@ -632,6 +633,7 @@ function ActivityDetailPage() {
         sessionIds: pickedSessionIds,
         parentName: fbName.trim(),
         parentPhone: fbPhone.trim(),
+        parentEmail: fbEmail.trim(),
         numberOfChildren: count,
       });
       setFbBookingNumber(data.bookingNumber || "");
@@ -1465,6 +1467,17 @@ function ActivityDetailPage() {
                     placeholder="WhatsApp number"
                     inputMode="tel"
                     maxLength={40}
+                    className="mb-2 w-full rounded-[10px] border border-gray-200 px-3 py-2.5 text-sm text-brand-brown outline-none focus:border-brand-orange"
+                  />
+                  {/* Online class ka joining link bhejne ke liye, is liye
+                      marzi ka hai magar maangna zaroori hai */}
+                  <input
+                    value={fbEmail}
+                    onChange={(e) => setFbEmail(e.target.value)}
+                    placeholder="Email (optional)"
+                    type="email"
+                    inputMode="email"
+                    maxLength={160}
                     className="mb-2 w-full rounded-[10px] border border-gray-200 px-3 py-2.5 text-sm text-brand-brown outline-none focus:border-brand-orange"
                   />
 

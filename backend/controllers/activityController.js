@@ -228,6 +228,27 @@ const getActivityById = async (req, res, next) => {
         .json({ success: false, message: "Class not found" });
     }
 
+    /**
+     * Online class ka joining link sirf class ke apne instructor aur admin
+     * ko. Parent tak woh is raaste se nahi jata, chahe uski booking ho:
+     * yeh endpoint public hai aur response cache bhi ho sakta hai. Parent
+     * ko link uski apni booking ke sath milta hai (dekho bookingController
+     * ka getBookingById) aur confirmation email me.
+     *
+     * Model me ye field "select: false" hai, is liye dobara maangna parta
+     * hai, aur sirf tab jab maangne wala haqdar ho.
+     */
+    let activityForResponse = activity;
+
+    if (isOwner || isAdmin) {
+      const withLink = await Activity.findById(req.params.id)
+        .select("+location.onlineLink")
+        .populate("category", "name slug icon")
+        .populate("instructor", "name avatar city");
+
+      if (withLink) activityForResponse = withLink;
+    }
+
     Activity.updateOne(
       { _id: activity._id },
       { $inc: { "stats.viewCount": 1 } },
@@ -236,7 +257,7 @@ const getActivityById = async (req, res, next) => {
       console.error(`! viewCount update failed: ${err.message}`),
     );
 
-    res.json({ success: true, activity });
+    res.json({ success: true, activity: activityForResponse });
   } catch (error) {
     next(error);
   }
@@ -325,6 +346,37 @@ function sanitizeFlexiblePricing(input) {
 }
 
 /**
+ * ONLINE CLASS KA JOINING LINK (Zoom, Google Meet, waghera).
+ *
+ * Yeh link location.onlineLink me rakha jata hai aur model me
+ * "select: false" hai, yaani kisi aam query me aata hi nahi. Sirf unhi
+ * parents tak jata hai jin ki booking confirmed hai, aur class ke apne
+ * instructor aur admin tak.
+ *
+ * Wapas kya milta hai:
+ *   ""    -> khali bhejna matlab link hata do
+ *   null  -> ghalat link, request rok do
+ *   string -> saaf https link
+ *
+ * Sirf https isliye ke "javascript:" jaisa link ek click par parent ke
+ * browser me koi bhi code chala sakta hai.
+ */
+const cleanOnlineLink = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (raw.length > 500) return null;
+
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+
+  return url.protocol === "https:" ? url.toString() : null;
+};
+
+/**
  * @desc    Nayi class banana
  * @route   POST /api/activities
  * @access  Instructor
@@ -347,6 +399,20 @@ const createActivity = async (req, res, next) => {
         });
       }
       data.videoUrl = safeVideo;
+    }
+
+    // Online class ka joining link. location ke andar rakha jata hai,
+    // lekin body me alag se aata hai taake frontend ko location ka poora
+    // object dobara bhejna na pare.
+    if (req.body.onlineLink !== undefined) {
+      const link = cleanOnlineLink(req.body.onlineLink);
+      if (link === null) {
+        return res.status(400).json({
+          success: false,
+          message: "The joining link must be a full https link",
+        });
+      }
+      data.location = { ...(data.location || {}), onlineLink: link };
     }
 
     if (data.faqs !== undefined) {
@@ -427,7 +493,15 @@ const createActivity = async (req, res, next) => {
  */
 const updateActivity = async (req, res, next) => {
   try {
-    const activity = await Activity.findById(req.params.id);
+    /**
+     * location.onlineLink model me "select: false" hai, is liye usay
+     * saaf maangna parta hai. Agar na maangein to woh load hi nahi hota,
+     * aur neeche jab location par nayi value lagti hai to purana link
+     * khamoshi se mit jata hai.
+     */
+    const activity = await Activity.findById(req.params.id).select(
+      "+location.onlineLink",
+    );
 
     if (!activity) {
       return res
@@ -478,6 +552,38 @@ const updateActivity = async (req, res, next) => {
       req.body.videoUrl = safeVideo;
     }
 
+    /**
+     * Joining link ko location ke baqi hisson se alag sambhalte hain, do
+     * wajuhat se:
+     *
+     *   1. Frontend location bhejte waqt onlineLink shamil nahi karta, is
+     *      liye use mehfooz rakhna parta hai warna har edit par mit jaye.
+     *
+     *   2. location "review triggering" field hai, yaani badalne par class
+     *      dobara pending ho jati hai. Zoom link badalna class ke content
+     *      me koi tabdeeli nahi, us par class ko offline karna ghalat hoga,
+     *      khaas kar jab class kal honi ho.
+     */
+    const keptOnlineLink = activity.location?.onlineLink;
+
+    if (req.body.location !== undefined && req.body.location !== null) {
+      req.body.location = {
+        ...req.body.location,
+        onlineLink: keptOnlineLink,
+      };
+    }
+
+    let newOnlineLink;
+    if (req.body.onlineLink !== undefined) {
+      newOnlineLink = cleanOnlineLink(req.body.onlineLink);
+      if (newOnlineLink === null) {
+        return res.status(400).json({
+          success: false,
+          message: "The joining link must be a full https link",
+        });
+      }
+    }
+
     if (req.body.faqs !== undefined) {
       req.body.faqs = sanitizeFaqs(req.body.faqs);
     }
@@ -523,6 +629,13 @@ const updateActivity = async (req, res, next) => {
 
       activity[field] = req.body[field];
     });
+
+    // Loop ke BAAD lagta hai, aur changedFields me shamil nahi hota, is
+    // liye sirf link badalne se class dobara review me nahi jati.
+    if (newOnlineLink !== undefined) {
+      activity.location = activity.location || {};
+      activity.location.onlineLink = newOnlineLink;
+    }
 
     const materiallyChanged = changedFields.some((f) =>
       REVIEW_TRIGGERING_FIELDS.includes(f),
