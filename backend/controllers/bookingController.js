@@ -745,6 +745,20 @@ const reserveFundraiserSpot = async (req, res, next) => {
 
     const { activity, sessionsToReserve, name, kids, names } = prepared;
 
+    /**
+     * Khula raasta hai, is liye class ka "active" hona zaroori hai. Draft,
+     * pending ya suspended class ka id kisi ke haath lag jaye to us par
+     * bahar se booking nahi honi chahiye. (Instructor wale haath se likhne
+     * wale raaste par ye shart nahi, kyunke wo guzri hui ya archive ho
+     * chuki class ka record bhi daal sakta hai.)
+     */
+    if (activity.status !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: "This class is not open for bookings right now",
+      });
+    }
+
     const phone = String(req.body.parentPhone || "").trim();
     if (!phone) {
       return res.status(400).json({
@@ -1347,9 +1361,28 @@ const getSessionAttendees = async (req, res, next) => {
     }).populate("parent", "name phone");
 
     // Sirf wohi cheezein bhejni hain jo instructor ko chahiyen
-    const attendees = bookings.flatMap((booking) =>
-      booking.children.map((child) => ({
-        name: child.name,
+    const attendees = bookings.flatMap((booking) => {
+      /**
+       * BUGFIX: pehle seedha booking.children par map hota tha. Aam booking
+       * me har bache ka record hota hai, lekin fundraiser wali booking me
+       * naam dena lazmi nahi. Naam na diye hon to children khali hota hai,
+       * aur map khali list deta, yaani wo bachay attendee list me nazar hi
+       * na aate halanke un ki seats ja chuki hoti hain. Instructor ginti
+       * kam dekh kar pareshan hota.
+       *
+       * Ab naam na hon to numberOfChildren ke barabar khaali rows banti
+       * hain, taake ginti hamesha seats se mel khaye.
+       */
+      const named = booking.children || [];
+      const total = Math.max(booking.numberOfChildren || 0, named.length, 1);
+
+      // Jitne naam diye hain wo, aur baqi seats ke liye khaali rows, taake
+      // ginti hamesha numberOfChildren ke barabar rahe. (Fundraiser form me
+      // 2 bachon ke liye sirf 1 naam likhna bhi jaiz hai.)
+      const rows = Array.from({ length: total }, (_, i) => named[i] || {});
+
+      return rows.map((child) => ({
+        name: child.name || "Name not given",
         age: child.age,
         allergies: child.allergies || "None",
         // Manual booking par parent account nahi hota, naam/number
@@ -1357,8 +1390,8 @@ const getSessionAttendees = async (req, res, next) => {
         parentName: booking.parent?.name || booking.offlineParent?.name,
         parentPhone: booking.parent?.phone || booking.offlineParent?.phone,
         bookingNumber: booking.bookingNumber,
-      })),
-    );
+      }));
+    });
 
     res.json({ success: true, count: attendees.length, attendees });
   } catch (error) {

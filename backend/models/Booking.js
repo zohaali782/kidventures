@@ -43,6 +43,20 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       index: true,
+      /**
+       * Manual (fundraiser) booking ka koi account nahi hota, is liye
+       * "required: true" hata diya gaya tha. Lekin aam booking par woh
+       * pehra zaroori hai: pehle agar kisi bug ki waja se parent set na
+       * hota to Mongoose error deta aur masla foran pakra jata, ab woh
+       * chup chaap bina malik ke booking save kar leta aur parent ko apni
+       * booking kabhi nazar hi na aati.
+       *
+       * Is liye shart ab source par lagi hai: online booking ke liye
+       * parent lazmi, manual ke liye nahi.
+       */
+      required: function () {
+        return this.source !== "manual";
+      },
     },
 
     // Sirf manual booking par: jis shakhs ne WhatsApp par seat li
