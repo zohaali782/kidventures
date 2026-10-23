@@ -16,6 +16,10 @@ function LoginPage() {
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Email confirm nahi hui to "dobara bhejo" ka button dikhate hain
+  const [needsVerify, setNeedsVerify] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState("");
 
   // Signup / email-verification / session-expiry ke baad yahan aate hain —
   // user ko bata dena chahiye ke hua kya hai.
@@ -51,8 +55,34 @@ function LoginPage() {
     return e;
   };
 
+  const handleResend = async () => {
+    if (!email.trim()) {
+      setErrors({ email: "Enter your email first" });
+      return;
+    }
+    setResending(true);
+    setResendMsg("");
+    try {
+      const res = await api.post("/auth/resend-verification", {
+        email: email.trim(),
+      });
+      setResendMsg(
+        res.data?.message ||
+          "We've sent a new confirmation link. Please check your inbox (and junk/spam folder).",
+      );
+    } catch (err) {
+      setResendMsg(
+        err?.response?.data?.message ||
+          "Couldn't send the email right now. Please try again in a few minutes.",
+      );
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setServerError("");
+    setResendMsg("");
     const e = validate();
     setErrors(e);
     if (Object.keys(e).length) return;
@@ -76,6 +106,7 @@ function LoginPage() {
       const dest = location.state?.from || homeForRole(user?.role);
       navigate(dest, { replace: true });
     } catch (err) {
+      setNeedsVerify(err?.response?.data?.code === "EMAIL_NOT_VERIFIED");
       // err.message axios interceptor set karta hai — us me server ka asli
       // message hota hai, ya "Cannot reach the server..." agar backend band ho.
       setServerError(
@@ -123,6 +154,24 @@ function LoginPage() {
           {serverError && (
             <div className="mb-4 rounded-[10px] border border-[#c0392b]/30 bg-[#c0392b]/10 px-4 py-3 text-[13px] text-[#c0392b]">
               {serverError}
+            </div>
+          )}
+
+          {(needsVerify || params.get("verified") === "expired") && (
+            <div className="mb-4 rounded-[10px] border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-[13px] text-brand-brown">
+              <p className="mb-2">
+                Didn&apos;t get the email? Check your junk/spam folder, or get a
+                new link.
+              </p>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resending}
+                className="cursor-pointer rounded-[8px] bg-brand-orange px-3.5 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resending ? "Sending..." : "Resend confirmation email"}
+              </button>
+              {resendMsg && <p className="mt-2 font-semibold">{resendMsg}</p>}
             </div>
           )}
 
