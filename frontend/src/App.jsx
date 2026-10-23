@@ -18,6 +18,7 @@ import RequestClassPage from "./pages/RequestClassPage";
 import FavoritesPage from "./pages/FavoritesPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ScrollToTop from "./components/ScrollToTop";
+import CanonicalTag from "./components/CanonicalTag";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import FAQPage from "./pages/FAQPage";
@@ -36,6 +37,7 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <CanonicalTag />
       <Routes>
         {/* Public pages — koi bhi dekh sakta hai */}
         <Route path="/" element={<Homepage />} />

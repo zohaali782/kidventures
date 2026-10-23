@@ -12,7 +12,6 @@
       name="description"
       content="Discover and book trusted kids' activities, camps, and classes across the UAE with Kidventures — where education meets imagination."
     />
-    <link rel="canonical" href="https://kidventures.ae/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Kidventures" />
@@ -24,7 +23,6 @@
       property="og:description"
       content="Discover and book trusted kids' activities, camps, and classes across the UAE with Kidventures — where education meets imagination."
     />
-    <meta property="og:url" content="https://kidventures.ae/" />
     <meta property="og:image" content="https://kidventures.ae/apple-touch-icon.png" />
 
     <meta name="twitter:card" content="summary" />
@@ -36,6 +34,32 @@
       name="twitter:description"
       content="Discover and book trusted kids' activities, camps, and classes across the UAE with Kidventures — where education meets imagination."
     />
+    <!-- Google ko batata hai ke "Kidventures" naam ki yeh website/brand kya hai -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://kidventures.ae/#organization",
+            "name": "Kidventures",
+            "url": "https://kidventures.ae/",
+            "logo": "https://kidventures.ae/apple-touch-icon.png",
+            "email": "hello@kidventures.ae",
+            "areaServed": "AE",
+            "description": "Kids' activities, camps and classes in Dubai and the UAE."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://kidventures.ae/#website",
+            "name": "Kidventures",
+            "alternateName": ["Kid Ventures", "Kidventures UAE", "Kidventures Dubai"],
+            "url": "https://kidventures.ae/",
+            "publisher": { "@id": "https://kidventures.ae/#organization" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
