@@ -47,7 +47,11 @@ export default function InstructorsPage() {
   return (
     <div className="min-h-screen bg-brand-cream flex flex-col">
       <Helmet>
-        <title>Find Instructors | Kidventures</title>
+        <title>Kids’ Activity Instructors in Dubai | Kidventures</title>
+        <meta
+          name="description"
+          content="Browse verified instructors in Dubai teaching art, music, coding, financial literacy, sports and more for kids. View profiles, reviews and classes."
+        />
       </Helmet>
 
       <Navbar />

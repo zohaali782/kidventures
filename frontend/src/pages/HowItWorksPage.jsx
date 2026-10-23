@@ -141,7 +141,11 @@ export default function HowItWorksPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown">
       <Helmet>
-        <title>How It Works — Kidventures</title>
+        <title>How Kidventures Works — Find & Book Kids’ Classes in Dubai</title>
+        <meta
+          name="description"
+          content="Find a class, pick a date and book in minutes. See how Kidventures helps Dubai parents discover trusted kids' activities with verified instructors."
+        />
       </Helmet>
       <Navbar />
 

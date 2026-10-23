@@ -8,6 +8,7 @@ export default function NotFoundPage() {
     <div className="flex min-h-screen flex-col bg-brand-cream">
       <Helmet>
         <title>Page Not Found — Kidventures</title>
+        <meta name="robots" content="noindex, follow" />
       </Helmet>
       <Navbar />
 

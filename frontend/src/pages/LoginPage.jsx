@@ -128,6 +128,7 @@ function LoginPage() {
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
         <title>Log In — Kidventures</title>
+        <meta name="robots" content="noindex, follow" />
         <meta
           name="description"
           content="Log in to your Kidventures account to book classes and manage your bookings."

@@ -11,6 +11,13 @@
       ],
       "destination": "/api/share-preview?id=:id"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/sitemap-classes.xml",
+      "destination": "/api/sitemap-classes"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

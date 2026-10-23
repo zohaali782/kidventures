@@ -104,7 +104,11 @@ export default function FAQPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown">
       <Helmet>
-        <title>FAQs — Kidventures</title>
+        <title>FAQs — Booking Kids’ Classes in Dubai | Kidventures</title>
+        <meta
+          name="description"
+          content="Answers to common questions about booking kids' activities and classes on Kidventures: payments, cancellations, safety and verified instructors."
+        />
       </Helmet>
       <Navbar />
 

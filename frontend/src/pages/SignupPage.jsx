@@ -125,6 +125,7 @@ function SignupPage() {
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
         <title>Sign Up — Kidventures</title>
+        <meta name="robots" content="noindex, follow" />
         <meta
           name="description"
           content="Create a Kidventures account to book kids' activities, or join as an instructor to teach classes in Dubai."

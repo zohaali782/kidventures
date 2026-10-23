@@ -69,6 +69,7 @@ function ResetPasswordPage() {
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
         <title>Reset Password — Kidventures</title>
+        <meta name="robots" content="noindex, follow" />
         <meta name="description" content="Set a new Kidventures password." />
       </Helmet>
 

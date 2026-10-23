@@ -713,6 +713,50 @@ function ActivityDetailPage() {
         {cover && <meta property="og:image" content={cover} />}
         <meta property="og:url" content={shareUrl} />
         <meta name="twitter:card" content="summary_large_image" />
+        {/* SEO: Google ko batata hai ke yeh ek kids' class hai, kis ne
+            sikhayi, kitne ki hai — search me behtar dikhti hai */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "Course",
+                name: String(a.title || ""),
+                description: String(a.description || "").slice(0, 500),
+                ...(cover ? { image: cover } : {}),
+                provider: {
+                  "@type": "Organization",
+                  name: "Kidventures",
+                  url: "https://kidventures.ae/",
+                },
+                ...(insName ? { instructor: { "@type": "Person", name: insName } } : {}),
+                ...(price !== "" && price != null
+                  ? {
+                      offers: {
+                        "@type": "Offer",
+                        price: String(price),
+                        priceCurrency: "AED",
+                        category: "Paid",
+                      },
+                    }
+                  : {}),
+                hasCourseInstance: {
+                  "@type": "CourseInstance",
+                  courseMode: isOnline ? "Online" : "Onsite",
+                  ...(locationText && !isOnline ? { location: locationText } : {}),
+                },
+              },
+              {
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: "https://kidventures.ae/" },
+                  { "@type": "ListItem", position: 2, name: "Activities", item: "https://kidventures.ae/activities" },
+                  { "@type": "ListItem", position: 3, name: String(a.title || "") },
+                ],
+              },
+            ],
+          })}
+        </script>
       </Helmet>
 
       <Navbar />

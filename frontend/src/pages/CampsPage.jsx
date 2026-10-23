@@ -8,6 +8,7 @@ export default function CampsPage() {
     <div className="flex min-h-screen flex-col bg-brand-cream">
       <Helmet>
         <title>Camps — Kidventures</title>
+        <meta name="robots" content="noindex, follow" />
       </Helmet>
       <Navbar />
 

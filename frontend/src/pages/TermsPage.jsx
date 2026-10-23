@@ -18,6 +18,10 @@ export default function TermsPage() {
     <div className="min-h-screen bg-white font-sans text-brand-brown">
       <Helmet>
         <title>Terms & Conditions — Kidventures</title>
+        <meta
+          name="description"
+          content="The terms and conditions for using Kidventures to book and teach kids' activities and classes in the UAE."
+        />
       </Helmet>
       <Navbar />
 

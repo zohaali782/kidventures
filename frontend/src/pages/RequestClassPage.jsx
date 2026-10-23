@@ -194,7 +194,11 @@ export default function RequestClassPage() {
   return (
     <div className="min-h-screen bg-[#F7F5F2] font-sans text-brand-brown">
       <Helmet>
-        <title>Request a Class — Kidventures</title>
+        <title>Request a Kids’ Class in Dubai — Kidventures</title>
+        <meta
+          name="description"
+          content="Can't find the class your child wants? Tell Kidventures what you're looking for and we'll find a trusted instructor in Dubai."
+        />
       </Helmet>
       <Navbar />
 

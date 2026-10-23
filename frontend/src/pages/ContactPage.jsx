@@ -56,7 +56,11 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown">
       <Helmet>
-        <title>Contact Us — Kidventures</title>
+        <title>Contact Kidventures — Kids’ Activities in Dubai</title>
+        <meta
+          name="description"
+          content="Questions about a class, booking or becoming an instructor? Get in touch with the Kidventures team in Dubai."
+        />
       </Helmet>
       <Navbar />
 

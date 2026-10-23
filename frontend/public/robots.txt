@@ -1,4 +1,20 @@
 User-agent: *
 Allow: /
 
+# Private / account pages - search me dikhane ka koi faida nahi
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password/
+Disallow: /favorites
+Disallow: /messages
+Disallow: /book/
+Disallow: /parent/
+Disallow: /admin
+Disallow: /instructor/dashboard
+Disallow: /instructor/create-class
+Disallow: /instructor/edit-class/
+Disallow: /instructor/my-classes
+
 Sitemap: https://kidventures.ae/sitemap.xml
+Sitemap: https://kidventures.ae/sitemap-classes.xml

@@ -108,7 +108,11 @@ export default function BecomeInstructorPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown">
       <Helmet>
-        <title>Become an Instructor — Kidventures</title>
+        <title>Become a Kids’ Activity Instructor in Dubai — Kidventures</title>
+        <meta
+          name="description"
+          content="Teach your art, music, coding, sports or STEM classes to kids in Dubai. List your classes on Kidventures, set your own schedule and get bookings from local parents."
+        />
       </Helmet>
       <Navbar />
 

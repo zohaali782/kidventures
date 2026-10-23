@@ -22,6 +22,7 @@ function FavoritesPage() {
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
       <Helmet>
         <title>Saved Classes, Kidventures</title>
+        <meta name="robots" content="noindex, follow" />
         <meta
           name="description"
           content="Your saved kids' activities and classes on Kidventures."
