@@ -389,12 +389,102 @@ function passwordChanged({ name }) {
   };
 }
 
+/* ---------- Admin: class review ka intezar kar rahi hai ---------- */
+/**
+ * Owner ko khabar karta hai ke koi class review ke liye ruki hui hai.
+ *
+ * KYUN: class "pending" hone par ab tak kisi ko kuch pata nahi chalta tha.
+ * Owner ko khud admin dashboard kholna parta tha, aur agar woh do din na
+ * khole to instructor ki class do din wahin ruki rehti, jabke uske parent
+ * us ka intezar kar rahe hote.
+ *
+ * `reason` batata hai ke yeh nayi class hai ya purani jo edit hone ke baad
+ * dobara review me aa gayi, kyunke dono ka taqaza alag hota hai.
+ */
+function classPendingReviewAdmin({ activity, instructorName, reason }) {
+  const isEdit = reason === "edited";
+
+  return {
+    subject: subj(
+      isEdit
+        ? `Edited class needs review: ${activity.title}`
+        : `New class needs review: ${activity.title}`,
+    ),
+    html: layout({
+      heading: isEdit
+        ? "An edited class is waiting for review"
+        : "A new class is waiting for review",
+      body: `
+        <p style="margin:0 0 16px 0;">
+          ${esc(instructorName || "An instructor")} ${
+            isEdit
+              ? "edited a live class, so it has gone back into review and is no longer visible to parents."
+              : "submitted a new class."
+          }
+        </p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;margin-bottom:16px;">
+          ${row("Class", activity.title)}
+          ${row("Instructor", instructorName || "")}
+          ${row("Format", activity.format === "online" ? "Online" : "In person")}
+          ${row("Price", `AED ${activity.price ?? 0} per child`)}
+          ${row("Ages", `${activity.ageMin ?? ""} to ${activity.ageMax ?? ""}`)}
+          ${row("Dates added", String((activity.sessions || []).length))}
+        </table>
+        <p style="margin:0;font-size:13px;color:#777;">
+          Approve or reject it from the Classes tab in your admin dashboard.
+        </p>`,
+      ctaText: "Open admin dashboard",
+      ctaUrl: `${APP()}/admin`,
+    }),
+  };
+}
+
+/* ---------- Instructor: fundraiser booking tasdeeq ka intezar kar rahi hai ---------- */
+/**
+ * Fundraiser class par parent charity ke link par donate karta hai aur
+ * screenshot instructor ko WhatsApp par bhejta hai. Booking "pending" bani
+ * rehti hai jab tak instructor Confirm na kare. Pehle instructor ko is
+ * booking ki koi email nahi jati thi, is liye usay pata hi nahi chalta tha
+ * ke koi seat rok kar baitha hai, aur 24 ghante guzar jate the.
+ */
+function fundraiserBookingPendingInstructor({ instructorName, booking, holdHours }) {
+  const parent = booking.offlineParent || {};
+
+  return {
+    subject: subj(`New fundraiser booking to confirm: ${booking.activityTitle}`),
+    html: layout({
+      heading: `New booking waiting, ${instructorName || "there"}`,
+      body: `
+        <p style="margin:0 0 16px 0;">A parent held a spot on your fundraiser class
+        <strong>${esc(booking.activityTitle)}</strong>. They will donate on the
+        charity link and send you a screenshot on WhatsApp.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;margin-bottom:16px;">
+          ${row("Parent", parent.name || "")}
+          ${row("WhatsApp", parent.phone || "")}
+          ${row("Children", String(booking.numberOfChildren))}
+          ${rowRaw("When", fmtWhen(booking))}
+          ${row("Booking ref", booking.bookingNumber)}
+        </table>
+        <p style="margin:0 0 12px 0;">When you receive the screenshot, open your
+        dashboard and press <strong>Confirm</strong> on this booking.</p>
+        <p style="margin:0;font-size:13px;color:#777;">
+          The spot is held for ${esc(holdHours)} hours. If it expires before you
+          confirm, you can still confirm it later as long as the seat is free.
+        </p>`,
+      ctaText: "Open dashboard",
+      ctaUrl: `${APP()}/instructor/dashboard`,
+    }),
+  };
+}
+
 module.exports = {
+  fundraiserBookingPendingInstructor,
   bookingConfirmedParent,
   newBookingInstructor,
   instructorApproved,
   instructorRejected,
   classApproved,
+  classPendingReviewAdmin,
   refundConfirmed,
   verifyEmail,
   passwordReset,

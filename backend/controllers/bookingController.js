@@ -2,6 +2,9 @@ const Booking = require("../models/Booking");
 const Activity = require("../models/Activity");
 const Child = require("../models/Child");
 const PDFDocument = require("pdfkit");
+const User = require("../models/User");
+const { sendEmail } = require("../utils/sendEmail");
+const tpl = require("../utils/emailTemplates");
 
 /**
  * Commission .env se aati hai. Booking ke waqt ka rate booking me
@@ -826,6 +829,30 @@ const reserveFundraiserSpot = async (req, res, next) => {
         parentNotes: String(req.body.notes || "").slice(0, 500),
       });
 
+      /**
+       * Instructor ko foran khabar. Pehle koi email nahi jati thi, is liye
+       * usay tab pata chalta tha jab parent screenshot bhejta, ya kabhi
+       * nahi, aur booking 24 ghante baad khud cancel ho jati. Email fail
+       * bhi ho to parent ki booking na ruke (sirf log hota hai).
+       */
+      try {
+        const instructorUser = await User.findById(activity.instructor).select(
+          "name email",
+        );
+        if (instructorUser?.email) {
+          const mail = tpl.fundraiserBookingPendingInstructor({
+            instructorName: instructorUser.name,
+            booking,
+            holdHours: FUNDRAISER_HOLD_HOURS,
+          });
+          await sendEmail({ to: instructorUser.email, ...mail });
+        }
+      } catch (mailError) {
+        console.error(
+          `! Fundraiser instructor email failed, booking ${booking._id}: ${mailError.message}`,
+        );
+      }
+
       res.status(201).json({
         success: true,
         message: `Your spot is held for ${FUNDRAISER_HOLD_HOURS} hours. Please donate and send your screenshot on WhatsApp.`,
@@ -935,9 +962,23 @@ const createManualBooking = async (req, res, next) => {
  */
 const getPendingFundraiserBookings = async (req, res, next) => {
   try {
+    /**
+     * "pending" ke sath wo bookings bhi dikhate hain jo 24 ghante guzarne par
+     * system ne cancel kar di (pichle 7 din ki), taake instructor late
+     * screenshot aane par unhe Confirm kar sake. Seat khali hui to booking
+     * wapas confirm ho jati hai (confirmFundraiserBooking dekho).
+     */
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const filter = {
       source: "manual",
-      status: "pending",
+      $or: [
+        { status: "pending" },
+        {
+          status: "cancelled",
+          "cancellation.cancelledBy": "system",
+          "cancellation.cancelledAt": { $gte: sevenDaysAgo },
+        },
+      ],
     };
 
     // Admin sab dekh sakta hai, instructor sirf apni classes ki
@@ -989,6 +1030,88 @@ const confirmFundraiserBooking = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: "This booking is already confirmed",
+      });
+    }
+
+    /**
+     * LATE CONFIRM: agar 24 ghante guzar gaye aur cleanup ne booking "system"
+     * ke naam se cancel kar di (instructor ne waqt par confirm nahi kiya),
+     * to parent ka paisa to charity ko ja chuka hota hai. Is liye usay
+     * dobara zinda karte hain, lekin sirf tab jab seat abhi tak khali ho.
+     * Seat kisi aur ne le li ho to saaf bata dete hain.
+     */
+    if (booking.status === "cancelled") {
+      if (booking.cancellation?.cancelledBy !== "system") {
+        return res.status(400).json({
+          success: false,
+          message: "This booking was cancelled and cannot be confirmed",
+        });
+      }
+
+      const activity = await Activity.findById(booking.activity);
+      const sessionIds =
+        booking.bundleSessions && booking.bundleSessions.length > 0
+          ? booking.bundleSessions.map((s) => String(s.sessionId))
+          : [String(booking.sessionId)];
+
+      const sessionsToReserve = activity
+        ? sessionIds
+            .map((id) => activity.sessions.find((s) => String(s._id) === id))
+            .filter(Boolean)
+        : [];
+
+      if (!activity || sessionsToReserve.length !== sessionIds.length) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "This class date no longer exists, so the booking cannot be restored.",
+        });
+      }
+
+      const { ok, incFields, arrayFilters } = await reserveFundraiserSeats({
+        activity,
+        sessionsToReserve,
+        kids: booking.numberOfChildren,
+      });
+
+      if (!ok) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "This spot expired and the seat was taken by someone else. Please contact the parent.",
+        });
+      }
+
+      const restored = await Booking.findOneAndUpdate(
+        {
+          _id: booking._id,
+          status: "cancelled",
+          "cancellation.cancelledBy": "system",
+        },
+        {
+          $set: {
+            status: "confirmed",
+            paymentStatus: "external",
+            recordedBy: req.user._id,
+          },
+          $unset: { reservationExpiresAt: "", cancellation: "" },
+        },
+        { new: true },
+      );
+
+      if (!restored) {
+        // Is dauran kisi aur ne booking badal di: seat wapas chhodo
+        await releaseFundraiserSeats(activity._id, incFields, arrayFilters);
+        return res.status(409).json({
+          success: false,
+          message: "This booking was just changed. Please refresh and try again.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Booking restored and confirmed. The seat is theirs.",
+        booking: restored,
       });
     }
 

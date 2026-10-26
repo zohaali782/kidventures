@@ -868,6 +868,11 @@ export default function InstructorDashboard() {
                                   <span className="ml-2 text-xs font-normal opacity-60">
                                     {b.bookingNumber}
                                   </span>
+                                  {b.status === "cancelled" && (
+                                    <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                                      Expired
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-xs opacity-65">
                                   {b.numberOfChildren} child
@@ -908,7 +913,9 @@ export default function InstructorDashboard() {
 
                           <div className="mt-2 text-[11px] text-amber-900/70">
                             Each held seat is released automatically after 24
-                            hours if you don't confirm it.
+                            hours if you don't confirm it. An "Expired" booking
+                            can still be confirmed for 7 days, as long as the
+                            seat is still free.
                           </div>
                         </div>
                       )}
