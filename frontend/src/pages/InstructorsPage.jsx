@@ -13,7 +13,15 @@ export default function InstructorsPage() {
 
   const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Backend ka default limit 12 hai, is liye 13+ instructors hon to baqi
+  // dikhte hi nahi the. Ab ek dafa me 50 mangte hain (backend ka max) aur
+  // agar us se bhi zyada hon to "Load more" button se agla page aata hai.
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     let cancelled = false;
@@ -21,13 +29,15 @@ export default function InstructorsPage() {
     async function loadInstructors() {
       setLoading(true);
       setError("");
+      setPage(1);
       try {
-        const params = {};
+        const params = { limit: PAGE_SIZE, page: 1 };
         if (location) params.area = location;
 
         const res = await axios.get("/instructors", { params });
         if (!cancelled) {
           setInstructors(res.data?.instructors || []);
+          setTotalPages(res.data?.pages || 1);
         }
       } catch (err) {
         if (!cancelled) {
@@ -43,6 +53,29 @@ export default function InstructorsPage() {
       cancelled = true;
     };
   }, [location]);
+
+  async function loadMore() {
+    const next = page + 1;
+    setLoadingMore(true);
+    try {
+      const params = { limit: PAGE_SIZE, page: next };
+      if (location) params.area = location;
+
+      const res = await axios.get("/instructors", { params });
+      const more = res.data?.instructors || [];
+      setInstructors((prev) => {
+        // dobara aane wale (duplicate) profiles hata do
+        const seen = new Set(prev.map((p) => String(p._id)));
+        return [...prev, ...more.filter((p) => !seen.has(String(p._id)))];
+      });
+      setPage(next);
+      setTotalPages(res.data?.pages || totalPages);
+    } catch (err) {
+      setError("Couldn't load more instructors. Please try again.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-brand-cream flex flex-col">
@@ -161,6 +194,19 @@ export default function InstructorsPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {!loading && !error && page < totalPages && (
+          <div className="text-center mt-8">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="border-2 border-brand-orange text-brand-orange font-bold rounded-full px-8 py-2 hover:bg-brand-orange hover:text-white transition-colors disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load more instructors"}
+            </button>
           </div>
         )}
       </main>
