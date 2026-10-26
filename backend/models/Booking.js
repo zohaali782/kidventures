@@ -222,6 +222,8 @@ const bookingSchema = new mongoose.Schema(
       confirmation: { type: Boolean, default: false },
       reminder24h: { type: Boolean, default: false },
       cancellation: { type: Boolean, default: false },
+      // Fundraiser: expire hone se pehle instructor ko yaad dihani email
+      fundraiserReminder: { type: Boolean, default: false },
     },
 
     parentNotes: { type: String, maxlength: 500 },

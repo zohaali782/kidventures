@@ -491,6 +491,36 @@ const createBooking = async (req, res, next) => {
  */
 const FUNDRAISER_HOLD_HOURS = 24;
 
+/** Booking ki saari session ids (bundle ho to sab, warna ek) */
+const bookingSessionIds = (b) =>
+  b.bundleSessions && b.bundleSessions.length > 0
+    ? b.bundleSessions.map((s) => String(s.sessionId))
+    : [String(b.sessionId)];
+
+/**
+ * Confirm hone par parent ko email, agar us ne form me email di thi.
+ * Fundraiser parent ka account nahi hota, is liye email optional hoti hai.
+ * Bina await ke chalta hai taake instructor ka Confirm button na atke.
+ */
+const emailFundraiserConfirmedToParent = (booking) => {
+  const to = booking.offlineParent?.email;
+  if (!to) return;
+
+  (async () => {
+    try {
+      const mail = tpl.fundraiserConfirmedParent({
+        parentName: booking.offlineParent?.name,
+        booking,
+      });
+      await sendEmail({ to, ...mail });
+    } catch (err) {
+      console.error(
+        `! Fundraiser parent email failed, booking ${booking._id}: ${err.message}`,
+      );
+    }
+  })();
+};
+
 /**
  * Dono fundraiser raaston ki mushtarak jaanch (parent khud bhare ya
  * instructor haath se likhe). Ghalti ho to { error } wapas karta hai,
@@ -835,23 +865,27 @@ const reserveFundraiserSpot = async (req, res, next) => {
        * nahi, aur booking 24 ghante baad khud cancel ho jati. Email fail
        * bhi ho to parent ki booking na ruke (sirf log hota hai).
        */
-      try {
-        const instructorUser = await User.findById(activity.instructor).select(
-          "name email",
-        );
-        if (instructorUser?.email) {
-          const mail = tpl.fundraiserBookingPendingInstructor({
-            instructorName: instructorUser.name,
-            booking,
-            holdHours: FUNDRAISER_HOLD_HOURS,
-          });
-          await sendEmail({ to: instructorUser.email, ...mail });
+      // Bina await ke: SMTP dheema ho to parent ka form 10-20 second na
+      // atke. Email peeche chalti hai, response foran jata hai.
+      (async () => {
+        try {
+          const instructorUser = await User.findById(
+            activity.instructor,
+          ).select("name email");
+          if (instructorUser?.email) {
+            const mail = tpl.fundraiserBookingPendingInstructor({
+              instructorName: instructorUser.name,
+              booking,
+              holdHours: FUNDRAISER_HOLD_HOURS,
+            });
+            await sendEmail({ to: instructorUser.email, ...mail });
+          }
+        } catch (mailError) {
+          console.error(
+            `! Fundraiser instructor email failed, booking ${booking._id}: ${mailError.message}`,
+          );
         }
-      } catch (mailError) {
-        console.error(
-          `! Fundraiser instructor email failed, booking ${booking._id}: ${mailError.message}`,
-        );
-      }
+      })();
 
       res.status(201).json({
         success: true,
@@ -1048,11 +1082,37 @@ const confirmFundraiserBooking = async (req, res, next) => {
         });
       }
 
+      /**
+       * DUPLICATE SE BACHAO: agar expire hone ke baad usi parent (same
+       * number) ne usi class ki usi date par dobara booking bana li hai
+       * (pending ya confirmed), to purani wali restore nahi hoti, warna
+       * ek parent ki do bookings aur dugni seats ban jatin.
+       */
+      const phone = booking.offlineParent?.phone;
+      if (phone) {
+        const myIds = bookingSessionIds(booking);
+        const others = await Booking.find({
+          _id: { $ne: booking._id },
+          activity: booking.activity,
+          source: "manual",
+          status: { $in: ["pending", "confirmed"] },
+          "offlineParent.phone": phone,
+        }).select("bookingNumber status sessionId bundleSessions");
+
+        const clash = others.find((o) =>
+          bookingSessionIds(o).some((id) => myIds.includes(id)),
+        );
+
+        if (clash) {
+          return res.status(409).json({
+            success: false,
+            message: `This parent already has a ${clash.status} booking for the same date (${clash.bookingNumber}). Confirm that one instead.`,
+          });
+        }
+      }
+
       const activity = await Activity.findById(booking.activity);
-      const sessionIds =
-        booking.bundleSessions && booking.bundleSessions.length > 0
-          ? booking.bundleSessions.map((s) => String(s.sessionId))
-          : [String(booking.sessionId)];
+      const sessionIds = bookingSessionIds(booking);
 
       const sessionsToReserve = activity
         ? sessionIds
@@ -1108,6 +1168,8 @@ const confirmFundraiserBooking = async (req, res, next) => {
         });
       }
 
+      emailFundraiserConfirmedToParent(restored);
+
       return res.json({
         success: true,
         message: "Booking restored and confirmed. The seat is theirs.",
@@ -1141,6 +1203,8 @@ const confirmFundraiserBooking = async (req, res, next) => {
           "This spot expired and the seat was released. Please add the booking again.",
       });
     }
+
+    emailFundraiserConfirmedToParent(confirmed);
 
     res.json({
       success: true,

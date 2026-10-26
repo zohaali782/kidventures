@@ -38,6 +38,7 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 const sanitizeRequest = require("./middleware/sanitize");
 const { handleWebhook } = require("./controllers/paymentController");
 const releaseExpiredReservations = require("./utils/releaseExpiredReservations");
+const remindPendingFundraiser = require("./utils/remindPendingFundraiser");
 
 const app = express();
 
@@ -177,6 +178,10 @@ mongoose
     if (!instanceId || instanceId === "0") {
       setInterval(releaseExpiredReservations, 2 * 60 * 1000);
       releaseExpiredReservations();
+
+      // Fundraiser: expire hone se ~4 ghante pehle instructor ko yaad dihani
+      setInterval(remindPendingFundraiser, 10 * 60 * 1000);
+      remindPendingFundraiser();
     } else {
       console.log(`Reservation cleanup skipped on worker ${instanceId}`);
     }

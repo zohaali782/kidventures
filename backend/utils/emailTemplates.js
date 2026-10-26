@@ -477,7 +477,62 @@ function fundraiserBookingPendingInstructor({ instructorName, booking, holdHours
   };
 }
 
+/* ---------- Instructor: fundraiser booking expire hone wali hai ---------- */
+function fundraiserReminderInstructor({ instructorName, booking, hoursLeft }) {
+  const parent = booking.offlineParent || {};
+
+  return {
+    subject: subj(`Reminder: confirm fundraiser booking, ${booking.activityTitle}`),
+    html: layout({
+      heading: `Still waiting, ${instructorName || "there"}`,
+      body: `
+        <p style="margin:0 0 16px 0;">This fundraiser booking has not been confirmed yet
+        and its held seat will be released in about
+        <strong>${esc(hoursLeft)} hours</strong>.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;margin-bottom:16px;">
+          ${row("Class", booking.activityTitle)}
+          ${row("Parent", parent.name || "")}
+          ${row("WhatsApp", parent.phone || "")}
+          ${row("Children", String(booking.numberOfChildren))}
+          ${rowRaw("When", fmtWhen(booking))}
+          ${row("Booking ref", booking.bookingNumber)}
+        </table>
+        <p style="margin:0;font-size:13px;color:#777;">
+          If you already received the donation screenshot, press Confirm in your
+          dashboard. If not, no action is needed and the seat will open up again.
+        </p>`,
+      ctaText: "Open dashboard",
+      ctaUrl: `${APP()}/instructor/dashboard`,
+    }),
+  };
+}
+
+/* ---------- Parent: fundraiser booking confirmed ---------- */
+function fundraiserConfirmedParent({ parentName, booking }) {
+  return {
+    subject: subj(`Your spot is confirmed: ${booking.activityTitle}`),
+    html: layout({
+      heading: `You're in, ${parentName || "there"}!`,
+      body: `
+        <p style="margin:0 0 16px 0;">Thank you for your donation. Your spot on
+        <strong>${esc(booking.activityTitle)}</strong> is confirmed.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;margin-bottom:16px;">
+          ${row("Class", booking.activityTitle)}
+          ${rowRaw("When", fmtWhen(booking))}
+          ${row("Children", String(booking.numberOfChildren))}
+          ${row("Booking ref", booking.bookingNumber)}
+        </table>
+        <p style="margin:0;font-size:13px;color:#777;">
+          Please keep this booking reference. If you need to change anything,
+          message your instructor on WhatsApp.
+        </p>`,
+    }),
+  };
+}
+
 module.exports = {
+  fundraiserReminderInstructor,
+  fundraiserConfirmedParent,
   fundraiserBookingPendingInstructor,
   bookingConfirmedParent,
   newBookingInstructor,
