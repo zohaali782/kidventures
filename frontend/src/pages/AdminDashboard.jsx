@@ -1268,6 +1268,24 @@ export default function AdminDashboard() {
                         >
                           <IcEye size={13} /> View
                         </button>
+                        {/* Kisi bhi class ki category badalna (ghalat
+                            category me ho ya khali ho to wo category page
+                            par nazar nahi aati) */}
+                        <button
+                          onClick={() => {
+                            setPickCategoryFor(c);
+                            setPickedCategory(
+                              c.category?._id || c.category || "",
+                            );
+                          }}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                            c.category
+                              ? "border-gray-200 bg-white"
+                              : "border-amber-400 bg-amber-50 text-amber-800"
+                          }`}
+                        >
+                          {c.category ? "Category" : "Set category"}
+                        </button>
                         {c.status === "pending" ? (
                           <button
                             onClick={() => approveClass(c._id)}
@@ -2361,8 +2379,12 @@ export default function AdminDashboard() {
           <div className="w-full max-w-[400px] rounded-2xl bg-white p-6">
             <h3 className="mb-1 text-base font-bold">Assign a category</h3>
             <p className="mb-3 text-xs opacity-60">
-              "{pickCategoryFor.title}", suggested: "
-              {pickCategoryFor.suggestedCategory}"
+              "{pickCategoryFor.title}"
+              {pickCategoryFor.suggestedCategory
+                ? `, suggested: "${pickCategoryFor.suggestedCategory}"`
+                : pickCategoryFor.category?.name
+                  ? `, now: ${pickCategoryFor.category.name}`
+                  : ", no category yet"}
             </p>
             <select
               value={pickedCategory}

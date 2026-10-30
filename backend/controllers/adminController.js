@@ -323,6 +323,22 @@ const approveActivity = async (req, res, next) => {
       });
     }
 
+    /**
+     * BINA CATEGORY KE LIVE NAHI. Instructor "Other" chun kar apni category
+     * likhta hai (jaise "Crochet"), to class ki asli category khali rehti hai.
+     * Pehle Approve dabane se aisi class live ho jati thi magar kisi bhi
+     * category page par nazar nahi aati thi, kyunke category filter isi
+     * field se chalta hai. Ab pehle category assign karni zaroori hai.
+     */
+    if (!activity.category) {
+      return res.status(400).json({
+        success: false,
+        message: activity.suggestedCategory
+          ? `Assign a category first (instructor suggested "${activity.suggestedCategory}")`
+          : "Assign a category first",
+      });
+    }
+
     activity.status = "active";
     activity.statusNote = undefined;
     await activity.save();
@@ -464,13 +480,36 @@ const resolveCategorySuggestion = async (req, res, next) => {
         .json({ success: false, message: "Class not found" });
     }
 
+    const oldCategory = activity.category ? String(activity.category) : null;
+
     activity.category = category._id;
     activity.suggestedCategory = undefined;
     await activity.save();
 
+    // Category ki ginti (activityCount) bhi theek rakho, warna category
+    // card par classes ki tadaad ghalat dikhti hai.
+    if (oldCategory !== String(category._id)) {
+      if (oldCategory) {
+        await Category.updateOne(
+          { _id: oldCategory, activityCount: { $gt: 0 } },
+          { $inc: { activityCount: -1 } },
+        );
+      }
+      await Category.updateOne(
+        { _id: category._id },
+        { $inc: { activityCount: 1 } },
+      );
+    }
+
+    // Admin list me naam dikhane ke liye category aur instructor populate
+    await activity.populate([
+      { path: "category", select: "name slug icon" },
+      { path: "instructor", select: "name email" },
+    ]);
+
     res.json({
       success: true,
-      message: `Category assigned: ${category.name}`,
+      message: `Category set: ${category.name}`,
       activity,
     });
   } catch (error) {
