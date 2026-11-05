@@ -1047,15 +1047,32 @@ function ActivityDetailPage() {
                         </Marker>
                       </MapContainer>
                     </div>
+                    {/* Poora pata, agar instructor ne class me likha hai.
+                        Pehle map ke neeche sirf "Approximate area" likha
+                        aata tha aur address kahin nazar nahi aata tha. */}
+                    {asText(a.location?.address) && (
+                      <div className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-brand-brown">
+                        <span aria-hidden="true">📍</span>
+                        <span className="font-semibold">
+                          {asText(a.location.address)}
+                        </span>
+                      </div>
+                    )}
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`}
+                      href={
+                        // Exact pin na ho magar address ho, to address se
+                        // directions do, area ke beech wale andazan pin se nahi
+                        approxLocation && asText(a.location?.address)
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(asText(a.location.address))}`
+                          : `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-semibold text-brand-orange no-underline"
                     >
                       <DirectionsArrowIcon /> Get Directions
                     </a>
-                    {approxLocation && (
+                    {approxLocation && !asText(a.location?.address) && (
                       <div className="mt-1 text-[11px] text-brand-brown/50">
                         Approximate area, exact address shared after booking.
                       </div>
