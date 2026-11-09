@@ -74,10 +74,26 @@ async function sendEmail({ to, subject, html }) {
     .trim()
     .slice(0, 180);
 
+  // From ka ADDRESS hamesha wahi hona chahiye jis account se login karke
+  // bhej rahe hain (SMTP_USER). Agar SMTP Gmail ka ho aur From
+  // hello@kidventures.ae ho, to SPF/DKIM fail hote hain aur Gmail/Outlook
+  // email chup chaap spam ya gayab kar dete hain, jabke logs "sent" kehte hain.
+  // EMAIL_FROM se sirf naam ("Kidventures") lete hain, aur agar us ka
+  // address alag ho to woh reply-to ban jata hai.
+  const smtpUser = process.env.SMTP_USER.trim();
+  const fromEnv = (process.env.EMAIL_FROM || "").trim();
+  const fromMatch = fromEnv.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  const fromName = (fromMatch ? fromMatch[1] : "").trim() || "Kidventures";
+  const fromAddr = (fromMatch ? fromMatch[2] : fromEnv).trim();
+  const replyTo =
+    fromAddr && fromAddr.includes("@") && fromAddr.toLowerCase() !== smtpUser.toLowerCase()
+      ? fromAddr
+      : undefined;
+
   try {
     const info = await getTransporter().sendMail({
-      from:
-        process.env.EMAIL_FROM || `"Kidventures" <${process.env.SMTP_USER}>`,
+      from: { name: fromName, address: smtpUser },
+      ...(replyTo ? { replyTo } : {}),
       to: to.trim(),
       subject: safeSubject,
       html,
@@ -87,7 +103,16 @@ async function sendEmail({ to, subject, html }) {
         .trim(),
     });
 
-    console.log("[email] sent:", safeSubject, "->", maskEmail(to), info.messageId);
+    // Server ne email waqai accept ki ya reject, dono log mein dikhta hai
+    if (info.rejected && info.rejected.length) {
+      console.error("[email] REJECTED by SMTP:", safeSubject, "->", maskEmail(to), info.response);
+      return { ok: false, error: "rejected" };
+    }
+    console.log(
+      "[email] sent:", safeSubject, "->", maskEmail(to),
+      "| from:", maskEmail(smtpUser), "| via:", process.env.SMTP_HOST,
+      "|", info.response,
+    );
     return { ok: true };
   } catch (err) {
     console.error("[email] FAILED:", safeSubject, "->", maskEmail(to), err.message);
