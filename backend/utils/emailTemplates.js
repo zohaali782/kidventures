@@ -121,8 +121,11 @@ function layout({ heading, body, ctaText, ctaUrl }) {
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;">
 
-        <tr><td style="background:${BRAND.gold};padding:20px 24px;">
-          <span style="font-size:22px;font-weight:bold;color:${BRAND.brown};">Kidventures</span>
+        <tr><td align="center" style="background:${BRAND.gold};padding:18px 24px;">
+          <a href="${APP()}" style="text-decoration:none;">
+            <img src="${APP()}/email-logo.png" width="96" height="96" alt="Kidventures"
+                 style="display:block;width:96px;height:96px;border:0;outline:none;font-size:22px;font-weight:bold;color:${BRAND.brown};">
+          </a>
         </td></tr>
 
         <tr><td style="padding:28px 24px 8px 24px;">
