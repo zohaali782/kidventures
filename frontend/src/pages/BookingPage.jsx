@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -272,6 +272,7 @@ function PaymentForm({ booking, onConfirmed }) {
 /* --------------------------------- page --------------------------------- */
 export default function BookingPage() {
   const { id } = useParams();
+  const location = useLocation();
   const user = getStoredUser();
 
   const [activity, setActivity] = useState(null);
@@ -286,7 +287,10 @@ export default function BookingPage() {
   // Multi-day bundle chuna ho to selectedSessionId khali rehta hai (aur
   // vice versa) - dono mutually exclusive hain, ek waqt me sirf ek hi
   // cheez book ho sakti hai.
-  const [selectedBundleId, setSelectedBundleId] = useState("");
+  // Class page par package chuna ho to wahi pehle se selected aata hai
+  const [selectedBundleId, setSelectedBundleId] = useState(
+    () => location.state?.bundleId || "",
+  );
   const [selectedChildIds, setSelectedChildIds] = useState([]);
   const [stepError, setStepError] = useState("");
   // Flexible pricing - jab instructor ne "let parents choose their own
@@ -489,9 +493,14 @@ export default function BookingPage() {
   // kare. Dono soorton me seat isi session se katti hai, aur ek hi bacha
   // dono tareeqon se book na ho jaye iska check backend me hai (dekho
   // createBooking ka duplicate-booking wala hissa).
-  const sessions = allSessions
-    .filter((s) => s.status === "scheduled" && new Date(s.date) >= now)
-    .sort((x, y) => new Date(x.date) - new Date(y.date));
+  // Package-only class (monthly course / multi-day camp): single dates
+  // bookable nahi, sirf packages. Backend bhi yehi rokta hai.
+  const packageOnly = a.bookingMode === "package";
+  const sessions = packageOnly
+    ? []
+    : allSessions
+        .filter((s) => s.status === "scheduled" && new Date(s.date) >= now)
+        .sort((x, y) => new Date(x.date) - new Date(y.date));
 
   // Bundles jo abhi book kiye ja saktay hain - active, kam se kam 2
   // sessions resolve hui hon, aur SAB abhi bhi scheduled/future hon (ek
@@ -566,7 +575,9 @@ export default function BookingPage() {
     setStepError("");
     if (step === 1) {
       if (!selectedSession && !isBundleSelected) {
-        setStepError("Please choose a date and time.");
+        setStepError(
+          packageOnly ? "Please choose a package." : "Please choose a date and time.",
+        );
         return;
       }
       setStep(2);
@@ -635,7 +646,12 @@ export default function BookingPage() {
     setStep(5);
   };
 
-  const steps = ["Date & Time", "Child", "Review", "Payment"];
+  const steps = [
+    packageOnly ? "Package" : "Date & Time",
+    "Child",
+    "Review",
+    "Payment",
+  ];
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] font-sans text-brand-brown">
@@ -731,7 +747,15 @@ export default function BookingPage() {
           {/* STEP 1, session */}
           {step === 1 && (
             <>
-              <h2 className="mb-4 text-base font-bold">Choose date & time</h2>
+              <h2 className="mb-4 text-base font-bold">
+                {packageOnly ? "Choose your package" : "Choose date & time"}
+              </h2>
+              {packageOnly && (
+                <p className="-mt-2.5 mb-4 text-xs opacity-60">
+                  This class is booked as a full package. One payment covers
+                  every date listed.
+                </p>
+              )}
 
               {bundles.length > 0 && (
                 <div className="mb-4 flex flex-col gap-2.5">
@@ -765,7 +789,8 @@ export default function BookingPage() {
                         <div className="mb-1.5 flex items-center justify-between">
                           <span className="flex items-center gap-1.5 font-bold">
                             <IcTag size={14} />
-                            {b.title || "Multi-day bundle"}
+                            {b.title ||
+                              (packageOnly ? "Full package" : "Multi-day bundle")}
                           </span>
                           <span
                             className={`text-xs font-bold ${
@@ -805,7 +830,9 @@ export default function BookingPage() {
 
               {sessions.length === 0 && bundles.length === 0 ? (
                 <div className="rounded-lg bg-brand-cream/60 px-4 py-6 text-center text-sm opacity-70">
-                  No upcoming sessions scheduled for this class.
+                  {packageOnly
+                    ? "No packages open for booking right now."
+                    : "No upcoming sessions scheduled for this class."}
                 </div>
               ) : (
                 sessions.length > 0 && (
@@ -960,8 +987,11 @@ export default function BookingPage() {
                 {selectedBundle ? (
                   <>
                     <Row
-                      label="Bundle"
-                      value={selectedBundle.title || "Multi-day bundle"}
+                      label={packageOnly ? "Package" : "Bundle"}
+                      value={
+                        selectedBundle.title ||
+                        (packageOnly ? "Full package" : "Multi-day bundle")
+                      }
                     />
                     {selectedBundle.sessions.map((s, i) => (
                       <Row
@@ -1019,7 +1049,11 @@ export default function BookingPage() {
                       : ""}
                     {suggestedPricePerChild
                       ? `Suggested amount: AED ${suggestedPricePerChild}${
-                          selectedBundle ? " for the whole bundle" : ""
+                          selectedBundle
+                            ? packageOnly
+                              ? " for the whole package"
+                              : " for the whole bundle"
+                            : ""
                         }.`
                       : "No suggested amount, it's entirely your choice."}
                   </p>

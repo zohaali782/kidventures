@@ -194,6 +194,25 @@ const activitySchema = new mongoose.Schema(
      * katti hai, aur ek hi bacha dono tareeqon se book na ho jaye iska
      * check bookingController.js ke createBooking mein hai.
      */
+    /**
+     * Booking ka tareeqa:
+     *   "session" -> parent koi bhi single date book kar sakta hai (purana
+     *                default), bundles sirf ek EXTRA option hain.
+     *   "package" -> class SIRF poore package (bundle) ki soorat me bikti hai,
+     *                jaise monthly course (4 weekly classes, fees monthly) ya
+     *                6-day winter camp. Single date ki booking band hai, dekho
+     *                bookingController.js createBooking.
+     *
+     * Package mode me `price` khud set hoti hai (sab se sasta active package),
+     * neeche pre-save hook dekho, taake cards, price filter aur sorting sahi
+     * qeemat dikhayein.
+     */
+    bookingMode: {
+      type: String,
+      enum: ["session", "package"],
+      default: "session",
+    },
+
     bundles: [
       {
         title: { type: String, trim: true, maxlength: 120 },
@@ -337,6 +356,18 @@ activitySchema.pre("save", function () {
     }
     if (ids.some((id) => !validSessionIds.has(id))) {
       throw new Error("A bundle can only include this class's own sessions");
+    }
+  }
+
+  // Package-only class: listing par wohi qeemat dikhe jo parent waqai deta
+  // hai, yaani sab se sasta ACTIVE package. Koi active package na ho to
+  // purani price hi rehne do (class us waqt bookable bhi nahi hoti).
+  if (this.bookingMode === "package") {
+    const activePrices = (this.bundles || [])
+      .filter((b) => b.status === "active" && Number.isFinite(b.price))
+      .map((b) => b.price);
+    if (activePrices.length > 0) {
+      this.price = Math.min(...activePrices);
     }
   }
 });

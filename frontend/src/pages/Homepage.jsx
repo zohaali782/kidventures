@@ -328,6 +328,7 @@ const normActivity = (a) => ({
     (a.isOnline ? "Online" : ""),
   // Parent bilkul yehi deta hai, commission instructor ki earning se katta hai.
   price: a.price ?? "",
+  packageOnly: a.bookingMode === "package",
   rating: asNum(a.rating ?? a.averageRating),
   reviews: asNum(a.reviews ?? a.reviewCount ?? a.numReviews),
   image: pickImg(a.images?.[0], a.coverImage, a.image),
@@ -1016,7 +1017,7 @@ function Homepage() {
                             Delegate pricing
                           </span>
                         ) : a.price !== "" ? (
-                          `AED ${a.price}`
+                          `AED ${a.price}${a.packageOnly ? " / package" : ""}`
                         ) : (
                           ""
                         )}

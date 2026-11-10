@@ -63,6 +63,14 @@ function addMinutes(time, mins) {
   return `${hh}:${mm}`;
 }
 
+/* "YYYY-MM-DD" + days -> "YYYY-MM-DD" (UTC math, so no timezone shifts) */
+function addDays(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (isNaN(d)) return dateStr;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 const inputCls =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-brand-brown outline-none focus:border-brand-orange";
 const labelCls = "mb-1.5 block text-xs font-semibold text-brand-brown/80";
@@ -85,6 +93,55 @@ function Section({ title, subtitle, children }) {
         {subtitle && <div className="text-xs opacity-60">{subtitle}</div>}
       </div>
       {children}
+    </div>
+  );
+}
+
+/* How parents book: any single date, or only the full package */
+const BOOKING_MODES = [
+  {
+    value: "session",
+    title: "Per class",
+    text: "Parents can book any single date.",
+  },
+  {
+    value: "package",
+    title: "Full package only",
+    text: "Parents pay once for all the dates, e.g. a monthly course (4 weekly classes) or a 6-day camp. Single dates can't be booked.",
+  },
+];
+
+function BookingModePicker({ value, onChange }) {
+  return (
+    <div className="mb-4">
+      <div className={labelCls}>How do parents book this class?</div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {BOOKING_MODES.map((m) => {
+          const on = value === m.value;
+          return (
+            <label
+              key={m.value}
+              className={`flex cursor-pointer gap-2.5 rounded-xl border p-3 ${
+                on
+                  ? "border-brand-orange bg-brand-cream"
+                  : "border-gray-200 bg-white"
+              }`}
+            >
+              <input
+                type="radio"
+                name="bookingMode"
+                checked={on}
+                onChange={() => onChange(m.value)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-orange"
+              />
+              <span>
+                <span className="block text-sm font-bold">{m.title}</span>
+                <span className="block text-xs opacity-65">{m.text}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -113,7 +170,16 @@ export default function CreateClassPage() {
     siblingDiscountPercent: "10",
     flexiblePricingEnabled: false,
     flexiblePricingMin: "",
+    // "session" = parents book any single date, "package" = only the full
+    // package (all dates below) can be booked, e.g. a monthly course or a
+    // multi-day camp
+    bookingMode: "session",
+    packageTitle: "",
   });
+  const isPackage = form.bookingMode === "package";
+  // Quick way to fill in weekly classes / camp days from the last date
+  const [repeatEvery, setRepeatEvery] = useState("7");
+  const [repeatCount, setRepeatCount] = useState("3");
   const [learnList, setLearnList] = useState([""]);
   const [faqList, setFaqList] = useState([{ question: "", answer: "" }]);
   // Start time defaults to a real value (not empty) - native <input
@@ -185,6 +251,35 @@ export default function CreateClassPage() {
   const removeSession = (i) =>
     setSessions((s) => s.filter((_, idx) => idx !== i));
 
+  /**
+   * Repeat the last filled-in date: every 7 days (weekly classes) or every
+   * day (camp), N more times, same start time. Empty rows are dropped so
+   * the list stays clean.
+   */
+  const repeatLastDate = () => {
+    const filled = sessions.filter((s) => s.date);
+    const last = filled[filled.length - 1];
+    if (!last) {
+      setErrors((e) => ({ ...e, sessions: "Pick the first date, then repeat it." }));
+      return;
+    }
+    const step = Number(repeatEvery) || 7;
+    const times = Math.min(Math.max(Number(repeatCount) || 0, 1), 30);
+    const extra = [];
+    for (let k = 1; k <= times; k++) {
+      extra.push({
+        date: addDays(last.date, step * k),
+        startTime: last.startTime,
+      });
+    }
+    setSessions([...filled, ...extra]);
+    setErrors((e) => {
+      const next = { ...e };
+      delete next.sessions;
+      return next;
+    });
+  };
+
   /* images — real files now, with local previews */
   const pickImages = (fileList) => {
     const incoming = Array.from(fileList).slice(
@@ -215,8 +310,11 @@ export default function CreateClassPage() {
     const p = Number(form.price);
     if (!p) return "";
     const youReceive = Math.round(p * 0.85 * 100) / 100;
+    if (form.bookingMode === "package") {
+      return `Parents pay AED ${p} once for the whole package · you receive AED ${youReceive} after Kidventures' 15% commission`;
+    }
     return `Parents pay exactly AED ${p} · you receive AED ${youReceive} after Kidventures' 15% commission`;
-  }, [form.price]);
+  }, [form.price, form.bookingMode]);
 
   // Price fee-explainer popup: shows automatically the first time the
   // instructor focuses the price field, so they price with the 15%
@@ -259,6 +357,11 @@ export default function CreateClassPage() {
     if (validSessions.length === 0)
       e.sessions =
         "Add at least one date and time. If you already filled it in, double check the time field, click into it and make sure AM/PM is also set, not just the hour and minutes.";
+    else if (isPackage && validSessions.length < 2)
+      e.sessions =
+        "A package needs at least 2 dates. Add every date included in the package (use \"Repeat\" to add weekly classes or camp days quickly).";
+    if (isPackage && form.packageTitle.trim().length > 120)
+      e.packageTitle = "Keep the package name under 120 characters";
     return e;
   };
 
@@ -331,6 +434,8 @@ export default function CreateClassPage() {
           ? Number(form.flexiblePricingMin) || 0
           : 0,
       },
+      bookingMode: form.bookingMode,
+      ...(isPackage ? { packageTitle: form.packageTitle.trim() } : {}),
       status, // "pending" = submit for approval, "draft" = save for later
       sessions: sessions
         .filter((s) => s.date && s.startTime)
@@ -572,15 +677,40 @@ export default function CreateClassPage() {
         {/* 3. pricing */}
         <Section
           title="Pricing & Capacity"
-          subtitle="How much and how many seats"
+          subtitle="How parents book, how much and how many seats"
         >
+          <BookingModePicker
+            value={form.bookingMode}
+            onChange={(v) => set("bookingMode", v)}
+          />
+
+          {isPackage && (
+            <Field
+              label="Package name (shown to parents)"
+              error={errors.packageTitle}
+              className="mb-4"
+            >
+              <input
+                className={inputCls}
+                value={form.packageTitle}
+                onChange={(e) => set("packageTitle", e.target.value)}
+                maxLength={120}
+                placeholder='e.g. "December, 4 weekly classes" or "6-Day Winter Camp"'
+              />
+            </Field>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="mb-1.5 flex items-center gap-1.5">
                 <label className={labelCls}>
-                  {form.flexiblePricingEnabled
-                    ? "Suggested amount per child (AED)"
-                    : "Price per child (AED)"}
+                  {isPackage
+                    ? form.flexiblePricingEnabled
+                      ? "Suggested package amount per child (AED)"
+                      : "Package price per child (AED)"
+                    : form.flexiblePricingEnabled
+                      ? "Suggested amount per child (AED)"
+                      : "Price per child (AED)"}
                 </label>
                 <button
                   type="button"
@@ -701,7 +831,11 @@ export default function CreateClassPage() {
         {/* 4. schedule */}
         <Section
           title="Schedule"
-          subtitle="Add one or more dates. End time is set automatically from the duration."
+          subtitle={
+            isPackage
+              ? "Add every date included in the package. End time is set automatically from the duration."
+              : "Add one or more dates. End time is set automatically from the duration."
+          }
         >
           {errors.sessions && (
             <div className="mb-2 text-xs text-red-600">{errors.sessions}</div>
@@ -742,6 +876,39 @@ export default function CreateClassPage() {
           >
             <IcPlus size={15} /> Add another date
           </button>
+
+          {/* Repeat helper: 4 weekly classes or 6 camp days in one click */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-brand-cream/50 p-3 text-xs">
+            <span className="font-semibold">Repeat the last date</span>
+            <select
+              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-brand-orange"
+              value={repeatEvery}
+              onChange={(e) => setRepeatEvery(e.target.value)}
+            >
+              <option value="7">every week</option>
+              <option value="1">every day</option>
+            </select>
+            <input
+              type="number"
+              min="1"
+              max="30"
+              className="w-16 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-brand-orange"
+              value={repeatCount}
+              onChange={(e) => setRepeatCount(e.target.value)}
+            />
+            <span>more times</span>
+            <button
+              type="button"
+              onClick={repeatLastDate}
+              className="rounded-lg bg-brand-orange px-3 py-1.5 text-xs font-bold text-white"
+            >
+              Add dates
+            </button>
+            <span className="basis-full opacity-60">
+              Example: first class on 6 Dec, every week, 3 more times gives 4
+              weekly classes. For a 6-day camp choose every day, 5 more times.
+            </span>
+          </div>
         </Section>
 
         {/* 5. learning points */}

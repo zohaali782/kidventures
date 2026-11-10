@@ -94,6 +94,9 @@ export const normActivity = (a) => {
     // schema me hai hi nahi; agar kabhi add ho jata to dikhne wali aur
     // charge hone wali price alag ho jatin.)
     price: a.price ?? "",
+    // Package-only class (monthly course / camp): card par price ke saath
+    // "package" likha aata hai, taake parent single class ki qeemat na samjhe
+    packageOnly: a.bookingMode === "package",
     // Instructor ne "parents choose their own amount" on kiya ho to yahan
     // milta hai - agar minAmount 0 hai to koi bhi amount suggest nahi karna,
     // sirf "Delegate pricing" dikhana hai (listing/cards is flag ko check

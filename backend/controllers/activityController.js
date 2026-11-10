@@ -2,6 +2,41 @@ const Activity = require("../models/Activity");
 const Category = require("../models/Category");
 const Booking = require("../models/Booking");
 const { cleanVideoUrl } = require("../utils/safeUrl");
+const { sendEmail } = require("../utils/sendEmail");
+const tpl = require("../utils/emailTemplates");
+
+/**
+ * Jahan admin ko khabar jati hai. .env me ADMIN_NOTIFY_EMAIL rakh kar
+ * badla ja sakta hai, taake address badalne ke liye code chhuna na pare.
+ */
+const adminNotifyEmail = () =>
+  (process.env.ADMIN_NOTIFY_EMAIL || "kidventuresevents@gmail.com").trim();
+
+/**
+ * Class review ke liye ruki hai, owner ko bata do.
+ *
+ * Fire and forget: email bhejne me der lag sakti hai aur SMTP kabhi kabhi
+ * fail bhi hota hai. Us ki waja se instructor ki class submit hona nahi
+ * rukni chahiye, is liye na await karte hain na error aage bhejte hain,
+ * bas log kar dete hain taake khamoshi se gum na ho.
+ */
+const notifyAdminClassPending = (activity, instructorName, reason) => {
+  const to = adminNotifyEmail();
+  if (!to) return;
+
+  Promise.resolve()
+    .then(() =>
+      sendEmail({
+        to,
+        ...tpl.classPendingReviewAdmin({ activity, instructorName, reason }),
+      }),
+    )
+    .catch((err) =>
+      console.error(
+        `[email] admin review alert failed for class ${activity?._id}: ${err.message}`,
+      ),
+    );
+};
 
 /**
  * SECURITY helper: user ka likha hua text seedha regex me daalna khatarnaak hai
@@ -302,7 +337,12 @@ const EDITABLE_FIELDS = [
   "cancellationPolicy",
   "siblingDiscount",
   "flexiblePricing",
+  "bookingMode",
 ];
+
+/** Sirf do qeemtein maanni hain, baaqi sab "session" (purana default). */
+const cleanBookingMode = (value) =>
+  value === "package" ? "package" : "session";
 
 /**
  * Clean the FAQ list, drop entries with an empty question or answer,
@@ -427,6 +467,36 @@ const createActivity = async (req, res, next) => {
       data.flexiblePricing = sanitizeFlexiblePricing(data.flexiblePricing);
     }
 
+    data.bookingMode = cleanBookingMode(data.bookingMode);
+
+    // Package-only class kam se kam 2 dates ke baghair package ban hi nahi
+    // sakta. Ye check DB me kuch likhne se pehle, taake aadhi bani class na
+    // reh jaye.
+    const packageTitle = String(req.body.packageTitle || "").trim();
+    if (data.bookingMode === "package") {
+      const validDates = Array.isArray(req.body.sessions)
+        ? req.body.sessions.filter((s) => s && s.date && s.startTime)
+        : [];
+      if (validDates.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "A package needs at least 2 dates. Add every date included in the package.",
+        });
+      }
+      if (packageTitle.length > 120) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Package name is too long" });
+      }
+      const pkgPrice = Number(data.price);
+      if (!Number.isFinite(pkgPrice) || pkgPrice < 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Please enter a valid package price" });
+      }
+    }
+
     // "Other" case: koi official category nahi, sirf free-text suggestion.
     const isOther =
       !data.category &&
@@ -462,7 +532,22 @@ const createActivity = async (req, res, next) => {
       }));
     }
 
-    const activity = await Activity.create(data);
+    const activity = new Activity(data);
+
+    // Package-only: saari dates ko ek package me jor do, form wali price
+    // par. Session ids `new Activity()` par hi ban jati hain, is liye
+    // save se pehle bundle bana sakte hain.
+    if (activity.bookingMode === "package") {
+      const n = activity.sessions.length;
+      activity.bundles.push({
+        title: packageTitle || `Full package (${n} classes)`,
+        sessionIds: activity.sessions.map((s) => s._id),
+        price: Number(data.price),
+        status: "active",
+      });
+    }
+
+    await activity.save();
 
     // Category count sirf tab barhao jab koi official category ho ("Other" me nahi)
     if (data.category) {
@@ -470,6 +555,12 @@ const createActivity = async (req, res, next) => {
         { _id: data.category },
         { $inc: { activityCount: 1 } },
       );
+    }
+
+    // Owner ko sirf tab khabar jaye jab class waqai review me gayi ho.
+    // Draft par kuch nahi, woh abhi instructor ke apne paas hai.
+    if (activity.status === "pending") {
+      notifyAdminClassPending(activity, req.user?.name, "new");
     }
 
     res.status(201).json({
@@ -521,6 +612,10 @@ const updateActivity = async (req, res, next) => {
 
     // "Other" class ki category undefined ho sakti hai - guard.
     const oldCategory = activity.category ? activity.category.toString() : null;
+
+    // Pehle ka status, taake baad me pata chale ke class ab review me AAYI
+    // hai ya pehle se hi wahan thi (dobara save karne par email na jaye)
+    const oldStatus = activity.status;
 
     /**
      * MODERATION BYPASS SE BACHAO.
@@ -600,6 +695,36 @@ const updateActivity = async (req, res, next) => {
       );
     }
 
+    if (req.body.bookingMode !== undefined) {
+      req.body.bookingMode = cleanBookingMode(req.body.bookingMode);
+
+      // "Package only" par switch karne se pehle kam se kam ek active
+      // package hona chahiye, warna class par booking ka koi raasta hi
+      // nahi bachta.
+      const switchingToPackage =
+        req.body.bookingMode === "package" &&
+        activity.bookingMode !== "package";
+      const hasActivePackage = (activity.bundles || []).some(
+        (b) => b.status === "active",
+      );
+      if (switchingToPackage && !hasActivePackage) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Create a package first (pick its dates and price in the Packages section), then switch to package-only booking.",
+        });
+      }
+    }
+
+    // Package mode me class ki price packages se khud banti hai (model ka
+    // pre-save hook). Form se aane wali purani price ko chhorna zaroori hai,
+    // warna woh "price badli" gini jati aur class bila wajah review me chali
+    // jati.
+    const effectiveMode = req.body.bookingMode ?? activity.bookingMode;
+    if (effectiveMode === "package") {
+      delete req.body.price;
+    }
+
     const REVIEW_TRIGGERING_FIELDS = [
       "title",
       "description",
@@ -669,6 +794,21 @@ const updateActivity = async (req, res, next) => {
     }
 
     await activity.save();
+
+    /**
+     * Class ab review me aa gayi, owner ko khabar kar do.
+     *
+     * Shart me oldStatus is liye hai ke instructor pending class ko dobara
+     * save kare to har baar nayi email na jaye. Aur admin khud status
+     * badle to bhi email ka koi faida nahi, woh khud hi dashboard par hai.
+     */
+    if (!isAdmin && activity.status === "pending" && oldStatus !== "pending") {
+      notifyAdminClassPending(
+        activity,
+        req.user?.name,
+        sentBackForReview ? "edited" : "new",
+      );
+    }
 
     // Category badli to counts theek karo (Other -> assigned bhi handle hota hai)
     const newCategory = activity.category ? activity.category.toString() : null;

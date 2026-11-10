@@ -803,7 +803,10 @@ export default function InstructorProfilePage() {
                               </span>
                             ) : (
                               price != null && (
-                                <span className="font-bold">AED {price}</span>
+                                <span className="font-bold">
+                                  AED {price}
+                                  {a.packageOnly ? " / package" : ""}
+                                </span>
                               )
                             )}
                           </div>

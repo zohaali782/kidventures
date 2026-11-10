@@ -273,6 +273,9 @@ function ActivityDetailPage() {
    * ek session par chalta hai.
    */
   const [pickedSessionIds, setPickedSessionIds] = useState([]);
+  // Package-only class (monthly course / multi-day camp): parent ek poora
+  // package chunta hai, single date nahi
+  const [pickedPackageId, setPickedPackageId] = useState("");
 
   /* ---- fundraiser: parent apni seat khud rok leta hai ----
    *
@@ -688,13 +691,68 @@ function ActivityDetailPage() {
       sameDay(new Date(s.date), selectedDate) &&
       (s.startTime || s.time) === selectedTime,
   );
-  const seatsLeft =
+  const sessionSeatsLeft =
     selectedSession && selectedSession.capacity != null
       ? Math.max(
           0,
           selectedSession.capacity - (selectedSession.seatsBooked || 0),
         )
       : null;
+
+  /* ---- package-only class: sirf poore packages bookable hain ----
+   * Wohi packages dikhate hain jin ki SAARI dates abhi aane wali hain
+   * (BookingPage bhi yehi rule lagata hai), warna parent aadha package
+   * khareedta. */
+  const isPackageOnly = a.bookingMode === "package" && !isFundraiser;
+  const packages = isPackageOnly
+    ? (a.bundles || [])
+        .filter((b) => b.status === "active")
+        .map((b) => {
+          const pSessions = (b.sessionIds || [])
+            .map((sid) =>
+              (a.sessions || []).find(
+                (s) => String(s._id || s.id) === String(sid),
+              ),
+            )
+            .filter(Boolean)
+            .sort((x, y) => new Date(x.date) - new Date(y.date));
+          const left = pSessions.length
+            ? Math.min(
+                ...pSessions.map((s) =>
+                  Math.max((s.capacity || 0) - (s.seatsBooked || 0), 0),
+                ),
+              )
+            : 0;
+          return { ...b, sessions: pSessions, seatsLeft: left };
+        })
+        .filter(
+          (b) =>
+            b.sessions.length >= 2 &&
+            b.sessions.length === (b.sessionIds || []).length &&
+            b.sessions.every(
+              (s) => s.status === "scheduled" && new Date(s.date) >= now,
+            ),
+        )
+        .sort(
+          (x, y) => new Date(x.sessions[0].date) - new Date(y.sessions[0].date),
+        )
+    : [];
+  const chosenPackage =
+    packages.find((p) => String(p._id || p.id) === pickedPackageId) ||
+    packages.find((p) => p.seatsLeft > 0) ||
+    packages[0] ||
+    null;
+  const chosenPackageId = chosenPackage
+    ? String(chosenPackage._id || chosenPackage.id)
+    : "";
+  const nothingToBook = isPackageOnly
+    ? packages.length === 0
+    : dates.length === 0;
+  const seatsLeft = isPackageOnly
+    ? chosenPackage
+      ? chosenPackage.seatsLeft
+      : null
+    : sessionSeatsLeft;
 
   return (
     <div className="min-h-screen bg-white font-sans text-brand-brown [color-scheme:light]">
@@ -1282,6 +1340,20 @@ function ActivityDetailPage() {
                   checkout.
                 </div>
               </>
+            ) : isPackageOnly ? (
+              <>
+                <div className="text-2xl font-bold text-brand-brown">
+                  {a.flexiblePricing?.enabled ? "From " : ""}AED{" "}
+                  {chosenPackage ? chosenPackage.price : price}
+                </div>
+                <div className="text-xs text-brand-brown/60">
+                  per child · full package
+                  {chosenPackage
+                    ? ` (${chosenPackage.sessions.length} classes)`
+                    : ""}
+                  {a.flexiblePricing?.enabled ? " · pay what you like" : ""}
+                </div>
+              </>
             ) : (
               <>
                 <div className="text-2xl font-bold text-brand-brown">
@@ -1305,13 +1377,81 @@ function ActivityDetailPage() {
             )}
             <div className="mb-4 mt-3 border-b border-gray-100 pb-4" />
 
-            {dates.length === 0 ? (
+            {nothingToBook ? (
               <div className="rounded-[10px] bg-brand-cream/60 px-4 py-4 text-center text-[13px] text-brand-brown/70">
-                No upcoming sessions scheduled yet.
+                {isPackageOnly
+                  ? "No packages open for booking right now."
+                  : "No upcoming sessions scheduled yet."}
               </div>
             ) : (
               <>
-                {isFundraiser ? (
+                {isPackageOnly ? (
+                  /* Package-only class: parent poora package chunta hai
+                     (jaise ek mahine ki 4 classes ya 6-day camp). */
+                  <>
+                    <div className="mb-1 text-[13px] font-bold">
+                      Choose a package
+                    </div>
+                    <div className="mb-2.5 text-[11px] text-brand-brown/60">
+                      This class is booked as a full package, one payment
+                      covers every date.
+                    </div>
+                    <div className="mb-4 flex flex-col gap-2">
+                      {packages.map((p) => {
+                        const pid = String(p._id || p.id);
+                        const chosen = pid === chosenPackageId;
+                        const full = p.seatsLeft <= 0;
+                        return (
+                          <label
+                            key={pid}
+                            className={`block rounded-[10px] border px-3.5 py-2.5 text-[13px] ${
+                              chosen
+                                ? "border-brand-orange bg-brand-cream"
+                                : "border-gray-200 bg-white"
+                            } ${full ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="radio"
+                                name="package"
+                                checked={chosen}
+                                disabled={full}
+                                onChange={() => setPickedPackageId(pid)}
+                                className="h-4 w-4 accent-brand-orange"
+                              />
+                              <span className="font-bold">
+                                {p.title || "Full package"}
+                              </span>
+                              <span className="ml-auto shrink-0 whitespace-nowrap font-bold text-brand-orange">
+                                AED {p.price}
+                              </span>
+                            </div>
+                            <div className="mt-1 pl-[26px] text-[11px] text-brand-brown/65">
+                              {p.sessions.length} classes ·{" "}
+                              {p.sessions
+                                .map(
+                                  (s) =>
+                                    `${fmtDate(s.date)}${s.startTime ? ` ${s.startTime}` : ""}`,
+                                )
+                                .join(", ")}
+                            </div>
+                            <div
+                              className={`mt-0.5 pl-[26px] text-[11px] font-semibold ${
+                                full
+                                  ? "text-[#c0392b]"
+                                  : p.seatsLeft <= 3
+                                    ? "text-brand-orange"
+                                    : "text-brand-brown/45"
+                              }`}
+                            >
+                              {full ? "Full" : `${p.seatsLeft} spots left`}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : isFundraiser ? (
                   /* Fundraiser class: parent jitni dates chahe chun sakta
                      hai (misaal ke tor par 2-day workshop ke dono din),
                      aur sab chuni hui dates WhatsApp message me chali
@@ -1568,14 +1708,18 @@ function ActivityDetailPage() {
                     sessionDate: selectedDate,
                     sessionTime: selectedTime,
                     count,
+                    ...(isPackageOnly && chosenPackageId
+                      ? { bundleId: chosenPackageId }
+                      : {}),
                   }}
                   className={`block rounded-[10px] py-3 text-center text-sm font-bold text-white no-underline ${
-                    dates.length === 0
+                    nothingToBook ||
+                    (isPackageOnly && (!chosenPackage || chosenPackage.seatsLeft <= 0))
                       ? "pointer-events-none bg-gray-300"
                       : "bg-brand-sky"
                   }`}
                 >
-                  Book Now
+                  {isPackageOnly ? "Book Package" : "Book Now"}
                 </Link>
                 <div className="mt-2.5 flex items-center justify-center gap-1 text-[11px] text-brand-brown/55">
                   <LockIcon /> Secure payment

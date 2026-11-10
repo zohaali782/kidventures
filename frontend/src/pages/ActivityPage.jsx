@@ -177,7 +177,7 @@ function ActivityCard({ a }) {
                 Delegate pricing
               </span>
             ) : a.price !== "" ? (
-              `AED ${a.price}`
+              `AED ${a.price}${a.packageOnly ? " / package" : ""}`
             ) : (
               ""
             )}

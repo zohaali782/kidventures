@@ -91,6 +91,16 @@ const createBooking = async (req, res, next) => {
       });
     }
 
+    // Package-only class (monthly course, multi-day camp): single date ki
+    // booking band hai, parent ko poora package hi lena hai.
+    if (activity.bookingMode === "package" && !bundleId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This class is booked as a full package only. Please choose a package.",
+      });
+    }
+
     /**
      * BUNDLE vs SINGLE SESSION.
      *

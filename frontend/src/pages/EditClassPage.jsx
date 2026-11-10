@@ -97,6 +97,63 @@ function Section({ title, subtitle, children }) {
   );
 }
 
+/* "YYYY-MM-DD" + days -> "YYYY-MM-DD" (UTC math, so no timezone shifts) */
+function addDays(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (isNaN(d)) return dateStr;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/* How parents book: any single date, or only a full package */
+const BOOKING_MODES = [
+  {
+    value: "session",
+    title: "Per class",
+    text: "Parents can book any single date.",
+  },
+  {
+    value: "package",
+    title: "Full package only",
+    text: "Parents can only book one of your packages, e.g. a monthly course (4 weekly classes) or a 6-day camp. Single dates can't be booked.",
+  },
+];
+
+function BookingModePicker({ value, onChange }) {
+  return (
+    <div className="mb-4">
+      <div className={labelCls}>How do parents book this class?</div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {BOOKING_MODES.map((m) => {
+          const on = value === m.value;
+          return (
+            <label
+              key={m.value}
+              className={`flex cursor-pointer gap-2.5 rounded-xl border p-3 ${
+                on
+                  ? "border-brand-orange bg-brand-cream"
+                  : "border-gray-200 bg-white"
+              }`}
+            >
+              <input
+                type="radio"
+                name="bookingMode"
+                checked={on}
+                onChange={() => onChange(m.value)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-orange"
+              />
+              <span>
+                <span className="block text-sm font-bold">{m.title}</span>
+                <span className="block text-xs opacity-65">{m.text}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function EditClassPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -169,6 +226,7 @@ export default function EditClassPage() {
           flexiblePricingMin: a.flexiblePricing?.minAmount
             ? String(a.flexiblePricing.minAmount)
             : "",
+          bookingMode: a.bookingMode === "package" ? "package" : "session",
           status: a.status,
         });
         setLearnList(
@@ -248,7 +306,12 @@ export default function EditClassPage() {
     if (form.format === "in-person" && !form.address.trim())
       e.address = "Enter the venue address so parents can find you";
 
-    if (!form.price) e.price = "Enter a price";
+    // Package mode: price packages se aati hai (neeche Packages section)
+    if (form.bookingMode === "package") {
+      if (!bundles.some((b) => b.status === "active"))
+        e.bookingMode =
+          "Create a package first in the Packages section below (pick its dates and price), then save.";
+    } else if (!form.price) e.price = "Enter a price";
     if (!form.capacity || Number(form.capacity) < 1)
       e.capacity = "Enter class capacity";
     if (form.siblingDiscountEnabled) {
@@ -313,7 +376,10 @@ export default function EditClassPage() {
           ? Number(form.flexiblePricingMin) || 0
           : 0,
       },
+      bookingMode: form.bookingMode,
     };
+    // Package mode me class ki price server khud packages se set karta hai
+    if (form.bookingMode === "package") delete payload.price;
     if (isOther) payload.suggestedCategory = form.suggestedCategory.trim();
     else payload.category = form.category;
 
@@ -323,7 +389,10 @@ export default function EditClassPage() {
 
     setSaving(true);
     try {
-      await api.put(`/activities/${id}`, payload);
+      const { data: saved } = await api.put(`/activities/${id}`, payload);
+      // Package mode me price server ne packages se nikali hai, form me bhi
+      // wohi dikhao
+      if (saved?.activity?.price != null) set("price", saved.activity.price);
       flash(
         submitForReview
           ? "Changes saved and sent for review."
@@ -346,6 +415,9 @@ export default function EditClassPage() {
     date: "",
     startTime: "",
     label: "",
+    // "0" = sirf ek date, "7" = har hafte, "1" = har din (camp)
+    repeatEvery: "0",
+    repeatTotal: "4", // kul kitni dates (pehli wali samet)
   });
   const [addingSession, setAddingSession] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
@@ -380,20 +452,32 @@ export default function EditClassPage() {
       return;
     }
     setAddingSession(true);
+    const step = Number(newSession.repeatEvery) || 0;
+    const total =
+      step > 0
+        ? Math.min(Math.max(Number(newSession.repeatTotal) || 1, 1), 31)
+        : 1;
+    let added = 0;
     try {
       const dur = Number(form.durationMinutes) || 60;
-      const { data } = await api.post(`/activities/${id}/sessions`, {
-        date: newSession.date,
-        startTime: newSession.startTime,
-        endTime: addMinutes(newSession.startTime, dur),
-        label: newSession.label.trim(),
-        capacity: Number(form.capacity) || undefined,
-      });
-      setSessions(toList(data.activity?.sessions));
-      setNewSession({ date: "", startTime: "", label: "" });
-      flash("Session added.");
+      // Ek ek kar ke add karte hain: beech me koi date fail ho to pehle
+      // wali add ho chuki hoti hain, aur instructor ko pata chal jata hai
+      for (let k = 0; k < total; k++) {
+        const { data } = await api.post(`/activities/${id}/sessions`, {
+          date: addDays(newSession.date, step * k),
+          startTime: newSession.startTime,
+          endTime: addMinutes(newSession.startTime, dur),
+          label: newSession.label.trim(),
+          capacity: Number(form.capacity) || undefined,
+        });
+        setSessions(toList(data.activity?.sessions));
+        added++;
+      }
+      setNewSession((s) => ({ ...s, date: "", label: "" }));
+      flash(added > 1 ? `${added} sessions added.` : "Session added.");
     } catch (err) {
-      flash(err?.response?.data?.message || "Couldn't add session.");
+      const msg = err?.response?.data?.message || "Couldn't add session.";
+      flash(added > 0 ? `${added} added, then: ${msg}` : msg);
     } finally {
       setAddingSession(false);
     }
@@ -428,6 +512,12 @@ export default function EditClassPage() {
   const [savingBundle, setSavingBundle] = useState(false);
   const [bundleActionId, setBundleActionId] = useState(null);
 
+  const pkgWord = form?.bookingMode === "package" ? "package" : "bundle";
+  // Package mode me class ki price server packages se nikalta hai
+  const syncPrice = (data) => {
+    if (data?.activity?.price != null) set("price", data.activity.price);
+  };
+
   const toggleBundleSession = (sid) =>
     setNewBundle((b) => ({
       ...b,
@@ -438,11 +528,11 @@ export default function EditClassPage() {
 
   const createBundle = async () => {
     if (newBundle.sessionIds.length < 2) {
-      flash("Select at least 2 sessions for the bundle.");
+      flash(`Select at least 2 sessions for the ${pkgWord}.`);
       return;
     }
     if (!newBundle.price) {
-      flash("Enter a combined price for the bundle.");
+      flash(`Enter a price for the ${pkgWord}.`);
       return;
     }
     setSavingBundle(true);
@@ -454,7 +544,8 @@ export default function EditClassPage() {
       });
       setBundles(toList(data.activity?.bundles));
       setNewBundle({ title: "", price: "", sessionIds: [] });
-      flash("Bundle added.");
+      syncPrice(data);
+      flash(form.bookingMode === "package" ? "Package added." : "Bundle added.");
     } catch (err) {
       flash(err?.response?.data?.message || "Couldn't add bundle.");
     } finally {
@@ -469,6 +560,7 @@ export default function EditClassPage() {
         status: currentStatus === "active" ? "archived" : "active",
       });
       setBundles(toList(data.activity?.bundles));
+      syncPrice(data);
     } catch (err) {
       flash(err?.response?.data?.message || "Couldn't update bundle.");
     } finally {
@@ -483,6 +575,7 @@ export default function EditClassPage() {
         `/activities/${id}/bundles/${bundleId}`,
       );
       setBundles(toList(data.activity?.bundles));
+      syncPrice(data);
       flash(data.message);
     } catch (err) {
       flash(err?.response?.data?.message || "Couldn't remove bundle.");
@@ -747,34 +840,55 @@ export default function EditClassPage() {
         {/* 3. pricing */}
         <Section
           title="Pricing & Capacity"
-          subtitle="How much and how many seats"
+          subtitle="How parents book, how much and how many seats"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <label className={labelCls}>
-                  {form.flexiblePricingEnabled
-                    ? "Suggested amount per child (AED)"
-                    : "Price per child (AED)"}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowFeeInfo(true)}
-                  className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-cream text-[10px] font-bold text-brand-orange"
-                >
-                  i
-                </button>
-              </div>
-              <input
-                type="number"
-                className={inputCls}
-                value={form.price}
-                onChange={(e) => set("price", e.target.value)}
-              />
-              {errors.price && (
-                <div className="mt-1 text-xs text-red-600">{errors.price}</div>
-              )}
+          <BookingModePicker
+            value={form.bookingMode}
+            onChange={(v) => set("bookingMode", v)}
+          />
+          {errors.bookingMode && (
+            <div className="-mt-2 mb-3 text-xs text-red-600">
+              {errors.bookingMode}
             </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {form.bookingMode === "package" ? (
+              <div>
+                <div className={labelCls}>Price</div>
+                <div className="rounded-lg border border-dashed border-gray-200 bg-brand-cream/40 px-3 py-2.5 text-xs leading-relaxed">
+                  Set in the <b>Packages</b> section below. Your class card
+                  shows your lowest package price
+                  {Number(form.price) > 0 ? ` (now AED ${form.price})` : ""}.
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <label className={labelCls}>
+                    {form.flexiblePricingEnabled
+                      ? "Suggested amount per child (AED)"
+                      : "Price per child (AED)"}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowFeeInfo(true)}
+                    className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-cream text-[10px] font-bold text-brand-orange"
+                  >
+                    i
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={form.price}
+                  onChange={(e) => set("price", e.target.value)}
+                />
+                {errors.price && (
+                  <div className="mt-1 text-xs text-red-600">{errors.price}</div>
+                )}
+              </div>
+            )}
             <Field label="Capacity (max children)" error={errors.capacity}>
               <input
                 type="number"
@@ -784,7 +898,7 @@ export default function EditClassPage() {
               />
             </Field>
           </div>
-          {priceHint && (
+          {priceHint && form.bookingMode !== "package" && (
             <p className="mt-2 text-xs text-brand-orange">{priceHint}</p>
           )}
 
@@ -970,14 +1084,55 @@ export default function EditClassPage() {
                 }
               />
             </Field>
+            <Field label="Repeat" className="min-w-[150px] flex-1">
+              <select
+                className={inputCls}
+                value={newSession.repeatEvery}
+                onChange={(e) =>
+                  setNewSession((s) => ({ ...s, repeatEvery: e.target.value }))
+                }
+              >
+                <option value="0">Just this date</option>
+                <option value="7">Every week</option>
+                <option value="1">Every day</option>
+              </select>
+            </Field>
+            {newSession.repeatEvery !== "0" && (
+              <Field label="Total dates" className="w-[110px]">
+                <input
+                  type="number"
+                  min="2"
+                  max="31"
+                  className={inputCls}
+                  value={newSession.repeatTotal}
+                  onChange={(e) =>
+                    setNewSession((s) => ({
+                      ...s,
+                      repeatTotal: e.target.value,
+                    }))
+                  }
+                />
+              </Field>
+            )}
             <button
               onClick={addSession}
               disabled={addingSession}
               className="mb-0.5 flex h-[42px] items-center gap-1.5 rounded-lg bg-brand-orange px-4 text-xs font-bold text-white disabled:opacity-60"
             >
-              <IcPlus size={15} /> {addingSession ? "Adding…" : "Add session"}
+              <IcPlus size={15} />{" "}
+              {addingSession
+                ? "Adding…"
+                : newSession.repeatEvery !== "0"
+                  ? "Add sessions"
+                  : "Add session"}
             </button>
           </div>
+          {form.bookingMode === "package" && (
+            <p className="mt-3 text-xs opacity-60">
+              Monthly class? Add next month&apos;s dates here (e.g. Every week,
+              4 dates), then create a new package for them below.
+            </p>
+          )}
         </Section>
 
         {/* 4b. multi-day bundles, live save */}
@@ -994,13 +1149,20 @@ export default function EditClassPage() {
               !bundledIds.has(String(s._id || s.id)),
           );
 
+          const pkgMode = form.bookingMode === "package";
+          const word = pkgMode ? "package" : "bundle";
+
           return (
             <Section
-              title="Multi-Day Bundles"
-              subtitle="Package 2+ of your sessions together as one combined price, parents pay once for all the dates"
+              title={pkgMode ? "Packages" : "Multi-Day Bundles"}
+              subtitle={
+                pkgMode
+                  ? "Parents can only book one of these packages, never a single date. Pick the dates and the price for each package."
+                  : "Package 2+ of your sessions together as one combined price, parents pay once for all the dates"
+              }
             >
               {bundles.length === 0 ? (
-                <p className="mb-3 text-sm opacity-60">No bundles yet.</p>
+                <p className="mb-3 text-sm opacity-60">No {word}s yet.</p>
               ) : (
                 <div className="mb-4 space-y-2">
                   {bundles.map((b) => {
@@ -1025,7 +1187,7 @@ export default function EditClassPage() {
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <b>{b.title || "Untitled bundle"}</b>
+                            <b>{b.title || `Untitled ${word}`}</b>
                             <span className="ml-2 text-xs opacity-60">
                               AED {b.price} · {bundleSessions.length} dates
                               {archived ? " · archived" : ""}
@@ -1070,19 +1232,23 @@ export default function EditClassPage() {
 
               {bundleableSessions.length < 2 ? (
                 <p className="text-xs opacity-60">
-                  Add at least 2 upcoming sessions above before you can create
-                  a bundle.
+                  Add at least 2 upcoming sessions above (that aren&apos;t in a
+                  {` ${word}`} yet) before you can create a {word}.
                 </p>
               ) : (
                 <div className="rounded-xl border border-gray-100 bg-brand-cream/50 p-4">
-                  <Field label="Bundle title">
+                  <Field label={pkgMode ? "Package name" : "Bundle title"}>
                     <input
                       className={inputCls}
                       value={newBundle.title}
                       onChange={(e) =>
                         setNewBundle((b) => ({ ...b, title: e.target.value }))
                       }
-                      placeholder="e.g. 2-Day Financial Literacy Bundle"
+                      placeholder={
+                        pkgMode
+                          ? 'e.g. "January, 4 weekly classes" or "6-Day Winter Camp"'
+                          : "e.g. 2-Day Financial Literacy Bundle"
+                      }
                     />
                   </Field>
                   <div className="mt-3">
@@ -1114,9 +1280,13 @@ export default function EditClassPage() {
                   <div className="mt-3 max-w-[220px]">
                     <Field
                       label={
-                        form.flexiblePricingEnabled
-                          ? "Suggested combined price per child (AED)"
-                          : "Combined price per child (AED)"
+                        pkgMode
+                          ? form.flexiblePricingEnabled
+                            ? "Suggested package amount per child (AED)"
+                            : "Package price per child (AED)"
+                          : form.flexiblePricingEnabled
+                            ? "Suggested combined price per child (AED)"
+                            : "Combined price per child (AED)"
                       }
                     >
                       <input
@@ -1145,7 +1315,7 @@ export default function EditClassPage() {
                     className="mt-3 flex items-center gap-1.5 rounded-lg bg-brand-orange px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
                   >
                     <IcPlus size={15} />{" "}
-                    {savingBundle ? "Adding…" : "Add bundle"}
+                    {savingBundle ? "Adding…" : `Add ${word}`}
                   </button>
                 </div>
               )}
