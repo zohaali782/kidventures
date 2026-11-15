@@ -435,7 +435,7 @@ const createActivity = async (req, res, next) => {
       if (safeVideo === null) {
         return res.status(400).json({
           success: false,
-          message: "Video link must be a YouTube or Vimeo https URL",
+          message: "Video link must be a YouTube, Vimeo or Kidventures Cloudinary https URL",
         });
       }
       data.videoUrl = safeVideo;
@@ -641,7 +641,7 @@ const updateActivity = async (req, res, next) => {
       if (safeVideo === null) {
         return res.status(400).json({
           success: false,
-          message: "Video link must be a YouTube or Vimeo https URL",
+          message: "Video link must be a YouTube, Vimeo or Kidventures Cloudinary https URL",
         });
       }
       req.body.videoUrl = safeVideo;

@@ -19,7 +19,7 @@ const VIDEO_HOSTS = [
 ];
 
 /**
- * Sirf https YouTube/Vimeo links qabool.
+ * Sirf https YouTube/Vimeo links, ya apni Cloudinary ki video, qabool.
  *
  * @returns {string|null} saaf URL, "" agar khali kiya ja raha ho,
  *                        ya null agar qabool nahi
@@ -37,7 +37,17 @@ const cleanVideoUrl = (value) => {
   if (parsed.protocol !== "https:") return null;
 
   // Poora hostname match — "youtube.com.evil.com" pass nahi hoga
-  if (!VIDEO_HOSTS.includes(parsed.hostname.toLowerCase())) return null;
+  const host = parsed.hostname.toLowerCase();
+
+  // Apni Cloudinary par upload ki hui video (website ke liye clean clips).
+  // Sirf apna cloud aur sirf video path, taake kisi doosre ka link na chale.
+  if (host === "res.cloudinary.com") {
+    const cloud = process.env.CLOUDINARY_CLOUD_NAME || "rwnkpzbs";
+    if (!parsed.pathname.startsWith(`/${cloud}/video/upload/`)) return null;
+    return parsed.toString();
+  }
+
+  if (!VIDEO_HOSTS.includes(host)) return null;
 
   return parsed.toString();
 };

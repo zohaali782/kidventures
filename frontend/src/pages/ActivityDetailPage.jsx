@@ -24,6 +24,21 @@ import {
   fmtDate,
 } from "../api/normalize";
 
+/**
+ * Activity ki video (videoUrl). Cloudinary ki video website par muted loop
+ * mein chalti hai aur tap par bari hoke sound ke saath khulti hai. Poster
+ * (thumbnail) Cloudinary khud video ke 2rey second se bana deta hai.
+ * YouTube/Vimeo ka link ho to "Watch video" link banta hai.
+ */
+const isCldVideo = (u) =>
+  typeof u === "string" && /^https:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload\//.test(u);
+const cldVideoSrc = (u) =>
+  u.replace("/video/upload/", "/video/upload/q_auto,vc_h264/").replace(/\.[a-z0-9]+(\?.*)?$/i, ".mp4");
+const cldVideoPoster = (u) =>
+  u
+    .replace("/video/upload/", "/video/upload/so_2,w_400,q_auto/")
+    .replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg");
+
 const markerIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl:
@@ -300,6 +315,8 @@ function ActivityDetailPage() {
   // Gallery lightbox - kaunsi image (images array ka index) bari dikha rahe
   // hain. null matlab lightbox band hai.
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  // Activity ki video bari hoke sound ke saath dekhne ke liye
+  const [videoOpen, setVideoOpen] = useState(false);
   const [reviewList, setReviewList] = useState([]);
   const [myRating, setMyRating] = useState(0);
   const [myComment, setMyComment] = useState("");
@@ -837,6 +854,31 @@ function ActivityDetailPage() {
         <div className="min-w-0 flex-[2]">
           {/* Gallery */}
           <div className="mb-6 flex gap-3">
+            {a.videoUrl && isCldVideo(a.videoUrl) && (
+              <button
+                type="button"
+                onClick={() => setVideoOpen(true)}
+                aria-label="Play class video"
+                className="relative h-[240px] w-[135px] shrink-0 overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px] sm:w-[169px]"
+              >
+                <video
+                  src={cldVideoSrc(a.videoUrl)}
+                  poster={cldVideoPoster(a.videoUrl)}
+                  muted
+                  loop
+                  autoPlay
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#fff">
+                    <path d="M6 4l14 8-14 8z" />
+                  </svg>
+                  Watch
+                </span>
+              </button>
+            )}
             <div
               className={`relative flex h-[240px] flex-[2] items-center justify-center overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px] ${
                 cover ? "cursor-pointer" : ""
@@ -1829,6 +1871,33 @@ function ActivityDetailPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Class video, bari screen par sound ke saath */}
+      {videoOpen && a.videoUrl && isCldVideo(a.videoUrl) && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setVideoOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setVideoOpen(false)}
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-2xl leading-none text-white"
+          >
+            ×
+          </button>
+          <video
+            src={cldVideoSrc(a.videoUrl)}
+            poster={cldVideoPoster(a.videoUrl)}
+            controls
+            autoPlay
+            playsInline
+            loop
+            className="max-h-[88vh] max-w-full rounded-xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
 
       {/* Gallery lightbox - cover/thumbnail par click karne se poori
