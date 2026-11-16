@@ -317,6 +317,7 @@ function ActivityDetailPage() {
   const [lightboxIndex, setLightboxIndex] = useState(null);
   // Activity ki video bari hoke sound ke saath dekhne ke liye
   const [videoOpen, setVideoOpen] = useState(false);
+  const [activeVideo, setActiveVideo] = useState(0);
   const [reviewList, setReviewList] = useState([]);
   const [myRating, setMyRating] = useState(0);
   const [myComment, setMyComment] = useState("");
@@ -528,7 +529,14 @@ function ActivityDetailPage() {
     .map((im) => pickImg(im))
     .filter(Boolean);
   const cover = images[0] || null;
-  const hasVideo = !!(a.videoUrl && isCldVideo(a.videoUrl));
+  // Activity ki videos: pehle videoUrls (kai), warna purani ek videoUrl
+  const videos = (
+    Array.isArray(a.videoUrls) && a.videoUrls.length > 0
+      ? a.videoUrls
+      : [a.videoUrl]
+  ).filter((u) => isCldVideo(u));
+  const hasVideo = videos.length > 0;
+  const curVideo = videos[Math.min(activeVideo, videos.length - 1)] || null;
   const isOnline = a.format === "online" || a.isOnline;
   const insName = asText(a.instructor?.name) || "Instructor";
   const insId = a.instructor?._id || a.instructor?.id;
@@ -856,22 +864,18 @@ function ActivityDetailPage() {
           {/* Gallery */}
           <div className="mb-6 flex gap-3">
             {hasVideo && (
-              <button
-                type="button"
-                onClick={() => setVideoOpen(true)}
-                aria-label="Play class video"
-                className="relative h-[360px] flex-[2] overflow-hidden rounded-2xl bg-brand-brown sm:h-[460px]"
-              >
+              <div className="relative h-[360px] flex-[2] overflow-hidden rounded-2xl bg-brand-brown sm:h-[460px]">
                 {/* Peeche poster ka dhundhla (blur) hissa, taake vertical video
                     ke dono taraf khali jagah achi lage */}
                 <div
                   aria-hidden="true"
                   className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl"
-                  style={{ backgroundImage: `url(${cldVideoPoster(a.videoUrl)})` }}
+                  style={{ backgroundImage: `url(${cldVideoPoster(curVideo)})` }}
                 />
                 <video
-                  src={cldVideoSrc(a.videoUrl)}
-                  poster={cldVideoPoster(a.videoUrl)}
+                  key={curVideo}
+                  src={cldVideoSrc(curVideo)}
+                  poster={cldVideoPoster(curVideo)}
                   muted
                   loop
                   autoPlay
@@ -879,20 +883,45 @@ function ActivityDetailPage() {
                   preload="metadata"
                   className="relative mx-auto h-full w-auto max-w-full object-contain"
                 />
+                <button
+                  type="button"
+                  onClick={() => setVideoOpen(true)}
+                  aria-label="Play class video with sound"
+                  className="absolute inset-0"
+                />
                 <span
-                  className={`absolute left-3.5 top-3.5 rounded-full px-3 py-1 text-[11px] font-bold text-white ${
+                  className={`pointer-events-none absolute left-3.5 top-3.5 rounded-full px-3 py-1 text-[11px] font-bold text-white ${
                     isOnline ? "bg-brand-sky" : "bg-brand-orange"
                   }`}
                 >
                   {isOnline ? "Online" : "In-person"}
                 </span>
-                <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-bold text-white">
+                <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-bold text-white">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff">
                     <path d="M6 4l14 8-14 8z" />
                   </svg>
                   Tap to watch with sound
                 </span>
-              </button>
+                {videos.length > 1 && (
+                  <div className="absolute bottom-3 right-3 z-10 flex gap-1.5">
+                    {videos.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setActiveVideo(i)}
+                        aria-label={`Video ${i + 1}`}
+                        className={`h-7 w-7 rounded-full text-[12px] font-bold ${
+                          i === activeVideo
+                            ? "bg-brand-orange text-white"
+                            : "bg-white/80 text-brand-brown"
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {!hasVideo && (
             <div
@@ -1891,7 +1920,7 @@ function ActivityDetailPage() {
       )}
 
       {/* Class video, bari screen par sound ke saath */}
-      {videoOpen && a.videoUrl && isCldVideo(a.videoUrl) && (
+      {videoOpen && curVideo && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
           onClick={() => setVideoOpen(false)}
@@ -1905,8 +1934,8 @@ function ActivityDetailPage() {
             ×
           </button>
           <video
-            src={cldVideoSrc(a.videoUrl)}
-            poster={cldVideoPoster(a.videoUrl)}
+            src={cldVideoSrc(curVideo)}
+            poster={cldVideoPoster(curVideo)}
             controls
             autoPlay
             playsInline

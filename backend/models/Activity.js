@@ -97,6 +97,8 @@ const activitySchema = new mongoose.Schema(
       },
     ],
     videoUrl: String,
+    // Kai videos (sirf admin script se set hoti hain, instructor edit nahi karta)
+    videoUrls: [String],
 
     /* --------------------------- Filter fields ---------------------------- */
     ageMin: { type: Number, required: true, min: 0, max: 18 },
