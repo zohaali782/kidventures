@@ -528,6 +528,7 @@ function ActivityDetailPage() {
     .map((im) => pickImg(im))
     .filter(Boolean);
   const cover = images[0] || null;
+  const hasVideo = !!(a.videoUrl && isCldVideo(a.videoUrl));
   const isOnline = a.format === "online" || a.isOnline;
   const insName = asText(a.instructor?.name) || "Instructor";
   const insId = a.instructor?._id || a.instructor?.id;
@@ -854,13 +855,20 @@ function ActivityDetailPage() {
         <div className="min-w-0 flex-[2]">
           {/* Gallery */}
           <div className="mb-6 flex gap-3">
-            {a.videoUrl && isCldVideo(a.videoUrl) && (
+            {hasVideo && (
               <button
                 type="button"
                 onClick={() => setVideoOpen(true)}
                 aria-label="Play class video"
-                className="relative h-[240px] w-[135px] shrink-0 overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px] sm:w-[169px]"
+                className="relative h-[360px] flex-[2] overflow-hidden rounded-2xl bg-brand-brown sm:h-[460px]"
               >
+                {/* Peeche poster ka dhundhla (blur) hissa, taake vertical video
+                    ke dono taraf khali jagah achi lage */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl"
+                  style={{ backgroundImage: `url(${cldVideoPoster(a.videoUrl)})` }}
+                />
                 <video
                   src={cldVideoSrc(a.videoUrl)}
                   poster={cldVideoPoster(a.videoUrl)}
@@ -869,16 +877,24 @@ function ActivityDetailPage() {
                   autoPlay
                   playsInline
                   preload="metadata"
-                  className="h-full w-full object-cover"
+                  className="relative mx-auto h-full w-auto max-w-full object-contain"
                 />
-                <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#fff">
+                <span
+                  className={`absolute left-3.5 top-3.5 rounded-full px-3 py-1 text-[11px] font-bold text-white ${
+                    isOnline ? "bg-brand-sky" : "bg-brand-orange"
+                  }`}
+                >
+                  {isOnline ? "Online" : "In-person"}
+                </span>
+                <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-bold text-white">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff">
                     <path d="M6 4l14 8-14 8z" />
                   </svg>
-                  Watch
+                  Tap to watch with sound
                 </span>
               </button>
             )}
+            {!hasVideo && (
             <div
               className={`relative flex h-[240px] flex-[2] items-center justify-center overflow-hidden rounded-2xl bg-brand-cream sm:h-[300px] ${
                 cover ? "cursor-pointer" : ""
@@ -915,36 +931,37 @@ function ActivityDetailPage() {
                 {isOnline ? "Online" : "In-person"}
               </span>
             </div>
+            )}
             {/* Baqi images. Mobile par side column mein nahi aa sakti (cover
                 dab jata), is liye wahan cover ke neeche ek scroll hone wali
                 qatar ban jati hai, aur bari screen par purani side column
                 hi rehti hai. Pehle ye poori tarah "hidden sm:flex" thi, yani
                 phone par sirf ek hi tasveer dikhti thi. */}
-            {images.length > 1 && (
+            {(hasVideo ? images.length > 0 : images.length > 1) && (
               <div className="hidden w-[120px] flex-col gap-3 sm:flex">
-                {images.slice(1, 4).map((src, i) => (
+                {images.slice(hasVideo ? 0 : 1, hasVideo ? 3 : 4).map((src, i) => (
                   <img
                     key={i}
                     src={cldOptimize(src, 200)}
-                    alt={`${a.title} ${i + 2}`}
+                    alt={`${a.title} ${i + (hasVideo ? 1 : 2)}`}
                     className="h-full w-full flex-1 cursor-pointer rounded-xl object-cover"
-                    onClick={() => setLightboxIndex(i + 1)}
+                    onClick={() => setLightboxIndex(i + (hasVideo ? 0 : 1))}
                   />
                 ))}
               </div>
             )}
           </div>
 
-          {images.length > 1 && (
+          {(hasVideo ? images.length > 0 : images.length > 1) && (
             <div className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-1 sm:hidden">
-              {images.slice(1).map((src, i) => (
+              {images.slice(hasVideo ? 0 : 1).map((src, i) => (
                 <img
                   key={i}
                   src={cldOptimize(src, 300)}
-                  alt={`${a.title} ${i + 2}`}
+                  alt={`${a.title} ${i + (hasVideo ? 1 : 2)}`}
                   loading="lazy"
                   className="h-[88px] w-[112px] shrink-0 cursor-pointer rounded-xl object-cover"
-                  onClick={() => setLightboxIndex(i + 1)}
+                  onClick={() => setLightboxIndex(i + (hasVideo ? 0 : 1))}
                 />
               ))}
             </div>
